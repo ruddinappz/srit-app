@@ -2027,7 +2027,7 @@ SRIT.Features.absensi={
   // ---------- SCAN WAJAH (pemindai di halaman terpisah; tab ini = pintu masuk + status pendaftaran) ----------
   _face:{q:'',f:'',page:1},_execUrl:'',
   _scanBase(){try{return (localStorage.getItem('srit_scan_url')||'').trim();}catch(e){return '';}},
-  async _prefetchExec(){if(this._execUrl)return;try{const r=await SRIT.Server.call('apiFaceStatus',{size:1});this._execUrl=r.execUrl||'';}catch(e){}},
+  async _prefetchExec(){if(this._execUrl)return;try{const r=await SRIT.Server.call('apiWajahStatus',{size:1});this._execUrl=r.execUrl||'';}catch(e){}},
   _openScan(mode){
     const base=this._scanBase();
     if(!base){SRIT.Notify('Isi alamat halaman pemindai dulu di tab Scan Wajah','warn');this.switchTab('face');return;}
@@ -2066,7 +2066,7 @@ SRIT.Features.absensi={
   },
   async _faceLoad(){
     const esc=SRIT.Util.esc;let r;
-    try{r=await SRIT.Server.call('apiFaceStatus',{search:this._face.q,f:this._face.f,page:this._face.page,size:25});}
+    try{r=await SRIT.Server.call('apiWajahStatus',{search:this._face.q,f:this._face.f,page:this._face.page,size:25});}
     catch(e){const el=$('#abFaceList');if(el)el.innerHTML='<div class="p-3 text-danger">'+esc(e.message||'Gagal memuat')+'</div>';return;}
     if(SRIT.currentFeature!=='absensi'||!$('#abFaceList'))return;
     this._execUrl=r.execUrl||this._execUrl;
@@ -2082,7 +2082,7 @@ SRIT.Features.absensi={
     if(pv)pv.onclick=()=>{this._face.page--;this._faceLoad();};if(nx)nx.onclick=()=>{this._face.page++;this._faceLoad();};
     $$('#abFaceList [data-del]').forEach(b=>b.onclick=async()=>{
       if(!window.confirm('Hapus data wajah anak ini? Anak perlu didaftarkan ulang untuk absen wajah.'))return;
-      try{await SRIT.Server.call('apiFaceDelete',b.dataset.del);SRIT.Notify('Data wajah dihapus','ok');this._faceLoad();}catch(e){SRIT.Notify(e.message||'Gagal menghapus','err');}
+      try{await SRIT.Server.call('apiWajahDelete',b.dataset.del);SRIT.Notify('Data wajah dihapus','ok');this._faceLoad();}catch(e){SRIT.Notify(e.message||'Gagal menghapus','err');}
     });
   },
   // ---------- QR CAMERA ----------
@@ -2630,7 +2630,7 @@ SRIT.Features.absensi={
     if(this._fs.samples.length<ENROLL_MIN){SRIT.Notify('Ambil minimal '+ENROLL_MIN+' sampel','warn');return;}
     const sv=$('#abFeSave');if(sv)sv.disabled=true;
     try{
-      const r=await SRIT.Server.call('apiFaceEnroll',id,this._fs.samples,'replace');
+      const r=await SRIT.Server.call('apiWajahEnroll',id,this._fs.samples,'replace');
       SRIT.Notify('Wajah '+((r&&r.nama)||'')+' terdaftar ('+((r&&r.jml)||this._fs.samples.length)+' sampel)','ok');
       this._fs.samples=[];this._fs.galAt=0;this._faceCnt();this._faceLoad();this._galLoad(true);
     }catch(e){SRIT.Notify(e.message||'Gagal menyimpan','err');this._faceCnt();}
@@ -2640,7 +2640,7 @@ SRIT.Features.absensi={
   async _galLoad(force){
     const fs=this._fs;
     if(!force&&fs.gal.length&&Date.now()-fs.galAt<300000)return;
-    const r=await SRIT.Server.call('apiFaceList');
+    const r=await SRIT.Server.call('apiWajahList');
     fs.gal=((r&&r.faces)||[]).map(f=>({id:String(f.id),nama:f.nama,s:(f.s||[]).map(v=>Float32Array.from(v))}));
     fs.galAt=Date.now();
   },
