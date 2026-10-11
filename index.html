@@ -2632,8 +2632,12 @@ SRIT.Features.absensi={
     try{
       const r=await SRIT.Server.call('apiWajahEnroll',id,this._fs.samples,'replace');
       SRIT.Notify('Wajah '+((r&&r.nama)||'')+' terdaftar ('+((r&&r.jml)||this._fs.samples.length)+' sampel)','ok');
-      this._fs.samples=[];this._fs.galAt=0;this._faceCnt();this._faceLoad();this._galLoad(true);
-    }catch(e){SRIT.Notify(e.message||'Gagal menyimpan','err');this._faceCnt();}
+      this._fs.samples=[];this._fs.galAt=0;this._faceCnt();this._faceLoad();this._galSafe(true,true);
+    }catch(e){
+      const m=(e&&e.message)||'Gagal menyimpan';
+      if(this._localSave(id,this._fs.samples)){SRIT.Notify('Server belum bisa menyimpan ('+m+'). Wajah disimpan di PERANGKAT INI saja.','warn',8000);this._fs.samples=[];this._faceCnt();this._galSafe(true,true);}
+      else{SRIT.Notify(m,'err');this._faceCnt();}
+    }
   },
 
   // ---------- galeri vektor ----------
@@ -2641,23 +2645,46 @@ SRIT.Features.absensi={
     const fs=this._fs;
     if(!force&&fs.gal.length&&Date.now()-fs.galAt<300000)return;
     const r=await SRIT.Server.call('apiWajahList');
-    fs.gal=((r&&r.faces)||[]).map(f=>({id:String(f.id),nama:f.nama,s:(f.s||[]).map(v=>Float32Array.from(v))}));
-    fs.galAt=Date.now();
+    const gal=((r&&r.faces)||[]).map(f=>({id:String(f.id),nama:f.nama,s:(f.s||[]).map(v=>Float32Array.from(v))}));
+    const have={};gal.forEach(g=>{have[g.id]=1;});
+    this._localGal().forEach(g=>{if(!have[g.id])gal.push(g);});   // pendaftaran yang tersimpan di perangkat ini ikut dipakai
+    fs.gal=gal;fs.galAt=Date.now();
+  },
+  // galeri cadangan di perangkat ini (dipakai bila server belum bisa dipakai)
+  _localRaw(){try{return JSON.parse(localStorage.getItem('srit_face_local')||'{}')||{};}catch(e){return {};}},
+  _localGal(){const m=this._localRaw();return Object.keys(m).map(id=>({id:id,nama:m[id].nama||'',s:(m[id].s||[]).map(v=>Float32Array.from(v))}));},
+  _localSave(id,samples){
+    try{
+      const m=this._localRaw(),a=SRIT.Store.read('ANAK').find(x=>String(x.ID)===String(id));
+      m[id]={nama:a?a.NAMA:'',s:samples.slice(-5)};
+      localStorage.setItem('srit_face_local',JSON.stringify(m));return true;
+    }catch(e){return false;}
+  },
+  async _galSafe(force,quiet){
+    const fs=this._fs;
+    try{await this._galLoad(force);return true;}
+    catch(e){
+      fs.galErr=(e&&e.message)||'gagal';
+      fs.gal=this._localGal();fs.galAt=Date.now();
+      if(!quiet)this._faceNote('Daftar wajah dari server belum bisa dimuat: '+fs.galErr+'. '+(fs.gal.length?'Memakai data wajah yang tersimpan di perangkat ini.':'Kamera tetap berfungsi; wajah yang Anda daftarkan sementara disimpan di perangkat ini.'));
+      return false;
+    }
+  },
+  _faceNote(msg,retry){
+    const b=$('#abCamErr');if(!b)return;
+    b.classList.remove('d-none');
+    b.innerHTML='<div class="alert alert-warning py-2 mb-0" style="font-size:12px"><i class="bi bi-exclamation-triangle"></i> '+esc(msg)+(retry?' <button class="btn btn-sm btn-outline-warning py-0 ms-2" id="abFRetry">Coba Lagi</button>':'')+'</div>';
+    const rt=$('#abFRetry');if(rt)rt.onclick=()=>this._faceInit();
   },
 
   // ---------- kamera & loop deteksi ----------
+  // Urutan: (1) kamera dulu supaya gambar selalu tampil, (2) pustaka wajah, (3) daftar wajah dari server (boleh gagal).
   async startFace(){
     const fs=this._fs;
     if(fs.stream||fs.starting)return;
     const video=$('#abFVideo');if(!video)return;
     this._showFaceCamError(null);
-    fs.starting=true;this._faceStat('Memuat pengenal wajah\u2026');
-    try{
-      await loadLib(t=>this._faceStat(t));
-      await this._galLoad(true);
-    }catch(e){fs.starting=false;this._faceStat('Gagal memuat','rgba(220,38,38,.92)');const b=$('#abCamErr');if(b){b.classList.remove('d-none');b.innerHTML='<div class="alert alert-danger py-2 mb-0" style="font-size:12px">'+esc(e.message||'Gagal memuat pengenal wajah')+' <button class="btn btn-sm btn-outline-danger py-0 ms-2" id="abCamRetry">Coba Lagi</button></div>';const rt=$('#abCamRetry');if(rt)rt.onclick=()=>this.startFace();}return;}
-    if(!$('#abFVideo')){fs.starting=false;return;}   // pengguna sudah pindah tab
-    this._faceStat('Meminta izin kamera\u2026');
+    fs.starting=true;this._faceStat('Meminta izin kamera\u2026');
     const tries=[{video:{facingMode:{ideal:'user'},width:{ideal:640},height:{ideal:480}},audio:false},{video:{facingMode:{ideal:'user'}},audio:false},{video:true,audio:false}];
     let stream=null,lastErr=null;
     for(const c of tries){
@@ -2666,12 +2693,23 @@ SRIT.Features.absensi={
     }
     fs.starting=false;
     if(!stream){this._faceStat('Gagal akses kamera','rgba(220,38,38,.92)');await this._showFaceCamError(lastErr);return;}
-    if(!$('#abFVideo')){stream.getTracks().forEach(t=>t.stop());return;}
+    if(!$('#abFVideo')){stream.getTracks().forEach(t=>t.stop());return;}   // pengguna sudah pindah tab
     fs.stream=stream;video.srcObject=stream;
     try{await video.play();}catch(e){}
     fs.votes={};
+    this._faceInit();
+  },
+  async _faceInit(){
+    const fs=this._fs;
+    if(!fs.stream)return;
+    this._showFaceCamError(null);
+    this._faceStat('Memuat pengenal wajah\u2026');
+    try{await loadLib(t=>this._faceStat(t));}
+    catch(e){this._faceNote((e&&e.message)||'Pengenal wajah gagal dimuat','retry');this._faceStat('Pengenal wajah gagal dimuat \u2014 kamera tetap aktif','rgba(217,119,6,.95)');return;}
+    await this._galSafe(true);
+    if(!fs.stream||!$('#abFVideo'))return;
     this._faceStat(fs.mode==='scan'?(fs.gal.length?'Arahkan wajah ke kamera\u2026':'Belum ada wajah terdaftar \u2014 buka mode Daftarkan'):'Mode pendaftaran: pilih anak, lalu Ambil sampel');
-    this._faceLoop();
+    clearTimeout(fs.timer);this._faceLoop();
   },
   async _showFaceCamError(err){
     await this._showCamError(err);
