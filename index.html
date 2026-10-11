@@ -966,18 +966,20 @@ SRIT.Api = {
   },
   // ---- sesi kegiatan pada suatu tanggal = JADWAL rutin (per hari) + KEGIATAN khusus (per tanggal) ----
   // all=true → termasuk kegiatan "tanpa absensi" (untuk jadwal/bel); default hanya kegiatan ber-absensi
+  // Kegiatan ber-absensi hanya bila kolom ABSENSI berisi ya/iya (kosong = ya untuk data lama). Selain itu (Tidak, tidak, N, 0, ...) = tanpa absensi.
+  absensiYa(v){const s=String(v==null?'':v).trim().toUpperCase();return s===''||['YA','IYA','Y','YES','TRUE','1','ADA'].indexOf(s)>=0;},
   getSessionsForDate(iso,all){
     const hari=SRIT.Util.hariOf(iso);
     const sessions=[];
     // recurring schedule templates matching this weekday
     SRIT.Store.read('JADWAL').filter(j=>(j.STATUS||'AKTIF')==='AKTIF'&&String(j.HARI||'').split(',').map(s=>s.trim()).includes(hari)).forEach(j=>{
       sessions.push({id:j.ID,source:'JADWAL',nama:j.NAMA,jamMulai:j.JAM_MULAI,jamSelesai:j.JAM_SELESAI,
-        jenjang:j.JENJANG||'SEMUA',jk:j.JK||'SEMUA',lokasi:j.LOKASI||'',petugas:j.PETUGAS||'',bel:j.BEL||'',belTeks:j.BEL_TEKS||'',absensi:(j.ABSENSI||'YA')!=='TIDAK',kelas:j.KELAS||''});
+        jenjang:j.JENJANG||'SEMUA',jk:j.JK||'SEMUA',lokasi:j.LOKASI||'',petugas:j.PETUGAS||'',bel:j.BEL||'',belTeks:j.BEL_TEKS||'',absensi:SRIT.Api.absensiYa(j.ABSENSI),kelas:j.KELAS||''});
     });
     // special dated activities
     SRIT.Store.read('KEGIATAN').filter(k=>k.TANGGAL===iso&&(k.STATUS||'TERJADWAL')!=='DIBATALKAN').forEach(k=>{
       sessions.push({id:k.ID,source:'KEGIATAN',nama:k.NAMA,jamMulai:k.JAM_MULAI,jamSelesai:k.JAM_SELESAI,
-        jenjang:k.JENJANG||'SEMUA',jk:k.JK||'SEMUA',lokasi:k.LOKASI||'',petugas:'',bel:k.BEL||'',belTeks:k.BEL_TEKS||'',absensi:(k.ABSENSI||'YA')!=='TIDAK',kelas:k.KELAS||''});
+        jenjang:k.JENJANG||'SEMUA',jk:k.JK||'SEMUA',lokasi:k.LOKASI||'',petugas:'',bel:k.BEL||'',belTeks:k.BEL_TEKS||'',absensi:SRIT.Api.absensiYa(k.ABSENSI),kelas:k.KELAS||''});
     });
     return sessions.filter(s=>all||s.absensi).sort((a,b)=>String(a.jamMulai||'').localeCompare(String(b.jamMulai||'')));
   },
@@ -1862,16 +1864,27 @@ SRIT.Features.absensi={
         </div>
         <div id="abSesInfo" class="mt-2"></div>
         <hr class="my-2">
-        <div class="filter-bar">
-          <div><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm" id="abJenjang"><option value="">Semua</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${this.state.jenjang===j?'selected':''}>${j}</option>`).join('')}</select></div>
-          <div><label class="form-label-sm">Asrama</label><select class="form-select form-select-sm" id="abAsrama"><option value="">Semua</option>${asrama.map(a=>`<option value="${a.ID}" ${this.state.asrama===a.ID?'selected':''}>${a.NAME}</option>`).join('')}</select></div>
-          <div><label class="form-label-sm">Kelas</label><select class="form-select form-select-sm" id="abKelas"><option value="">Semua</option>${kelasList.map(k=>`<option value="${k}" ${this.state.kelas===k?'selected':''}>${k}</option>`).join('')}</select></div>
-          <div style="flex:1;min-width:160px"><label class="form-label-sm">Cari Anak</label>
-            <div style="position:relative">
-              <input class="form-control form-control-sm" id="abSearch" placeholder="Nama / NIS" style="padding-right:26px" value="${SRIT.Util.esc(this.state.search||'')}">
-              <button type="button" id="abSearchClear" class="sf-clear-x" style="display:${this.state.search?'flex':'none'}" title="Hapus pencarian"><i class="bi bi-x-circle-fill"></i></button>
-            </div>
+        <style>.ab-ddrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}@media(max-width:575px){.ab-ddrow{grid-template-columns:1fr}}
+.ab-dd{position:relative}.ab-dd-lbl{display:block;font-size:11px;color:var(--srit-text-2);margin-bottom:3px}
+.ab-dd-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 11px;background:var(--srit-surface);border:1px solid var(--srit-border);border-radius:10px;color:var(--srit-text);font-size:13px;cursor:pointer;transition:.15s;user-select:none}
+.ab-dd-btn:hover{border-color:var(--srit-primary)}.ab-dd.open .ab-dd-btn,.ab-dd-btn.on{border-color:var(--srit-primary)}
+.ab-dd.open .ab-dd-btn{box-shadow:0 0 0 3px rgba(var(--srit-primary-rgb),.18)}
+.ab-dd-btn .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.ab-dd-btn .v.ph{font-weight:400;color:var(--srit-text-2)}
+.ab-dd-btn .x{opacity:.55;font-size:14px}.ab-dd-btn .x:hover{opacity:1}.ab-dd-btn .ch{font-size:11px;opacity:.7;transition:.15s}.ab-dd.open .ch{transform:rotate(180deg)}
+.ab-dd-panel{display:none;position:absolute;z-index:1060;left:0;right:0;top:calc(100% + 4px);min-width:190px;background:var(--srit-card);border:1px solid var(--srit-border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.28);overflow:hidden}
+.ab-dd.open .ab-dd-panel{display:block}.ab-dd-search{padding:8px;border-bottom:1px solid var(--srit-border)}
+.ab-dd-search input{width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--srit-border);border-radius:8px;background:var(--srit-surface);color:var(--srit-text);outline:none}
+.ab-dd-search input:focus{border-color:var(--srit-primary)}.ab-dd-list{max-height:250px;overflow:auto;padding:4px}
+.ab-dd-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+.ab-dd-opt:hover{background:var(--srit-hover)}.ab-dd-opt.sel{background:rgba(var(--srit-primary-rgb),.14);color:var(--srit-primary);font-weight:600}.ab-dd-opt .ck{margin-left:auto}
+.ab-dd-empty{padding:12px;text-align:center;font-size:12px;color:var(--srit-text-2)}</style>
+        <div id="abFilter">
+          <div style="position:relative">
+            <i class="bi bi-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.6"></i>
+            <input class="form-control" id="abSearch" placeholder="Cari nama atau NIS anak\u2026" autocomplete="off" style="padding-left:34px;padding-right:32px" value="${SRIT.Util.esc(this.state.search||'')}">
+            <button type="button" id="abSearchClear" class="sf-clear-x" style="display:${this.state.search?'flex':'none'}" title="Hapus pencarian"><i class="bi bi-x-circle-fill"></i></button>
           </div>
+          <div class="ab-ddrow"><div class="ab-dd" id="abDdJenjang"></div><div class="ab-dd" id="abDdAsrama"></div><div class="ab-dd" id="abDdKelas"></div></div>
         </div>
         <div id="abActiveChips"></div>
       </div>
@@ -1885,27 +1898,69 @@ SRIT.Features.absensi={
       <div id="abTabBody"></div>`;
     $('#abDate').onchange=e=>{this.state.date=e.target.value;this.state.dirty={};this.buildSessions();};
     $('#abKeg').onchange=e=>{this.state.keg=e.target.value;this.state.dirty={};this.load();};
-    $('#abJenjang').onchange=e=>{this.state.jenjang=e.target.value;this.state.page=1;this.load();};
     this.state.jk='';
-    $('#abAsrama').onchange=e=>{this.state.asrama=e.target.value;this.state.page=1;this.load();};
-    $('#abKelas').onchange=e=>{this.state.kelas=e.target.value;this.state.page=1;this.load();};
     $('#abSearch').oninput=e=>{
       $('#abSearchClear').style.display=e.target.value?'flex':'none';
       clearTimeout(this._searchT);
       this._searchT=setTimeout(()=>{this.state.search=e.target.value;this.state.page=1;this.load();},350);
     };
     $('#abSearchClear').onclick=()=>{$('#abSearch').value='';$('#abSearchClear').style.display='none';this.state.search='';this.state.page=1;this.load();};
+    // filter dropdown kustom: pilih = langsung terapkan; X = lepas; klik di luar / Esc = tutup
+    const closeDD=()=>$$('#abFilter .ab-dd.open').forEach(x=>x.classList.remove('open'));
+    $('#abFilter').onclick=e=>{
+      const x=e.target.closest('[data-ddx]');
+      if(x){this.state[x.dataset.ddx]='';this.state.page=1;closeDD();this.load();return;}
+      const o=e.target.closest('.ab-dd-opt');
+      if(o){const k=o.dataset.k;this.state[k]=o.dataset.v;if(k!=='kelas'&&this.state.kelas&&this._kelasOpts().indexOf(this.state.kelas)<0)this.state.kelas='';closeDD();this.state.page=1;this.load();return;}
+      const b=e.target.closest('.ab-dd-btn');
+      if(b){const dd=b.closest('.ab-dd'),was=dd.classList.contains('open');closeDD();
+        if(!was){dd.classList.add('open');const si=dd.querySelector('.ab-dd-search input');if(si){si.value='';this._ddFilter(dd,'');if(!('ontouchstart' in window))si.focus();}}}
+    };
+    $('#abFilter').oninput=e=>{const s=e.target.closest('.ab-dd-search');if(s)this._ddFilter(s.closest('.ab-dd'),e.target.value);};
+    $('#abFilter').onkeydown=e=>{if(e.key==='Escape')closeDD();};
+    if(this._ddDoc)document.removeEventListener('click',this._ddDoc);
+    this._ddDoc=ev=>{if(!ev.target.closest||!ev.target.closest('#abFilter'))$$('#abFilter .ab-dd.open').forEach(x=>x.classList.remove('open'));};
+    document.addEventListener('click',this._ddDoc);
     $$('#abTabs a').forEach(a=>a.onclick=()=>this.switchTab(a.dataset.tab));
     this.buildSessions();
   },
+  _kelasOpts(){
+    const s=this.state;
+    return [...new Set(SRIT.Store.read('ANAK').filter(a=>(!s.jenjang||a.JENJANG===s.jenjang)&&(!s.asrama||a.ASRAMA===s.asrama)).map(a=>a.KELAS).filter(Boolean))].sort((x,y)=>String(x).localeCompare(String(y),'id',{numeric:true}));
+  },
+  _ddFilter(dd,q){q=String(q||'').trim().toLowerCase();dd.querySelectorAll('.ab-dd-opt').forEach(o=>{o.style.display=(!q||o.textContent.toLowerCase().indexOf(q)>=0)?'':'none';});},
+  _renderDD(){
+    const s=this.state,asrama=SRIT.Store.read('ASRAMA'),esc=SRIT.Util.esc;
+    const defs=[
+      {id:'abDdJenjang',k:'jenjang',label:'Jenjang',items:['SRD','SRMP','SRMA'].map(j=>[j,j])},
+      {id:'abDdAsrama',k:'asrama',label:'Asrama',items:asrama.map(a=>[a.ID,a.NAME])},
+      {id:'abDdKelas',k:'kelas',label:'Kelas',items:this._kelasOpts().map(k=>[k,k])}];
+    defs.forEach(d=>{
+      const el=$('#'+d.id);if(!el||el.classList.contains('open'))return;
+      const cur=s[d.k],it=d.items.find(i=>i[0]===cur),low=d.label.toLowerCase();
+      el.innerHTML=`<span class="ab-dd-lbl">${d.label}</span>
+        <div class="ab-dd-btn ${cur?'on':''}" role="button" tabindex="0">
+          <span class="v ${cur?'':'ph'}">${cur?esc(it?it[1]:cur):'Semua'}</span>
+          ${cur?'<i class="bi bi-x-circle-fill x" data-ddx="'+d.k+'" title="Hapus filter"></i>':''}
+          <i class="bi bi-chevron-down ch"></i></div>
+        <div class="ab-dd-panel">
+          ${d.items.length>7?'<div class="ab-dd-search"><input type="text" placeholder="Cari '+low+'\u2026" autocomplete="off"></div>':''}
+          <div class="ab-dd-list">
+            <div class="ab-dd-opt ${cur?'':'sel'}" data-k="${d.k}" data-v="">Semua ${low}${cur?'':'<i class="bi bi-check2 ck"></i>'}</div>
+            ${d.items.map(i=>`<div class="ab-dd-opt ${cur===i[0]?'sel':''}" data-k="${d.k}" data-v="${esc(i[0])}">${esc(i[1])}${cur===i[0]?'<i class="bi bi-check2 ck"></i>':''}</div>`).join('')}
+            ${d.items.length?'':'<div class="ab-dd-empty">Tidak ada pilihan</div>'}
+          </div></div>`;
+    });
+  },
   renderChips(){
+    this._renderDD();
     const box=$('#abActiveChips');if(!box)return;
     const asrama=SRIT.Store.read('ASRAMA');
     const chips=[];
     if(this.state.search)chips.push({label:'Cari: "'+this.state.search+'"',clear:()=>{this.state.search='';$('#abSearch').value='';$('#abSearchClear').style.display='none';}});
-    if(this.state.jenjang)chips.push({label:'Jenjang: '+this.state.jenjang,clear:()=>{this.state.jenjang='';$('#abJenjang').value='';}});
-    if(this.state.asrama)chips.push({label:'Asrama: '+((asrama.find(a=>a.ID===this.state.asrama)||{}).NAME||this.state.asrama),clear:()=>{this.state.asrama='';$('#abAsrama').value='';}});
-    if(this.state.kelas)chips.push({label:'Kelas: '+this.state.kelas,clear:()=>{this.state.kelas='';$('#abKelas').value='';}});
+    if(this.state.jenjang)chips.push({label:'Jenjang: '+this.state.jenjang,clear:()=>{this.state.jenjang='';}});
+    if(this.state.asrama)chips.push({label:'Asrama: '+((asrama.find(a=>a.ID===this.state.asrama)||{}).NAME||this.state.asrama),clear:()=>{this.state.asrama='';}});
+    if(this.state.kelas)chips.push({label:'Kelas: '+this.state.kelas,clear:()=>{this.state.kelas='';}});
     if(!chips.length){box.innerHTML='';return;}
     box.innerHTML=`<div class="d-flex align-items-center gap-2 flex-wrap mt-2">
       <span class="text-muted-2" style="font-size:11px">Filter aktif:</span>
@@ -1915,7 +1970,7 @@ SRIT.Features.absensi={
     box.querySelectorAll('[data-chip]').forEach((el,i)=>{el.onclick=()=>{chips[i].clear();this.state.page=1;this.load();};});
     const ca=$('#abClearAll');if(ca)ca.onclick=()=>{
       this.state.search='';this.state.jenjang='';this.state.asrama='';this.state.kelas='';
-      $('#abSearch').value='';$('#abSearchClear').style.display='none';$('#abJenjang').value='';$('#abAsrama').value='';$('#abKelas').value='';
+      $('#abSearch').value='';$('#abSearchClear').style.display='none';
       this.state.page=1;this.load();
     };
   },
@@ -5819,6 +5874,189 @@ document.addEventListener('DOMContentLoaded',async()=>{
     if(lib.length)SRIT.Notify('Pustaka '+lib.join(' & ')+' dari CDN belum termuat — tampilan/grafik mungkin tidak lengkap. Periksa koneksi internet.','warn',12000);
   });
 });
+</script>
+
+<script>
+//# sourceURL=JS_Dropdown.html
+// ---------- DROPDOWN FILTER BARU (global) ----------
+// Mengubah SEMUA <select> filter di seluruh menu menjadi dropdown bergaya (panel melayang, cari di dalam daftar panjang,
+// tombol X untuk melepas, navigasi keyboard). <select> asli tetap ada (disembunyikan) sehingga seluruh kode lama yang membaca
+// .value / menangkap event change / mengganti isi option tetap berjalan tanpa perubahan.
+// Tidak diterapkan pada: select di dalam modal/formulir, select ber-name (isian formulir), multiple, size>1, atau [data-native].
+(function(){
+  if(window.__sdInit)return;window.__sdInit=true;
+  var css=
+'.sd{position:relative;display:block;width:100%}'+
+'.sd-native{display:none!important}'+
+'.sd-btn{display:flex;align-items:center;gap:6px;min-height:31px;padding:4px 10px;background:var(--srit-surface);border:1px solid var(--srit-border);border-radius:8px;color:var(--srit-text);font-size:.875rem;cursor:pointer;transition:border-color .15s,box-shadow .15s;user-select:none;-webkit-tap-highlight-color:transparent}'+
+'.sd-btn:hover{border-color:var(--srit-primary)}'+
+'.sd-btn:focus-visible,.sd.open .sd-btn{outline:none;border-color:var(--srit-primary);box-shadow:0 0 0 3px rgba(var(--srit-primary-rgb),.18)}'+
+'.sd-v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'+
+'.sd.sd-has-val .sd-v{font-weight:600}.sd.sd-has-val .sd-btn{border-color:var(--srit-primary)}'+
+'.sd-v.ph{color:var(--srit-text-2)}'+
+'.sd-x{display:none;opacity:.55;font-size:14px}.sd-x:hover{opacity:1}.sd.sd-has-val .sd-x{display:inline}'+
+'.sd-ch{font-size:11px;opacity:.7;transition:transform .15s}.sd.open .sd-ch{transform:rotate(180deg)}'+
+'.sd.sd-dis .sd-btn{opacity:.55;cursor:not-allowed;pointer-events:none}'+
+'.sd-panel{position:fixed;z-index:2000;background:var(--srit-card);border:1px solid var(--srit-border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);overflow:hidden;outline:none}'+
+'.sd-search{padding:8px;border-bottom:1px solid var(--srit-border)}'+
+'.sd-search input{width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--srit-border);border-radius:8px;background:var(--srit-surface);color:var(--srit-text);outline:none}'+
+'.sd-search input:focus{border-color:var(--srit-primary)}'+
+'.sd-list{overflow:auto;padding:4px;-webkit-overflow-scrolling:touch}'+
+'.sd-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--srit-text)}'+
+'.sd-opt:hover,.sd-opt.act{background:var(--srit-hover)}'+
+'.sd-opt.sel{background:rgba(var(--srit-primary-rgb),.14);color:var(--srit-primary);font-weight:600}'+
+'.sd-opt.dis{opacity:.45;cursor:not-allowed}.sd-opt .ck{margin-left:auto;flex:none}'+
+'.sd-grp{padding:8px 10px 3px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--srit-text-2)}'+
+'.sd-empty{padding:12px;text-align:center;font-size:12px;color:var(--srit-text-2)}';
+  var st=document.createElement('style');st.id='sd-style';st.textContent=css;document.head.appendChild(st);
+
+  var cur=null;   // dropdown yang sedang terbuka: {sel,wrap,btn,panel,list,q,build,pos}
+  var valDesc=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+  var idxDesc=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'selectedIndex');
+  var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+
+  function eligible(s){
+    if(s.__sd||s.multiple||s.hasAttribute('data-native'))return false;
+    if(s.size>1||s.name)return false;
+    if(s.closest('.modal,.offcanvas,form,[data-native-selects]'))return false;
+    return true;
+  }
+  function closeAny(){
+    if(!cur)return;
+    try{cur.panel.remove();}catch(e){}
+    cur.wrap.classList.remove('open');cur=null;
+  }
+  function position(){
+    if(!cur)return;
+    if(!document.body.contains(cur.wrap)){closeAny();return;}
+    var r=cur.btn.getBoundingClientRect(),vw=window.innerWidth,vh=window.innerHeight;
+    var w=Math.min(Math.max(r.width,220),vw-16);
+    var left=Math.max(8,Math.min(r.left,vw-w-8));
+    var below=vh-r.bottom-12,above=r.top-12;
+    var up=below<200&&above>below;
+    var avail=Math.max(140,up?above:below);
+    var sh=cur.panel.querySelector('.sd-search')?52:0;
+    cur.list.style.maxHeight=Math.max(110,Math.min(300,avail-sh))+'px';
+    var p=cur.panel.style;p.width=w+'px';p.left=left+'px';
+    if(up){p.top='auto';p.bottom=(vh-r.top+4)+'px';}else{p.bottom='auto';p.top=(r.bottom+4)+'px';}
+  }
+
+  function enhance(sel){
+    sel.__sd=true;
+    var wrap=document.createElement('div');wrap.className='sd';
+    (sel.className||'').split(/\s+/).forEach(function(c){
+      if(/^(m[tbsexy]?-\d|w-\d+|w-auto|d-inline-block|flex-.+|col-.+|me-.+|ms-.+)$/.test(c))wrap.classList.add(c);
+    });
+    ['width','minWidth','maxWidth','flex','margin'].forEach(function(k){if(sel.style[k])wrap.style[k]=sel.style[k];});
+    var btn=document.createElement('div');
+    btn.className='sd-btn';btn.tabIndex=0;btn.setAttribute('role','combobox');btn.setAttribute('aria-haspopup','listbox');
+    btn.innerHTML='<span class="sd-v"></span><i class="bi bi-x-circle-fill sd-x" title="Hapus pilihan"></i><i class="bi bi-chevron-down sd-ch"></i>';
+    wrap.appendChild(btn);
+    sel.parentNode.insertBefore(wrap,sel);
+    sel.classList.add('sd-native');
+
+    function sync(){
+      var o=sel.options[sel.selectedIndex],v=btn.querySelector('.sd-v');
+      v.textContent=o?o.text:'';
+      var empty=!sel.value;
+      v.classList.toggle('ph',empty);
+      var hasEmpty=false;for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===''&&!sel.options[i].disabled){hasEmpty=true;break;}}
+      wrap.classList.toggle('sd-has-val',!empty&&hasEmpty);
+      wrap.classList.toggle('sd-dis',!!sel.disabled);
+      wrap.style.display=(sel.hidden||sel.classList.contains('d-none')||sel.style.display==='none')?'none':'';
+    }
+    // kode lama sering mengubah value/selectedIndex lewat skrip tanpa event → tampilan ikut disinkronkan
+    Object.defineProperty(sel,'value',{configurable:true,get:function(){return valDesc.get.call(sel);},set:function(v){valDesc.set.call(sel,v);sync();}});
+    Object.defineProperty(sel,'selectedIndex',{configurable:true,get:function(){return idxDesc.get.call(sel);},set:function(v){idxDesc.set.call(sel,v);sync();}});
+    new MutationObserver(function(){sync();if(cur&&cur.sel===sel)cur.build(cur.q);}).observe(sel,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['disabled','hidden','class','style','label','selected']});
+    sync();
+
+    function choose(idx){
+      var changed=sel.selectedIndex!==idx;
+      if(changed){sel.selectedIndex=idx;sel.dispatchEvent(new Event('input',{bubbles:true}));sel.dispatchEvent(new Event('change',{bubbles:true}));}
+      closeAny();
+      try{btn.focus({preventScroll:true});}catch(e){}
+    }
+    function clear(){
+      for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===''&&!sel.options[i].disabled){choose(i);return;}}
+    }
+    function openPanel(){
+      if(sel.disabled)return;
+      closeAny();sync();
+      var panel=document.createElement('div');panel.className='sd-panel';panel.tabIndex=-1;
+      var many=sel.options.length>8;
+      panel.innerHTML=(many?'<div class="sd-search"><input type="text" placeholder="Cari\u2026" autocomplete="off"></div>':'')+'<div class="sd-list" role="listbox"></div>';
+      var list=panel.querySelector('.sd-list'),inp=panel.querySelector('input');
+      function build(q){
+        q=String(q||'').trim().toLowerCase();if(cur)cur.q=q;
+        var html='',n=0;
+        function opt(o,i){
+          var t=o.text;if(q&&t.toLowerCase().indexOf(q)<0)return;
+          var isSel=i===sel.selectedIndex;n++;
+          html+='<div class="sd-opt'+(isSel?' sel':'')+(o.disabled?' dis':'')+'" role="option" data-i="'+i+'">'+esc(t)+(isSel?'<i class="bi bi-check2 ck"></i>':'')+'</div>';
+        }
+        var idx=0;
+        Array.prototype.forEach.call(sel.children,function(ch){
+          if(ch.tagName==='OPTGROUP'){
+            var gHtml='',before=html;html='';
+            Array.prototype.forEach.call(ch.children,function(o){opt(o,idx);idx++;});
+            gHtml=html;html=before+(gHtml?'<div class="sd-grp">'+esc(ch.label)+'</div>'+gHtml:'');
+          }else{opt(ch,idx);idx++;}
+        });
+        list.innerHTML=html||'<div class="sd-empty">Tidak ada hasil</div>';
+        var s=list.querySelector('.sel');if(s&&!q)s.scrollIntoView({block:'nearest'});
+      }
+      document.body.appendChild(panel);
+      cur={sel:sel,wrap:wrap,btn:btn,panel:panel,list:list,q:'',build:build};
+      wrap.classList.add('open');
+      build('');position();
+      var sc=list.querySelector('.sel');if(sc)list.scrollTop=Math.max(0,sc.offsetTop-list.clientHeight/2);
+      if(inp){inp.oninput=function(){build(inp.value);var f=list.querySelector('.sd-opt:not(.dis)');if(f)f.classList.add('act');};if(!('ontouchstart' in window))inp.focus();}
+      else if(!('ontouchstart' in window))panel.focus({preventScroll:true});
+      list.onclick=function(e){
+        var o=e.target.closest('.sd-opt');if(!o||o.classList.contains('dis'))return;
+        choose(parseInt(o.getAttribute('data-i'),10));
+      };
+      panel.onkeydown=function(e){
+        var vis=[].slice.call(list.querySelectorAll('.sd-opt:not(.dis)'));
+        var a=list.querySelector('.act'),i=vis.indexOf(a);
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+          e.preventDefault();
+          var nx=e.key==='ArrowDown'?Math.min(vis.length-1,i+1):Math.max(0,i<0?0:i-1);
+          if(a)a.classList.remove('act');
+          if(vis[nx]){vis[nx].classList.add('act');vis[nx].scrollIntoView({block:'nearest'});}
+        }else if(e.key==='Enter'){
+          e.preventDefault();var t=a||list.querySelector('.sd-opt.sel')||vis[0];if(t)choose(parseInt(t.getAttribute('data-i'),10));
+        }else if(e.key==='Escape'){e.preventDefault();closeAny();try{btn.focus({preventScroll:true});}catch(x){}}
+        else if(e.key==='Tab'){closeAny();}
+      };
+    }
+    btn.addEventListener('click',function(e){
+      if(e.target.closest('.sd-x')){e.stopPropagation();clear();return;}
+      if(cur&&cur.sel===sel)closeAny();else openPanel();
+    });
+    btn.addEventListener('keydown',function(e){
+      if(e.key==='Enter'||e.key===' '||e.key==='ArrowDown'){e.preventDefault();if(!(cur&&cur.sel===sel))openPanel();}
+    });
+  }
+
+  // tutup saat klik di luar; posisi ikut bila layar digulir / diubah ukurannya (mis. keyboard HP muncul)
+  document.addEventListener('mousedown',function(e){if(cur&&!cur.panel.contains(e.target)&&!cur.wrap.contains(e.target))closeAny();},true);
+  document.addEventListener('touchstart',function(e){if(cur&&!cur.panel.contains(e.target)&&!cur.wrap.contains(e.target))closeAny();},{capture:true,passive:true});
+  window.addEventListener('resize',position);
+  window.addEventListener('scroll',function(e){if(cur&&!cur.panel.contains(e.target))position();},true);
+
+  function scan(){var all=document.querySelectorAll('select');for(var i=0;i<all.length;i++){if(eligible(all[i]))enhance(all[i]);}}
+  var queued=false;
+  new MutationObserver(function(ms){
+    if(queued)return;
+    for(var i=0;i<ms.length;i++){var a=ms[i].addedNodes;
+      for(var j=0;j<a.length;j++){var n=a[j];
+        if(n.nodeType===1&&(n.tagName==='SELECT'||(n.querySelector&&n.querySelector('select')))){queued=true;requestAnimationFrame(function(){queued=false;scan();});return;}}}
+  }).observe(document.body,{childList:true,subtree:true});
+  scan();
+  window.SRIT_Dropdown={scan:scan};
+})();
 </script>
 
 </body>
