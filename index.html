@@ -2497,14 +2497,18 @@ SRIT.Features.absensi={
     }).catch(function(e){libP=null;throw e;});
     return libP;
   }
-  // Pilih mesin hitung secara eksplisit: berkas .wasm TIDAK ada di paket jsdelivr face-api (404), jadi WebGL dulu,
-  // lalu WASM dari paket resmi tfjs-backend-wasm, terakhir CPU.
+  // Berkas .wasm TIDAK ada di paket jsdelivr face-api (404), tetapi backend 'wasm' tetap terdaftar sebagai prioritas tertinggi
+  // dan membuat semua panggilan tf gagal ("highest priority backend 'wasm' has not yet been initialized").
+  // Solusi: cabut pendaftaran 'wasm' lebih dulu, lalu pilih WebGL, cadangan CPU.
   async function pickBackend(fa){
     var tf=fa.tf;
-    try{if(tf.wasm&&tf.wasm.setWasmPaths)tf.wasm.setWasmPaths('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/');}catch(e){}
-    var order=['webgl','wasm','cpu'];
+    try{tf.removeBackend('wasm');}catch(e){}
+    var order=['webgl','cpu'];
     for(var i=0;i<order.length;i++){
-      try{if(await tf.setBackend(order[i])){await tf.ready();if(tf.getBackend()===order[i]){console.info('Mesin wajah:',order[i]);return order[i];}}}catch(e){console.warn('Mesin '+order[i]+' gagal',e&&e.message);}
+      try{
+        var ok=await tf.setBackend(order[i]);
+        if(ok){await tf.ready();if(tf.getBackend()===order[i]){console.info('Mesin wajah:',order[i]);return order[i];}}
+      }catch(e){console.warn('Mesin '+order[i]+' gagal',e&&e.message);}
     }
     throw new Error('Tidak ada mesin hitung yang bisa dipakai di browser ini.');
   }
