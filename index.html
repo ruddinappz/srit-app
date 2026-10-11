@@ -2088,7 +2088,7 @@ SRIT.Features.absensi={
   // ---------- QR CAMERA ----------
   async _doScan(method,payload){
     if(!this.state.keg){SRIT.Notify('Pilih sesi kegiatan dulu','warn');return;}
-    const r=await (method==='RFID'?SRIT.Api.rfidScan(this.state.date,this.state.keg,payload):SRIT.Api.qrScan(this.state.date,this.state.keg,payload));
+    const r=await (method==='RFID'?SRIT.Api.rfidScan(this.state.date,this.state.keg,payload):method==='WAJAH'?SRIT.Api.faceScan(this.state.date,this.state.keg,payload):SRIT.Api.qrScan(this.state.date,this.state.keg,payload));
     try{if(this._sound)this._sound(r);}catch(e){}
     if(r.ok){
       this.state.log.unshift({time:new Date().toLocaleTimeString('id-ID'),nama:r.anak.NAMA,nis:r.anak.NIS,method,ok:true});
@@ -2458,6 +2458,285 @@ SRIT.Features.absensi={
   A._qr=Object.assign({stream:null,raf:null,last:'',lastTime:0,busy:false,starting:false,det:null},A._qr||{});
 })();
 </script>
+
+<script>__srit.n('View_AbsensiWajah')</script>
+<script>
+//# sourceURL=View_AbsensiWajah.html
+// ---------- ABSENSI: scan wajah langsung di aplikasi (kamera live + pendaftaran) ----------
+// Memakai face-api.js (@vladmandic) dimuat saat tab dibuka. Pencocokan di browser; hasil dikirim lewat jalur scan yang sama
+// dengan QR/RFID (anti-ganda, antrean, suara, log) dengan metode 'WAJAH'. Yang disimpan di server hanya vektor angka.
+(function(){
+  var A=SRIT&&SRIT.Features&&SRIT.Features.absensi;
+  if(!A){console.error('View_AbsensiWajah: SRIT.Features.absensi belum ada');return;}
+  var esc=function(s){return SRIT.Util.esc(String(s==null?'':s));};
+  var VER='1.7.13';
+  var LIB_URL='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@'+VER+'/dist/face-api.js';
+  var MODEL_URL='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@'+VER+'/model/';
+  var MATCH_MAX=0.5;      // jarak Euclidean maksimum agar dianggap cocok (makin kecil makin ketat)
+  var MARGIN=0.04;        // selisih minimal dengan anak lain terdekat (mencegah salah orang)
+  var NEED_HITS=3;        // wajah harus cocok pada 3 bingkai berturut-turut
+  var COOLDOWN=6000;      // anak yang sama tidak diproses ulang dalam 6 dtk
+  var ENROLL_MIN=3,ENROLL_MAX=5;
+
+  // ---------- pemuat pustaka & model ----------
+  var libP=null;
+  function loadLib(setStat){
+    if(libP)return libP;
+    libP=new Promise(function(res,rej){
+      if(window.faceapi){res();return;}
+      var s=document.createElement('script');s.src=LIB_URL;s.async=true;
+      s.onload=function(){res();};s.onerror=function(){rej(new Error('Pustaka pengenal wajah gagal dimuat. Periksa koneksi internet lalu coba lagi.'));};
+      document.head.appendChild(s);
+    }).then(function(){
+      if(setStat)setStat('Memuat model wajah\u2026');
+      var fa=window.faceapi;
+      return Promise.all([fa.nets.tinyFaceDetector.loadFromUri(MODEL_URL),fa.nets.faceLandmark68Net.loadFromUri(MODEL_URL),fa.nets.faceRecognitionNet.loadFromUri(MODEL_URL)]);
+    }).catch(function(e){libP=null;throw e;});
+    return libP;
+  }
+  function dist(a,b){var s=0;for(var i=0;i<128;i++){var d=a[i]-b[i];s+=d*d;}return Math.sqrt(s);}
+  function matchFace(desc,gal){
+    var best=1e9,bestId=null,second=1e9;
+    for(var i=0;i<gal.length;i++){
+      var g=gal[i],m=1e9;
+      for(var j=0;j<g.s.length;j++){var d=dist(desc,g.s[j]);if(d<m)m=d;}
+      if(m<best){second=best;best=m;bestId=g.id;}else if(m<second){second=m;}
+    }
+    return {id:bestId,d:best,second:second,ok:!!(bestId&&best<=MATCH_MAX&&(second-best)>=MARGIN)};
+  }
+
+  Object.assign(A,{
+  _fs:{stream:null,timer:null,mode:'scan',gal:[],galAt:0,votes:{},last:{},samples:[],lastDesc:null,lastDescAt:0,busy:false},
+  _face:{q:'',f:'',page:1},
+
+  // ---------- tampilan ----------
+  _renderFace(body){
+    const block=this._camBlock(),canEnroll=SRIT.Auth.can('absensi:UPDATE');
+    body.innerHTML=`<div class="row g-3">
+      <div class="col-lg-5"><div class="card-srit p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="section-title mb-0"><i class="bi bi-person-bounding-box me-1"></i>Absensi Wajah</h6>
+          <div class="btn-group btn-group-sm" role="group">
+            <button class="btn btn-primary" id="abFmScan">Pindai</button>
+            ${canEnroll?'<button class="btn btn-outline-primary" id="abFmEnroll">Daftarkan</button>':''}
+          </div>
+        </div>
+        ${block?`<div class="alert alert-warning py-2 mb-2" style="font-size:12.5px"><i class="bi bi-exclamation-triangle"></i> Kamera langsung tidak tersedia di halaman ini. Buka aplikasi lewat alamat GitHub Pages (HTTPS), bukan dari dalam Apps Script.<div id="abCamErr" class="mt-2"></div></div>`:`
+        <div style="position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3">
+          <video id="abFVideo" playsinline muted autoplay style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1)"></video>
+          <canvas id="abFCanvas" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1);pointer-events:none"></canvas>
+          <div id="abFStat" style="position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:6px;text-align:center">Menyiapkan\u2026</div>
+        </div>
+        <div id="abCamErr" class="mt-2 d-none"></div>
+        <div id="abFEnroll" class="mt-2 d-none"></div>
+        <button class="btn btn-outline-secondary btn-sm w-100 mt-2" id="abFToggle"><i class="bi bi-pause-circle"></i> Jeda kamera</button>`}
+        <button class="btn btn-outline-secondary btn-sm w-100 mt-2" id="abSoundBtn"></button>
+        <div class="text-muted-2 mt-2" style="font-size:11px">Yang disimpan hanya vektor angka (bukan foto). Pastikan ada persetujuan wali sebelum mendaftarkan wajah anak. Pencocokan wajah membantu, bukan pengganti: bila ragu, pakai QR/manual.</div>
+        <div id="abFaceSumm" class="mt-2"></div>
+      </div>
+      <div class="card-srit p-0 mt-3">
+        <div class="p-3 border-bottom d-flex justify-content-between"><h6 class="section-title mb-0"><i class="bi bi-clock-history me-1"></i>Log Scan Terakhir</h6><span class="badge-soft st-HADIR" id="abLogN">0</span></div>
+        <div id="abLog" style="max-height:260px;overflow:auto"></div>
+      </div></div>
+      <div class="col-lg-7"><div class="card-srit p-0 h-100">
+        <div class="p-3 border-bottom d-flex gap-2 flex-wrap justify-content-between align-items-center">
+          <h6 class="section-title mb-0">Status Pendaftaran Wajah</h6>
+          <div class="d-flex gap-2"><input class="form-control form-control-sm" id="abFaceQ" placeholder="Cari nama / NIS" value="${esc(this._face.q)}">
+            <select class="form-select form-select-sm" id="abFaceF"><option value="">Semua</option><option value="belum" ${this._face.f==='belum'?'selected':''}>Belum terdaftar</option><option value="sudah" ${this._face.f==='sudah'?'selected':''}>Sudah terdaftar</option></select></div>
+        </div>
+        <div id="abFaceList"><div class="p-3 text-muted-2">Memuat\u2026</div></div>
+      </div></div></div>`;
+    let tm;$('#abFaceQ').oninput=e=>{clearTimeout(tm);tm=setTimeout(()=>{this._face.q=e.target.value.trim();this._face.page=1;this._faceLoad();},350);};
+    $('#abFaceF').onchange=e=>{this._face.f=e.target.value;this._face.page=1;this._faceLoad();};
+    const sb=$('#abSoundBtn');
+    if(sb){const paint=()=>{const [ic,tx]=this._soundLabel(this._soundMode());sb.innerHTML='<i class="bi '+ic+'"></i> '+tx;};paint();
+      sb.onclick=()=>{const o=['suara','nada','senyap'],n=o[(o.indexOf(this._soundMode())+1)%3];this._soundSet(n);paint();if(n==='suara')this._speak('Suara aktif');else if(n==='nada')this._beep('ok');};}
+    const ms=$('#abFmScan'),me=$('#abFmEnroll');
+    if(ms)ms.onclick=()=>this._faceMode('scan');
+    if(me)me.onclick=()=>this._faceMode('enroll');
+    const tg=$('#abFToggle');
+    if(tg)tg.onclick=()=>{if(this._fs.stream){this.stopFace();tg.innerHTML='<i class="bi bi-camera-video"></i> Lanjutkan kamera';}else{this.startFace();tg.innerHTML='<i class="bi bi-pause-circle"></i> Jeda kamera';}};
+    this._renderLog();
+    this._faceLoad();
+    if(!block){this._fs.mode='scan';this.startFace();}
+  },
+  _faceStat(txt,color){const s=$('#abFStat');if(!s)return;s.textContent=txt;s.style.background=color||'rgba(0,0,0,.6)';},
+
+  _faceMode(m){
+    this._fs.mode=m;this._fs.samples=[];this._fs.votes={};
+    const ms=$('#abFmScan'),me=$('#abFmEnroll');
+    if(ms)ms.className='btn '+(m==='scan'?'btn-primary':'btn-outline-primary');
+    if(me)me.className='btn '+(m==='enroll'?'btn-primary':'btn-outline-primary');
+    const box=$('#abFEnroll');if(!box)return;
+    if(m==='scan'){box.classList.add('d-none');box.innerHTML='';this._faceStat('Arahkan wajah ke kamera\u2026');return;}
+    box.classList.remove('d-none');
+    box.innerHTML=`<input class="form-control form-control-sm mb-1" id="abFeQ" placeholder="Cari nama / NIS anak yang didaftarkan">
+      <select class="form-select form-select-sm mb-2" id="abFeSel" size="4"></select>
+      <div class="d-flex gap-2 align-items-center mb-2"><button class="btn btn-sm btn-outline-primary" id="abFeShot"><i class="bi bi-camera"></i> Ambil sampel</button>
+        <span id="abFeCnt" class="small text-muted-2"></span></div>
+      <div class="d-flex gap-2"><button class="btn btn-sm btn-success flex-grow-1" id="abFeSave" disabled><i class="bi bi-check2-circle"></i> Simpan pendaftaran</button>
+        <button class="btn btn-sm btn-outline-secondary" id="abFeReset">Ulang</button></div>
+      <div class="text-muted-2 mt-1" style="font-size:11px">Ambil ${ENROLL_MIN}\u2013${ENROLL_MAX} sampel: hadap depan, sedikit menoleh kiri/kanan, pencahayaan cukup, tanpa masker/topi. Hanya satu wajah di layar.</div>`;
+    const fill=()=>{
+      const q=($('#abFeQ').value||'').trim().toLowerCase();
+      const rows=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF'&&(!q||String(a.NAMA||'').toLowerCase().indexOf(q)>=0||String(a.NIS||'').toLowerCase().indexOf(q)>=0)).slice(0,60);
+      $('#abFeSel').innerHTML=rows.map(a=>`<option value="${esc(a.ID)}">${esc(a.NAMA)} (${esc(a.NIS||'-')})</option>`).join('');
+      if(rows.length===1)$('#abFeSel').value=rows[0].ID;
+    };
+    $('#abFeQ').oninput=fill;fill();
+    $('#abFeShot').onclick=()=>this._faceShot();
+    $('#abFeSave').onclick=()=>this._faceSave();
+    $('#abFeReset').onclick=()=>{this._fs.samples=[];this._faceCnt();};
+    this._faceCnt();this._faceStat('Mode pendaftaran: pilih anak, lalu Ambil sampel');
+  },
+  _faceCnt(){
+    const c=$('#abFeCnt'),sv=$('#abFeSave'),n=this._fs.samples.length;
+    if(c)c.textContent=n+' / '+ENROLL_MAX+' sampel'+(n<ENROLL_MIN?' (min '+ENROLL_MIN+')':'');
+    if(sv)sv.disabled=n<ENROLL_MIN;
+  },
+  _faceShot(){
+    const fs=this._fs;
+    if(!fs.lastDesc||Date.now()-fs.lastDescAt>1500){SRIT.Notify('Wajah belum terdeteksi tepat satu. Hadap kamera, satu orang saja.','warn');return;}
+    if(fs.samples.length>=ENROLL_MAX){SRIT.Notify('Sampel sudah cukup. Simpan atau Ulang.','warn');return;}
+    const id=($('#abFeSel')||{}).value;
+    // peringatan bila wajah ini sangat mirip anak LAIN yang sudah terdaftar (salah pilih nama / kembar)
+    const m=matchFace(fs.lastDesc,fs.gal.filter(g=>g.id!==id));
+    if(m.id&&m.d<0.4){const g=fs.gal.find(x=>x.id===m.id);SRIT.Notify('Wajah ini sangat mirip dengan '+(g?g.nama:'anak lain')+' yang sudah terdaftar. Pastikan nama yang dipilih benar.','warn',6000);}
+    fs.samples.push(Array.from(fs.lastDesc).map(x=>Math.round(x*10000)/10000));
+    try{if(navigator.vibrate)navigator.vibrate(40);}catch(e){}
+    this._faceCnt();
+  },
+  async _faceSave(){
+    const id=($('#abFeSel')||{}).value;
+    if(!id){SRIT.Notify('Pilih anak dulu','warn');return;}
+    if(this._fs.samples.length<ENROLL_MIN){SRIT.Notify('Ambil minimal '+ENROLL_MIN+' sampel','warn');return;}
+    const sv=$('#abFeSave');if(sv)sv.disabled=true;
+    try{
+      const r=await SRIT.Server.call('apiFaceEnroll',id,this._fs.samples,'replace');
+      SRIT.Notify('Wajah '+((r&&r.nama)||'')+' terdaftar ('+((r&&r.jml)||this._fs.samples.length)+' sampel)','ok');
+      this._fs.samples=[];this._fs.galAt=0;this._faceCnt();this._faceLoad();this._galLoad(true);
+    }catch(e){SRIT.Notify(e.message||'Gagal menyimpan','err');this._faceCnt();}
+  },
+
+  // ---------- galeri vektor ----------
+  async _galLoad(force){
+    const fs=this._fs;
+    if(!force&&fs.gal.length&&Date.now()-fs.galAt<300000)return;
+    const r=await SRIT.Server.call('apiFaceList');
+    fs.gal=((r&&r.faces)||[]).map(f=>({id:String(f.id),nama:f.nama,s:(f.s||[]).map(v=>Float32Array.from(v))}));
+    fs.galAt=Date.now();
+  },
+
+  // ---------- kamera & loop deteksi ----------
+  async startFace(){
+    const fs=this._fs;
+    if(fs.stream||fs.starting)return;
+    const video=$('#abFVideo');if(!video)return;
+    this._showFaceCamError(null);
+    fs.starting=true;this._faceStat('Memuat pengenal wajah\u2026');
+    try{
+      await loadLib(t=>this._faceStat(t));
+      await this._galLoad(true);
+    }catch(e){fs.starting=false;this._faceStat('Gagal memuat','rgba(220,38,38,.92)');const b=$('#abCamErr');if(b){b.classList.remove('d-none');b.innerHTML='<div class="alert alert-danger py-2 mb-0" style="font-size:12px">'+esc(e.message||'Gagal memuat pengenal wajah')+' <button class="btn btn-sm btn-outline-danger py-0 ms-2" id="abCamRetry">Coba Lagi</button></div>';const rt=$('#abCamRetry');if(rt)rt.onclick=()=>this.startFace();}return;}
+    if(!$('#abFVideo')){fs.starting=false;return;}   // pengguna sudah pindah tab
+    this._faceStat('Meminta izin kamera\u2026');
+    const tries=[{video:{facingMode:{ideal:'user'},width:{ideal:640},height:{ideal:480}},audio:false},{video:{facingMode:{ideal:'user'}},audio:false},{video:true,audio:false}];
+    let stream=null,lastErr=null;
+    for(const c of tries){
+      try{stream=await navigator.mediaDevices.getUserMedia(c);break;}
+      catch(e){lastErr=e;if(e&&(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'||e.name==='SecurityError'||e.name==='NotFoundError'||e.name==='NotReadableError'))break;}
+    }
+    fs.starting=false;
+    if(!stream){this._faceStat('Gagal akses kamera','rgba(220,38,38,.92)');await this._showFaceCamError(lastErr);return;}
+    if(!$('#abFVideo')){stream.getTracks().forEach(t=>t.stop());return;}
+    fs.stream=stream;video.srcObject=stream;
+    try{await video.play();}catch(e){}
+    fs.votes={};
+    this._faceStat(fs.mode==='scan'?(fs.gal.length?'Arahkan wajah ke kamera\u2026':'Belum ada wajah terdaftar \u2014 buka mode Daftarkan'):'Mode pendaftaran: pilih anak, lalu Ambil sampel');
+    this._faceLoop();
+  },
+  async _showFaceCamError(err){
+    await this._showCamError(err);
+    const rt=$('#abCamRetry');if(rt)rt.onclick=()=>this.startFace();
+  },
+  stopFace(){
+    const fs=this._fs;
+    if(fs.timer){clearTimeout(fs.timer);fs.timer=null;}
+    if(fs.stream){fs.stream.getTracks().forEach(t=>t.stop());fs.stream=null;}
+    fs.busy=false;fs.starting=false;fs.lastDesc=null;
+    const v=$('#abFVideo');if(v)v.srcObject=null;
+    const c=$('#abFCanvas');if(c){const x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);}
+    this._faceStat('Kamera berhenti.');
+  },
+  async _faceLoop(){
+    const fs=this._fs,video=$('#abFVideo'),canvas=$('#abFCanvas');
+    if(!video||!fs.stream)return;
+    const next=(ms)=>{if(fs.stream)fs.timer=setTimeout(()=>this._faceLoop(),ms||180);};
+    if(!video.videoWidth||video.readyState<video.HAVE_ENOUGH_DATA||fs.busy){next(120);return;}
+    fs.busy=true;
+    let dets=[];
+    try{
+      const fa=window.faceapi;
+      dets=await fa.detectAllFaces(video,new fa.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:0.5})).withFaceLandmarks().withFaceDescriptors();
+    }catch(e){console.error('deteksi wajah',e);}
+    fs.busy=false;
+    if(!fs.stream||!$('#abFVideo'))return;
+    canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.lineWidth=Math.max(3,canvas.width/200);
+    const now=Date.now();
+    if(fs.mode==='enroll'){
+      const one=dets.length===1;
+      dets.forEach(d=>{const b=d.detection.box;ctx.strokeStyle=one?'#22c55e':'#f59e0b';ctx.strokeRect(b.x,b.y,b.width,b.height);});
+      if(one){fs.lastDesc=dets[0].descriptor;fs.lastDescAt=now;this._faceStat('Wajah terdeteksi \u2014 tekan Ambil sampel');}
+      else{fs.lastDesc=null;this._faceStat(dets.length?'Terdeteksi '+dets.length+' wajah \u2014 harus satu saja':'Wajah belum terdeteksi','rgba(0,0,0,.6)');}
+      next(200);return;
+    }
+    // ---- mode pindai ----
+    const seen={};
+    dets.forEach(d=>{
+      const b=d.detection.box,m=matchFace(d.descriptor,fs.gal);
+      ctx.strokeStyle=m.ok?'#22c55e':'#f59e0b';ctx.strokeRect(b.x,b.y,b.width,b.height);
+      if(!m.ok)return;
+      seen[m.id]=1;
+      const v=fs.votes[m.id]||(fs.votes[m.id]={n:0,t:now});
+      v.n=(now-v.t>1500)?1:v.n+1;v.t=now;
+      if(v.n>=NEED_HITS&&now-(fs.last[m.id]||0)>COOLDOWN){fs.last[m.id]=now;v.n=0;this._faceHit(m.id);}
+    });
+    Object.keys(fs.votes).forEach(id=>{if(!seen[id]&&now-fs.votes[id].t>1500)delete fs.votes[id];});
+    if(!dets.length&&!fs.statLock)this._faceStat(fs.gal.length?'Arahkan wajah ke kamera\u2026':'Belum ada wajah terdaftar \u2014 buka mode Daftarkan');
+    next(180);
+  },
+  _faceHit(id){
+    const fs=this._fs;
+    Promise.resolve(this._doScan('WAJAH',id)).then(r=>{
+      if(!r)return;   // sesi belum dipilih
+      const ok=!!r.ok,dup=!!r.dup;
+      try{if(navigator.vibrate)navigator.vibrate(ok?50:dup?[90,60,90]:[220]);}catch(e){}
+      this._faceStat(ok?'\u2713 '+r.anak.NAMA+' \u2192 HADIR':dup?'\u26a0 '+r.msg:'\u2717 '+(r.msg||id),ok?'rgba(22,163,74,.9)':dup?'rgba(217,119,6,.95)':'rgba(220,38,38,.92)');
+      fs.statLock=true;clearTimeout(fs.statT);
+      fs.statT=setTimeout(()=>{fs.statLock=false;this._faceStat('Arahkan wajah ke kamera\u2026');},ok?1500:2600);
+      this._renderLog();
+    });
+  }
+  });
+
+  // semua jalur penghentian kamera (ganti tab / keluar menu) ikut mematikan kamera wajah
+  var _stopQR=A.stopQR;
+  A.stopQR=function(){try{if(_stopQR)_stopQR.apply(this,arguments);}catch(e){}try{this.stopFace();}catch(e){}};
+
+  // jalur scan 'WAJAH': pola sama dengan qrScan/rfidScan (anti-ganda instan, antrean, kirim berkelompok ke apiAttScan)
+  SRIT.Api.faceScan=function(iso,sessionId,anakId){
+    const a=this._anakIdx().id[String(anakId)];
+    if(!a){this._staleCheck();return Promise.resolve({ok:false,msg:'Anak tidak dikenali'});}
+    if(a.STATUS!=='AKTIF')return Promise.resolve({ok:false,msg:a.NAMA+' tidak aktif'});
+    const done=this._isDone(iso,sessionId,a.ID);if(done)return Promise.resolve(this._dupResult(a,done));
+    this._markDone(iso,sessionId,a.ID,'HADIR');
+    this._enqueue('WAJAH',iso,sessionId,a.ID,a.ID);
+    return Promise.resolve({ok:true,anak:Object.assign({},a)});
+  };
+})();
+</script>
+
 
 <script>__srit.n('View_Jadwal')</script>
 <script>
