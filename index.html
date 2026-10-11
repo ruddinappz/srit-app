@@ -991,12 +991,25 @@ SRIT.Api = {
   getAttendanceSession(iso,sessionId,opt){return SRIT.Server.call('apiAttSession',iso,sessionId||'',opt||{});},
   async saveAttendanceBatch(iso,kegiatanId,changes){
     const r=await SRIT.Server.call('apiAttSave',iso,kegiatanId,changes);
+    (changes||[]).forEach(c=>{if(c.status==='HADIR'||c.status==='IZIN'||c.status==='SAKIT')this._markDone(iso,kegiatanId,c.anakId,c.status);else this._unmark(iso,kegiatanId,c.anakId);});
     if(r&&r.rekap)SRIT.Sync.merge('REKAP_HARIAN',r.rekap);
     SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
     return r;
   },
   // ---- Pemindaian RFID/QR: konfirmasi INSTAN dari data lokal; penyimpanan dikirim berkelompok di latar ----
   _sq:{},_sChain:Promise.resolve(),_sPend:0,_ai:null,_lastStale:0,
+  // ---- Anti-ganda: tanggal + kegiatan + anak. Dicek instan di browser dan DIPUTUSKAN ulang di server (apiAttScan) ----
+  _seen:{},
+  _sk(iso,sid){return iso+'|'+sid;},
+  _isDone(iso,sid,id){const m=this._seen[this._sk(iso,sid)];return (m&&m[id])||'';},
+  _markDone(iso,sid,id,st){const k=this._sk(iso,sid);(this._seen[k]=this._seen[k]||{})[id]=st||'HADIR';},
+  _unmark(iso,sid,id){const m=this._seen[this._sk(iso,sid)];if(m)delete m[id];},
+  async seedScanned(iso,sid){ // muat yang sudah tercatat (HADIR/IZIN/SAKIT) agar scan ulang langsung terdeteksi
+    if(!iso||!sid)return;
+    try{const r=await SRIT.Server.call('apiAttDone',iso,sid);const k=this._sk(iso,sid),m=this._seen[k]=this._seen[k]||{};
+      Object.keys((r&&r.map)||{}).forEach(id=>{const s=r.map[id];if(s==='HADIR'||s==='IZIN'||s==='SAKIT')m[id]=s;});}catch(e){}
+  },
+  _dupResult(a,st){return {ok:false,dup:true,status:st,anak:{...a},msg:a.NAMA+(st==='HADIR'?' sudah absen':' berstatus '+st)+' di kegiatan ini'};},
   _anakIdx(){ // indeks pencarian dari cermin ANAK (dibangun ulang hanya saat data berubah)
     const s=SRIT.Store._s.ANAK||'[]';
     if(this._ai&&this._ai.s===s)return this._ai;
@@ -1012,10 +1025,10 @@ SRIT.Api = {
   _staleCheck(){ // kartu/QR tak dikenal bisa karena data lokal usang → segarkan cermin (maks 1× / 10 dtk)
     if(Date.now()-this._lastStale<10000)return;this._lastStale=Date.now();SRIT.Sync.lastPoll=0;SRIT.Sync.poll();
   },
-  _enqueue(method,iso,sid,payload){
+  _enqueue(method,iso,sid,payload,anakId){
     const key=method+'|'+iso+'|'+sid;
-    const b=this._sq[key]||(this._sq[key]={method,iso,sid,items:[],timer:null});
-    b.items.push(payload);
+    const b=this._sq[key]||(this._sq[key]={method,iso,sid,items:[],ids:[],timer:null});
+    b.items.push(payload);b.ids.push(anakId);
     if(!b.timer)b.timer=setTimeout(()=>this._flushScan(key),1000);
   },
   _flushScan(key){
@@ -1026,12 +1039,17 @@ SRIT.Api = {
   async _sendScan(b,attempt=1){ // tidak pernah melempar; gagal jaringan diulang (3/6/9 dtk) sebelum melapor
     try{
       const r=await SRIT.Server.call('apiAttScan',b.iso,b.sid,b.method,b.items);
-      const bad=(r.results||[]).filter(x=>!x||!x.ok);
-      if(bad.length)SRIT.Notify(bad.length+' pindaian ditolak server: '+(bad[0].msg||'gagal'),'warn',5000);
+      const bad=[];
+      (r.results||[]).forEach(x=>{
+        if(x&&x.dup){if(x.anak)this._markDone(b.iso,b.sid,x.anak.ID,x.status);if(typeof this.onScanDup==='function'){try{this.onScanDup(x,b);}catch(e){}}}
+        else if(!x||!x.ok)bad.push(x);
+      });
+      if(bad.length)SRIT.Notify(bad.length+' pindaian ditolak server: '+((bad[0]&&bad[0].msg)||'gagal'),'warn',5000);
       SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
     }catch(e){
       if(e.code==='AUTH'||e.code==='FORBIDDEN'){SRIT.Notify(e.message||'Tidak diizinkan','err',6000);return;}
       if(attempt<4){await new Promise(r=>setTimeout(r,attempt*3000));return this._sendScan(b,attempt+1);}
+      (b.ids||[]).forEach(id=>this._unmark(b.iso,b.sid,id));   // tidak jadi tersimpan → boleh dipindai ulang
       SRIT.Notify('Gagal menyimpan '+b.items.length+' pindaian ('+(e.message||e)+'). Pindai ulang bila perlu.','err',9000);
     }
   },
@@ -1042,14 +1060,18 @@ SRIT.Api = {
     const ix=this._anakIdx();const a=ix.id[p]||ix.nis[p]||ix.rf[p];
     if(!a){this._staleCheck();return Promise.resolve({ok:false,msg:'QR tidak dikenali: '+p});}
     if(a.STATUS!=='AKTIF')return Promise.resolve({ok:false,msg:a.NAMA+' tidak aktif'});
-    this._enqueue('QR',iso,sessionId,p);
+    const done=this._isDone(iso,sessionId,a.ID);if(done)return Promise.resolve(this._dupResult(a,done));
+    this._markDone(iso,sessionId,a.ID,'HADIR');
+    this._enqueue('QR',iso,sessionId,p,a.ID);
     return Promise.resolve({ok:true,anak:{...a}});
   },
   rfidScan(iso,kegiatanId,rfidUid){
     const p=String(rfidUid==null?'':rfidUid).trim();
     const a=this._anakIdx().rfA[p];
     if(!a){this._staleCheck();return Promise.resolve({ok:false,msg:'RFID tidak dikenali'});}
-    this._enqueue('RFID',iso,kegiatanId,p);
+    const done=this._isDone(iso,kegiatanId,a.ID);if(done)return Promise.resolve(this._dupResult(a,done));
+    this._markDone(iso,kegiatanId,a.ID,'HADIR');
+    this._enqueue('RFID',iso,kegiatanId,p,a.ID);
     return Promise.resolve({ok:true,anak:{...a}});
   },
   // ---- Analisis Data (server; label sumbu diformat di browser seperti aslinya) ----
@@ -1946,6 +1968,7 @@ SRIT.Features.absensi={
     if(!r){try{r=await this._query();}catch(e){SRIT.Notify(e.message||'Gagal memuat absensi','err');return;}
       if(SRIT.currentFeature!=='absensi'||!$('#abTabBody'))return;}
     const body=$('#abTabBody');
+    if(this.state.tab==='qr'||this.state.tab==='rfid')SRIT.Api.seedScanned(this.state.date,this.state.keg);   // anti-ganda: muat yang sudah tercatat
     if(this.state.tab==='manual')this._renderManual(body,r);
     else if(this.state.tab==='rfid')this._renderRfid(body,r);
     else if(this.state.tab==='face')this._renderFace(body);
@@ -2066,9 +2089,13 @@ SRIT.Features.absensi={
   async _doScan(method,payload){
     if(!this.state.keg){SRIT.Notify('Pilih sesi kegiatan dulu','warn');return;}
     const r=await (method==='RFID'?SRIT.Api.rfidScan(this.state.date,this.state.keg,payload):SRIT.Api.qrScan(this.state.date,this.state.keg,payload));
+    try{if(this._sound)this._sound(r);}catch(e){}
     if(r.ok){
       this.state.log.unshift({time:new Date().toLocaleTimeString('id-ID'),nama:r.anak.NAMA,nis:r.anak.NIS,method,ok:true});
       SRIT.Notify(r.anak.NAMA+' \u2192 HADIR ('+method+')','ok',1800);
+    }else if(r.dup){   // sudah tercatat pada tanggal + kegiatan + anak yang sama → tidak ditulis ulang
+      this.state.log.unshift({time:new Date().toLocaleTimeString('id-ID'),nama:r.msg,nis:(r.anak&&r.anak.NIS)||payload,method,ok:false,dup:true});
+      SRIT.Notify('\u26a0 '+r.msg,'warn',3500);
     }else{
       this.state.log.unshift({time:new Date().toLocaleTimeString('id-ID'),nama:r.msg,nis:payload,method,ok:false});
       SRIT.Notify(r.msg,'err',2000);
@@ -2085,12 +2112,13 @@ SRIT.Features.absensi={
     $('#abSumm').innerHTML=chip('HADIR',s.HADIR,'st-HADIR')+chip('IZIN',s.IZIN,'st-IZIN')+chip('SAKIT',s.SAKIT,'st-SAKIT')+chip('ALPA',s.ALPA,'st-ALPA')+chip('BELUM',s.BELUM,'st-BELUM')+chip('% HADIR (Kegiatan)',pctSes+'%','st-HADIR');
     },4000);}
     this._renderLog();
+    return r;
   },
   _renderLog(){
     const el=$('#abLog');if(!el)return;
     const n=$('#abLogN');if(n)n.textContent=this.state.log.length;
     el.innerHTML=this.state.log.length?this.state.log.map(l=>`<div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom" style="font-size:13px">
-      <i class="bi bi-${l.ok?'check-circle-fill text-success':'x-circle-fill text-danger'}"></i>
+      <i class="bi bi-${l.ok?'check-circle-fill text-success':(l.dup?'exclamation-triangle-fill text-warning':'x-circle-fill text-danger')}"></i>
       <div class="flex-grow-1"><div class="fw-semibold">${SRIT.Util.esc(l.nama)}</div><div class="text-muted-2" style="font-size:11px">${SRIT.Util.esc(l.nis)} \u00b7 ${l.method}</div></div>
       <span class="text-muted-2" style="font-size:11px">${l.time}</span></div>`).join(''):'<div class="empty-state py-4"><i class="bi bi-inbox d-block"></i>Belum ada scan</div>';
   },
@@ -2186,6 +2214,7 @@ SRIT.Features.absensi={
         <button class="btn btn-primary btn-sm w-100" id="abQrPhotoBtn"><i class="bi bi-camera"></i> Ambil Foto QR</button>
         <input type="file" id="abQrPhoto" accept="image/*" capture="environment" class="d-none">
         <div id="abPhotoStat" class="mt-2 small text-muted-2" style="min-height:18px"></div>`}
+        <button class="btn btn-outline-secondary btn-sm w-100 mt-2" id="abSoundBtn"></button>
         <input class="form-control form-control-sm mt-3" id="abQrManual" placeholder="Atau ketik / tempel kode QR, NIS, atau ID lalu Enter">
       </div></div>
       <div class="col-lg-7"><div class="card-srit p-0 h-100">
@@ -2198,6 +2227,9 @@ SRIT.Features.absensi={
     if(pb&&pi){pb.onclick=()=>pi.click();pi.onchange=async()=>{const fs=Array.from(pi.files||[]);pi.value='';if(fs.length)await this._decodeFiles(fs);};}
     const tg=$('#abQrToggle');
     if(tg)tg.onclick=()=>{if(this._qr.stream){this.stopQR();tg.innerHTML='<i class="bi bi-camera-video"></i> Lanjutkan kamera';}else{this.startQR();tg.innerHTML='<i class="bi bi-pause-circle"></i> Jeda kamera';}};
+    const sb=$('#abSoundBtn');
+    if(sb){const paint=()=>{const [ic,tx]=this._soundLabel(this._soundMode());sb.innerHTML='<i class="bi '+ic+'"></i> '+tx;};paint();
+      sb.onclick=()=>{const o=['suara','nada','senyap'],n=o[(o.indexOf(this._soundMode())+1)%3];this._soundSet(n);paint();if(n==='suara')this._speak('Suara aktif');else if(n==='nada')this._beep('ok');};}
     this._renderLog();
     if(live)this.startQR();
   },
@@ -2273,13 +2305,55 @@ SRIT.Features.absensi={
     const rt=$('#abCamRetry');if(rt)rt.onclick=()=>this.startQR();
     const dg=$('#abCamDiag');if(dg)dg.onclick=()=>this._showDiag(err);
   },
+  // ---------- suara: 3 mode (Suara = ucapan + nada, Nada saja, Senyap); tersimpan per perangkat ----------
+  _soundMode(){try{return localStorage.getItem('srit_sound')||'suara';}catch(e){return 'suara';}},
+  _soundSet(m){try{localStorage.setItem('srit_sound',m);}catch(e){}},
+  _soundLabel(m){return {suara:['bi-volume-up-fill','Suara: ucapan + nada'],nada:['bi-bell-fill','Suara: nada saja'],senyap:['bi-volume-mute-fill','Suara: senyap']}[m];},
+  _beep(kind){ // ok = satu nada tinggi; dup = dua nada rendah; err = nada panjang rendah
+    try{
+      const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+      const ac=this._ac||(this._ac=new C());if(ac.state==='suspended')ac.resume();
+      const seq=kind==='ok'?[[880,0,.09]]:kind==='dup'?[[330,0,.11],[330,.16,.11]]:[[200,0,.35]];
+      seq.forEach(([f,t,d])=>{const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='sine';g.gain.value=.15;o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+d);});
+    }catch(e){}
+  },
+  _speak(text){
+    try{
+      const ss=window.speechSynthesis;if(!ss||!text)return;
+      ss.cancel();   // scan beruntun: ucapan terbaru menggantikan yang antre, supaya tidak tertinggal
+      const u=new SpeechSynthesisUtterance(text);u.lang='id-ID';u.rate=1.05;u.volume=1;
+      const v=(ss.getVoices()||[]).find(x=>/^id([-_]|$)/i.test(x.lang));if(v)u.voice=v;
+      ss.speak(u);
+    }catch(e){}
+  },
+  _shortName(n){return String(n||'').trim().split(/\s+/).slice(0,3).join(' ');},
+  /** Dipanggil setiap hasil pindai (QR / RFID): nada + ucapan sesuai mode. r = hasil SRIT.Api.qrScan/rfidScan */
+  _sound(r){
+    const m=this._soundMode();if(m==='senyap'||!r)return;
+    const kind=r.ok?'ok':r.dup?'dup':'err';
+    this._beep(kind);
+    if(m!=='suara')return;
+    const nm=this._shortName(r.anak&&r.anak.NAMA);
+    let t;
+    if(r.ok)t=nm+', hadir';
+    else if(r.dup)t=nm+(r.status==='HADIR'?', sudah absen':', berstatus '+String(r.status||'').toLowerCase());
+    else t=/tidak aktif/.test(r.msg||'')?(r.msg||'Anak tidak aktif'):(/tidak dikenali/i.test(r.msg||'')?'Kode tidak dikenali':(r.msg||'Gagal'));
+    setTimeout(()=>this._speak(t),kind==='ok'?120:260);   // sesudah nada
+  },
   _qrHit(data){
     const now=Date.now();
-    if(data===this._qr.last&&now-this._qr.lastTime<=2500)return;
+    // QR yang masih ada di depan kamera tidak diproses/diberitahukan berulang-ulang
+    if(data===this._qr.last&&now-this._qr.lastTime<=2500){this._qr.lastTime=now;return;}
     this._qr.last=data;this._qr.lastTime=now;
-    this._doScan('QR',data);
-    try{if(navigator.vibrate)navigator.vibrate(50);}catch(e){}
-    const stat=$('#abQrStat');if(stat){stat.textContent='\u2713 '+data;stat.style.background='rgba(22,163,74,.85)';setTimeout(()=>{const s=$('#abQrStat');if(s){s.style.background='rgba(0,0,0,.6)';s.textContent='Arahkan QR ke dalam kotak\u2026';}},1200);}
+    Promise.resolve(this._doScan('QR',data)).then(r=>{
+      const ok=!!(r&&r.ok),dup=!!(r&&r.dup);
+      try{if(navigator.vibrate)navigator.vibrate(ok?50:dup?[90,60,90]:[220]);}catch(e){}
+      const stat=$('#abQrStat');if(!stat)return;
+      stat.textContent=ok?'\u2713 '+r.anak.NAMA+' \u2192 HADIR':dup?'\u26a0 '+r.msg:'\u2717 '+((r&&r.msg)||data);
+      stat.style.background=ok?'rgba(22,163,74,.9)':dup?'rgba(217,119,6,.95)':'rgba(220,38,38,.92)';
+      clearTimeout(this._qr.statT);
+      this._qr.statT=setTimeout(()=>{const s=$('#abQrStat');if(s){s.style.background='rgba(0,0,0,.6)';s.textContent='Arahkan QR ke dalam kotak\u2026';}},ok?1400:2600);
+    });
   },
   _qrLoop(){
     const video=$('#abVideo'),canvas=$('#abCanvas');
@@ -2374,6 +2448,13 @@ SRIT.Features.absensi={
   },
   async _decodePhoto(file){await this._decodeFiles([file]);},
   });
+  SRIT.Api.onScanDup=function(x){   // server menolak karena sudah tercatat (mis. dipindai di perangkat lain)
+    A.state.log.unshift({time:new Date().toLocaleTimeString('id-ID'),nama:x.msg,nis:(x.anak&&x.anak.NIS)||'',method:'QR',ok:false,dup:true});
+    if(A.state.log.length>50)A.state.log.pop();
+    if(A._renderLog)A._renderLog();
+    SRIT.Notify('\u26a0 '+x.msg,'warn',4500);
+    if(A._sound)A._sound(x);
+  };
   A._qr=Object.assign({stream:null,raf:null,last:'',lastTime:0,busy:false,starting:false,det:null},A._qr||{});
 })();
 </script>
