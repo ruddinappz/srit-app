@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="light">
 <head>
-<meta charset="UTF-8"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1c6ef2"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="mobile-web-app-capable" content="yes"><script src="config.js"></script><script src="gas-bridge.js"></script>
+<meta charset="UTF-8"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1c6ef2"><link rel="icon" type="image/png" href="favicon.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><script src="config.js"></script><script src="gas-bridge.js"></script>
 <style>#srit-boot{position:fixed;inset:0;z-index:2147483000;background:#eef2f8;color:#1b2440;overflow:auto;font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
 #srit-boot .sb-c{min-height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
 #srit-boot .sb-dot{display:inline-block;width:9px;height:9px;margin:0 3px;border-radius:50%;background:#1c6ef2;animation:sbd 1s infinite ease-in-out}
@@ -5882,9 +5882,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
 // Mengubah SEMUA <select> filter di seluruh menu menjadi dropdown bergaya (panel melayang, cari di dalam daftar panjang,
 // tombol X untuk melepas, navigasi keyboard). <select> asli tetap ada (disembunyikan) sehingga seluruh kode lama yang membaca
 // .value / menangkap event change / mengganti isi option tetap berjalan tanpa perubahan.
-// Tidak diterapkan pada: select di dalam modal/formulir, select ber-name (isian formulir), multiple, size>1, atau [data-native].
+// Berlaku di semua tempat (halaman, modal, formulir). Dikecualikan hanya: multiple, daftar terbuka (size>1), atau yang diberi atribut data-native.
 (function(){
   if(window.__sdInit)return;window.__sdInit=true;
+  function boot(){
   var css=
 '.sd{position:relative;display:block;width:100%}'+
 '.sd-native{display:none!important}'+
@@ -5897,6 +5898,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
 '.sd-x{display:none;opacity:.55;font-size:14px}.sd-x:hover{opacity:1}.sd.sd-has-val .sd-x{display:inline}'+
 '.sd-ch{font-size:11px;opacity:.7;transition:transform .15s}.sd.open .sd-ch{transform:rotate(180deg)}'+
 '.sd.sd-dis .sd-btn{opacity:.55;cursor:not-allowed;pointer-events:none}'+
+'.sd.sd-invalid .sd-btn{border-color:var(--srit-danger,#dc3545);box-shadow:0 0 0 3px rgba(220,53,69,.2)}'+
 '.sd-panel{position:fixed;z-index:2000;background:var(--srit-card);border:1px solid var(--srit-border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);overflow:hidden;outline:none}'+
 '.sd-search{padding:8px;border-bottom:1px solid var(--srit-border)}'+
 '.sd-search input{width:100%;padding:6px 10px;font-size:13px;border:1px solid var(--srit-border);border-radius:8px;background:var(--srit-surface);color:var(--srit-text);outline:none}'+
@@ -5917,8 +5919,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
 
   function eligible(s){
     if(s.__sd||s.multiple||s.hasAttribute('data-native'))return false;
-    if(s.size>1||s.name)return false;
-    if(s.closest('.modal,.offcanvas,form,[data-native-selects]'))return false;
+    if(s.size>1)return false;
     return true;
   }
   function closeAny(){
@@ -5970,6 +5971,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
     Object.defineProperty(sel,'selectedIndex',{configurable:true,get:function(){return idxDesc.get.call(sel);},set:function(v){idxDesc.set.call(sel,v);sync();}});
     new MutationObserver(function(){sync();if(cur&&cur.sel===sel)cur.build(cur.q);}).observe(sel,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['disabled','hidden','class','style','label','selected']});
     sync();
+    // select wajib (required) yang kosong: tandai merah & fokuskan (select asli tersembunyi sehingga bubble bawaan browser tidak tampil)
+    sel.addEventListener('invalid',function(e){e.preventDefault();wrap.classList.add('sd-invalid');try{btn.focus({preventScroll:false});}catch(x){}});
+    sel.addEventListener('change',function(){wrap.classList.remove('sd-invalid');});
 
     function choose(idx){
       var changed=sel.selectedIndex!==idx;
@@ -6006,7 +6010,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
         list.innerHTML=html||'<div class="sd-empty">Tidak ada hasil</div>';
         var s=list.querySelector('.sel');if(s&&!q)s.scrollIntoView({block:'nearest'});
       }
-      document.body.appendChild(panel);
+      (sel.closest('.modal,.offcanvas')||document.body).appendChild(panel);   // di dalam modal agar fokus keyboard tidak direbut Bootstrap
       cur={sel:sel,wrap:wrap,btn:btn,panel:panel,list:list,q:'',build:build};
       wrap.classList.add('open');
       build('');position();
@@ -6046,7 +6050,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   window.addEventListener('resize',position);
   window.addEventListener('scroll',function(e){if(cur&&!cur.panel.contains(e.target))position();},true);
 
-  function scan(){var all=document.querySelectorAll('select');for(var i=0;i<all.length;i++){if(eligible(all[i]))enhance(all[i]);}}
+  function scan(){var all=document.querySelectorAll('select');for(var i=0;i<all.length;i++){try{if(eligible(all[i]))enhance(all[i]);}catch(e){console.error('SRIT_Dropdown:',e);}}}
   var queued=false;
   new MutationObserver(function(ms){
     if(queued)return;
@@ -6055,7 +6059,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
         if(n.nodeType===1&&(n.tagName==='SELECT'||(n.querySelector&&n.querySelector('select')))){queued=true;requestAnimationFrame(function(){queued=false;scan();});return;}}}
   }).observe(document.body,{childList:true,subtree:true});
   scan();
-  window.SRIT_Dropdown={scan:scan};
+  window.SRIT_Dropdown={scan:scan,version:2};
+  console.info('SRIT_Dropdown aktif');
+  }
+  if(document.body&&document.head)boot();else document.addEventListener('DOMContentLoaded',boot);
 })();
 </script>
 

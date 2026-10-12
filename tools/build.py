@@ -16,7 +16,7 @@ def expand(text, depth=0):
 html = expand((src / 'Index.html').read_text(encoding='utf-8'))
 if '<?' in html: print('PERINGATAN: masih ada tag <? ?> yang tidak diganti')
 bridge = ('<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1c6ef2">'
-          '<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">'
+          '<link rel="icon" type="image/png" href="favicon.png"><link rel="apple-touch-icon" href="apple-touch-icon.png">'
           '<meta name="mobile-web-app-capable" content="yes">'
           '<script src="config.js"></script><script src="gas-bridge.js"></script>')
 html = html.replace('<meta charset="UTF-8">', '<meta charset="UTF-8">' + bridge, 1)
