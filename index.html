@@ -723,68 +723,11 @@ SRIT.Modal = {
    Native <select> tetap dipertahankan (nilai + event change) agar kode lama jalan.
    ========================================================================= */
 SRIT.SS={
-  enhance(sel){
-    if(!sel||sel.dataset.ssDone||sel.multiple||sel.size>1||sel.dataset.nosearch)return;
-    sel.dataset.ssDone='1';
-    const wrap=document.createElement('span');wrap.className='ss-wrap';
-    sel.parentNode.insertBefore(wrap,sel);wrap.appendChild(sel);
-    sel.style.display='none';
-    const input=document.createElement('input');
-    input.type='text';input.autocomplete='off';input.spellcheck=false;
-    input.className=(sel.className||'form-select form-select-sm').replace('ss-done','')+' ss-input';
-    if(sel.disabled)input.disabled=true;
-    const menu=document.createElement('div');menu.className='ss-menu';
-    wrap.appendChild(input);wrap.appendChild(menu);
-    let active=-1;
-    const sync=()=>{const o=sel.options[sel.selectedIndex];input.value=o?o.textContent.trim():'';};
-    const build=(q='')=>{
-      q=q.toLowerCase();menu.innerHTML='';active=-1;
-      let shown=0;
-      [...sel.options].forEach((o,i)=>{
-        const txt=o.textContent.trim();
-        if(o.disabled&&o.value==='')return;
-        if(q&&!txt.toLowerCase().includes(q))return;
-        const d=document.createElement('div');d.className='ss-opt'+(i===sel.selectedIndex?' sel':'');
-        d.textContent=txt;d.dataset.i=i;
-        d.onmousedown=e=>{e.preventDefault();sel.selectedIndex=i;sync();hide();sel.dispatchEvent(new Event('change',{bubbles:true}));};
-        menu.appendChild(d);shown++;
-      });
-      if(!shown)menu.innerHTML='<div class="ss-opt muted">Tidak ditemukan</div>';
-    };
-    const show=()=>{build();menu.classList.add('show');input.select();};
-    const hide=()=>{menu.classList.remove('show');sync();};
-    input.onfocus=show;
-    input.oninput=()=>{build(input.value);menu.classList.add('show');};
-    input.onblur=()=>setTimeout(hide,150);
-    input.onkeydown=e=>{
-      const opts=[...menu.querySelectorAll('.ss-opt:not(.muted)')];
-      if(e.key==='ArrowDown'){e.preventDefault();active=Math.min(active+1,opts.length-1);}
-      else if(e.key==='ArrowUp'){e.preventDefault();active=Math.max(active-1,0);}
-      else if(e.key==='Enter'){e.preventDefault();const t=opts[active]||opts[0];if(t){sel.selectedIndex=+t.dataset.i;sync();hide();sel.dispatchEvent(new Event('change',{bubbles:true}));}return;}
-      else if(e.key==='Escape'){hide();return;}
-      else return;
-      opts.forEach((o,i)=>o.classList.toggle('active',i===active));
-      if(opts[active])opts[active].scrollIntoView({block:'nearest'});
-    };
-    // sinkron bila opsi/nilai diubah kode (childList berubah saat innerHTML di-set)
-    sel.addEventListener('change',sync);
-    new MutationObserver(()=>sync()).observe(sel,{childList:true});
-    sync();
-  },
-  scan(root){try{$$('select',root||document).forEach(s=>this.enhance(s));}catch(e){}},
-  init(){
-    this.scan(document);
-    // auto-enhance <select> baru yang ditambahkan ke DOM
-    const mo=new MutationObserver(muts=>{
-      let has=false;muts.forEach(m=>m.addedNodes&&m.addedNodes.forEach(n=>{
-        if(n.nodeType!==1||n.classList&&n.classList.contains('ss-wrap'))return;
-        if(n.tagName==='SELECT'&&!n.dataset.ssDone)has=true;
-        else if(n.querySelector&&n.querySelector('select:not([data-ss-done])'))has=true;
-      }));
-      if(has)this.scan(document);
-    });
-    mo.observe(document.body,{childList:true,subtree:true});
-  }
+  // Pencarian-dropdown lama DIGANTI oleh dropdown baru (berkas JS_Dropdown). Fungsi di bawah dipertahankan agar kode lama
+  // (SRIT.SS.init() di JS_Boot, SRIT.SS.enhance/scan) tetap berjalan, tetapi sekarang meneruskan ke dropdown baru.
+  enhance(sel){try{if(window.SRIT_Dropdown)window.SRIT_Dropdown.enhance(sel);}catch(e){}},
+  scan(root){try{if(window.SRIT_Dropdown)window.SRIT_Dropdown.scan();}catch(e){}},
+  init(){try{if(window.SRIT_Dropdown)window.SRIT_Dropdown.scan();}catch(e){}}
 };
 
 /* =========================================================================
@@ -3378,11 +3321,7 @@ SRIT.Features.analytics={
     return `<div class="card-srit p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h6 class="section-title mb-0">Filter</h6>
-        <div class="btn-group btn-group-sm">
-          <button class="btn ${st.period==='harian'?'btn-primary':'btn-outline-secondary'}" data-p="harian">Harian</button>
-          <button class="btn ${st.period==='mingguan'?'btn-primary':'btn-outline-secondary'}" data-p="mingguan">Mingguan</button>
-          <button class="btn ${st.period==='bulanan'?'btn-primary':'btn-outline-secondary'}" data-p="bulanan">Bulanan</button>
-        </div>
+        <div style="min-width:180px"><select class="form-select form-select-sm" id="anPeriod">${[['harian','Harian'],['mingguan','Mingguan'],['bulanan','Bulanan']].map(p=>`<option value="${p[0]}" ${st.period===p[0]?'selected':''}>Periode: ${p[1]}</option>`).join('')}</select></div>
       </div>
       <div class="filter-bar">
         <div><label class="form-label-sm">Dari Tanggal</label><input type="date" class="form-control form-control-sm" id="anFrom" value="${st.from||''}" max="${SRIT.Util.todayISO()}"></div>
@@ -3398,7 +3337,7 @@ SRIT.Features.analytics={
     </div>`;
   },
   wireFilterBar(st,afterApply){
-    $$('[data-p]').forEach(b=>b.onclick=()=>{st.period=b.dataset.p;afterApply();});
+    $('#anPeriod').onchange=e=>{st.period=e.target.value;afterApply();};
     $('#anApply').onclick=()=>{
       st.from=$('#anFrom').value;st.to=$('#anTo').value;
       st.jenjang=$('#anJenjang').value;st.jk=$('#anJk').value;st.asrama=$('#anAsrama').value;
@@ -4804,7 +4743,7 @@ const F={
       </div>
       <hr class="my-2"><div class="filter-bar">
         <div><label class="form-label-sm">Tahun Ajaran</label><select class="form-select form-select-sm" id="pfTA">${[cur,cur-1,cur-2].map(s=>`<option value="${s}" ${+this.st.ta===s?'selected':''}>${s}/${s+1}</option>`).join('')}</select></div>
-        <div><label class="form-label-sm">Periode</label><div class="btn-group btn-group-sm" id="pfMode">${[['bulan','Bulanan'],['tribulan','Tribulan'],['semester','Semester'],['ta','Tahun Ajaran']].map(m=>`<button class="btn ${this.st.mode===m[0]?'btn-primary':'btn-outline-primary'}" data-m="${m[0]}">${m[1]}</button>`).join('')}</div></div>
+        <div><label class="form-label-sm">Periode</label><select class="form-select form-select-sm" id="pfMode">${[['bulan','Bulanan'],['tribulan','Tribulan'],['semester','Semester'],['ta','Tahun Ajaran']].map(m=>`<option value="${m[0]}" ${this.st.mode===m[0]?'selected':''}>${m[1]}</option>`).join('')}</select></div>
         <div id="pfSubWrap"><label class="form-label-sm">&nbsp;</label><select class="form-select form-select-sm" id="pfSub"></select></div>
       </div></div><div id="pfBody"></div>`;
     this._fillKelas();this._fillSub();this._wire();
@@ -4833,7 +4772,7 @@ const F={
     document.addEventListener('click',this._away=e=>{const p=$('#pfPick');if(p&&!e.target.closest('#pfPick')&&e.target.id!=='pfQ')p.classList.add('d-none');});
     $('#pfPrev').onclick=()=>this._step(-1);$('#pfNext').onclick=()=>this._step(1);
     $('#pfTA').onchange=e=>{this.st.ta=e.target.value;this._defSub();this._fillSub();this.load();};
-    $$('#pfMode button').forEach(b=>b.onclick=()=>{this.st.mode=b.dataset.m;$$('#pfMode button').forEach(x=>x.className='btn '+(x===b?'btn-primary':'btn-outline-primary'));this._defSub();this._fillSub();this.draw();});
+    $('#pfMode').onchange=e=>{this.st.mode=e.target.value;this._defSub();this._fillSub();this.draw();};
     $('#pfSub').onchange=e=>{this.st.sub=e.target.value;this.draw();};
   },
   _pick(){
@@ -5818,64 +5757,7 @@ SRIT.LiveTV={
 };
 </script>
 
-<script>__srit.n('JS_Boot')</script>
-<script>
-//# sourceURL=JS_Boot.html
-/* =========================================================================
-   BOOTSTRAP APP — memuat konfigurasi publik, memulihkan sesi, lalu menjalankan router.
-   Setiap langkah dilindungi agar satu galat tidak membuat layar kosong; galat tampil di layar (window.__srit).
-   ========================================================================= */
-document.addEventListener('DOMContentLoaded',async()=>{
-  const D=window.__srit;
-  const note=(name,e)=>{console.error('SRIT boot: '+name,e);if(D)D.errs.push({kind:'js',msg:name+': '+String((e&&e.message)||e),file:'JS_Boot'});};
-  const step=(name,f)=>{try{return f();}catch(e){note(name,e);}};
-  // 1) pastikan berkas inti termuat lengkap; berkas menu yang cacat hanya diperingatkan
-  const miss=D?D.check():[];
-  if(miss.some(m=>m.core)){D.fail(miss);return;}
-  // 2) tema awal dari penyimpanan lokal (agar tidak berkedip), lalu disempurnakan oleh pengaturan server
-  step('tema awal',()=>{SRIT.Theme.apply(SRIT.LS.get('SRIT_THEME')||'light');SRIT.Brand.render();});
-  step('tombol tema',()=>{$('#themeToggle').onclick=()=>{SRIT.Theme.toggle();};});
-  step('form login',()=>{$('#loginForm').onsubmit=async e=>{e.preventDefault();
-    const btn=$('#loginForm button[type=submit]');if(btn)btn.disabled=true;SRIT.Loading.show();
-    const r=await SRIT.Auth.login($('#loginEmail').value.trim(),$('#loginPass').value);
-    SRIT.Loading.hide();if(btn)btn.disabled=false;
-    if(r.ok){$('#loginErr').classList.add('d-none');location.hash='#/dashboard';SRIT.Router.go();}
-    else{$('#loginErr').textContent=r.msg;$('#loginErr').classList.remove('d-none');}
-  };});
-  step('pencarian dropdown',()=>SRIT.SS.init()); // aktifkan pencarian pada semua dropdown
-  step('router hash',()=>window.addEventListener('hashchange',()=>SRIT.Router.go()));
-  // 3) konfigurasi publik (branding, tema, pengaturan Live TV)
-  try{const cfg=await SRIT.Server.pub('apiPublicConfig');SRIT.Store._set('SETTINGS',cfg.settings||{});}
-  catch(e){
-    note('apiPublicConfig',e);
-    if(/Database belum dibuat/i.test(String(e&&e.message)))step('info',()=>SRIT.Notify('Database belum dibuat. Jalankan runFullSetup() di editor Apps Script, lalu muat ulang halaman.','err',15000));
-  }
-  step('tema server',()=>{
-    const s=SRIT.Store.readObj('SETTINGS');
-    const themeId=SRIT.LS.get('SRIT_THEME')||s.THEME_MODE||'light';
-    SRIT.Theme.apply(themeId);
-    // warna kustom hanya untuk tema light/dark; tema lain punya palet sendiri
-    if((themeId==='light'||themeId==='dark')&&s.THEME_PRIMARY)SRIT.Theme.setPrimary(s.THEME_PRIMARY);
-    SRIT.Brand.render();
-  });
-  // 4) restore session
-  try{await SRIT.Auth.restore();}catch(e){note('restore sesi',e);}
-  // pembaruan cermin data berkala (multi-pengguna)
-  setInterval(()=>{if(SRIT.Auth.user)SRIT.Sync.poll();},45000);
-  // 5) default landing = Live TV
-  if(!location.hash)location.hash='#/live';
-  let routed=true;
-  try{SRIT.Router.go();}catch(e){routed=false;note('router',e);}
-  if(D){if(routed)D.ready();else{D.fail(miss);return;}}   // router gagal → tampilkan penyebab, jangan biarkan layar kosong
-  // peringatan non-fatal: menu yang berkasnya cacat & pustaka CDN yang gagal dimuat
-  step('peringatan',()=>{
-    if(miss.length)SRIT.Notify('Berkas belum termuat lengkap: '+miss.map(m=>m.file).join(', ')+'. Menu terkait tidak akan berfungsi.','warn',15000);
-    const lib=['bootstrap','Chart'].filter(k=>!window[k]);
-    if(lib.length)SRIT.Notify('Pustaka '+lib.join(' & ')+' dari CDN belum termuat — tampilan/grafik mungkin tidak lengkap. Periksa koneksi internet.','warn',12000);
-  });
-});
-</script>
-
+<script>__srit.n('JS_Dropdown')</script>
 <script>
 //# sourceURL=JS_Dropdown.html
 // ---------- DROPDOWN FILTER BARU (global) ----------
@@ -5918,7 +5800,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
 
   function eligible(s){
-    if(s.__sd||s.multiple||s.hasAttribute('data-native'))return false;
+    if(s.__sd||s.multiple||s.hasAttribute('data-native')||s.dataset.nosearch)return false;
     if(s.size>1)return false;
     return true;
   }
@@ -6050,7 +5932,23 @@ document.addEventListener('DOMContentLoaded',async()=>{
   window.addEventListener('resize',position);
   window.addEventListener('scroll',function(e){if(cur&&!cur.panel.contains(e.target))position();},true);
 
-  function scan(){var all=document.querySelectorAll('select');for(var i=0;i<all.length;i++){try{if(eligible(all[i]))enhance(all[i]);}catch(e){console.error('SRIT_Dropdown:',e);}}}
+  // Pencarian-dropdown LAMA (SRIT.SS di JS_UI) membungkus <select> menjadi kotak ketik. Itu diganti total oleh dropdown baru ini:
+  // fungsi lama dialihkan ke sini, dan select yang sudah terlanjur dibungkus dibongkar lalu dipercantik ulang.
+  function takeOver(){
+    try{
+      if(window.SRIT&&window.SRIT.SS){
+        window.SRIT.SS.enhance=function(s){try{if(s&&eligible(s))enhance(s);}catch(e){}};
+        window.SRIT.SS.scan=function(){scan();};
+        window.SRIT.SS.init=function(){scan();};
+      }
+      var ws=document.querySelectorAll('.ss-wrap');
+      for(var i=0;i<ws.length;i++){
+        var w=ws[i],sel=w.querySelector('select');if(!sel||!w.parentNode)continue;
+        w.parentNode.insertBefore(sel,w);sel.style.display='';delete sel.dataset.ssDone;w.parentNode.removeChild(w);
+      }
+    }catch(e){console.error('SRIT_Dropdown takeOver:',e);}
+  }
+  function scan(){takeOver();var all=document.querySelectorAll('select');for(var i=0;i<all.length;i++){try{if(eligible(all[i]))enhance(all[i]);}catch(e){console.error('SRIT_Dropdown:',e);}}}
   var queued=false;
   new MutationObserver(function(ms){
     if(queued)return;
@@ -6059,11 +5957,68 @@ document.addEventListener('DOMContentLoaded',async()=>{
         if(n.nodeType===1&&(n.tagName==='SELECT'||(n.querySelector&&n.querySelector('select')))){queued=true;requestAnimationFrame(function(){queued=false;scan();});return;}}}
   }).observe(document.body,{childList:true,subtree:true});
   scan();
-  window.SRIT_Dropdown={scan:scan,version:2};
+  window.SRIT_Dropdown={scan:scan,enhance:function(s){try{if(s&&eligible(s))enhance(s);}catch(e){}},version:3};
   console.info('SRIT_Dropdown aktif');
   }
   if(document.body&&document.head)boot();else document.addEventListener('DOMContentLoaded',boot);
 })();
+</script>
+<script>__srit.n('JS_Boot')</script>
+<script>
+//# sourceURL=JS_Boot.html
+/* =========================================================================
+   BOOTSTRAP APP — memuat konfigurasi publik, memulihkan sesi, lalu menjalankan router.
+   Setiap langkah dilindungi agar satu galat tidak membuat layar kosong; galat tampil di layar (window.__srit).
+   ========================================================================= */
+document.addEventListener('DOMContentLoaded',async()=>{
+  const D=window.__srit;
+  const note=(name,e)=>{console.error('SRIT boot: '+name,e);if(D)D.errs.push({kind:'js',msg:name+': '+String((e&&e.message)||e),file:'JS_Boot'});};
+  const step=(name,f)=>{try{return f();}catch(e){note(name,e);}};
+  // 1) pastikan berkas inti termuat lengkap; berkas menu yang cacat hanya diperingatkan
+  const miss=D?D.check():[];
+  if(miss.some(m=>m.core)){D.fail(miss);return;}
+  // 2) tema awal dari penyimpanan lokal (agar tidak berkedip), lalu disempurnakan oleh pengaturan server
+  step('tema awal',()=>{SRIT.Theme.apply(SRIT.LS.get('SRIT_THEME')||'light');SRIT.Brand.render();});
+  step('tombol tema',()=>{$('#themeToggle').onclick=()=>{SRIT.Theme.toggle();};});
+  step('form login',()=>{$('#loginForm').onsubmit=async e=>{e.preventDefault();
+    const btn=$('#loginForm button[type=submit]');if(btn)btn.disabled=true;SRIT.Loading.show();
+    const r=await SRIT.Auth.login($('#loginEmail').value.trim(),$('#loginPass').value);
+    SRIT.Loading.hide();if(btn)btn.disabled=false;
+    if(r.ok){$('#loginErr').classList.add('d-none');location.hash='#/dashboard';SRIT.Router.go();}
+    else{$('#loginErr').textContent=r.msg;$('#loginErr').classList.remove('d-none');}
+  };});
+  step('pencarian dropdown',()=>SRIT.SS.init()); // aktifkan pencarian pada semua dropdown
+  step('router hash',()=>window.addEventListener('hashchange',()=>SRIT.Router.go()));
+  // 3) konfigurasi publik (branding, tema, pengaturan Live TV)
+  try{const cfg=await SRIT.Server.pub('apiPublicConfig');SRIT.Store._set('SETTINGS',cfg.settings||{});}
+  catch(e){
+    note('apiPublicConfig',e);
+    if(/Database belum dibuat/i.test(String(e&&e.message)))step('info',()=>SRIT.Notify('Database belum dibuat. Jalankan runFullSetup() di editor Apps Script, lalu muat ulang halaman.','err',15000));
+  }
+  step('tema server',()=>{
+    const s=SRIT.Store.readObj('SETTINGS');
+    const themeId=SRIT.LS.get('SRIT_THEME')||s.THEME_MODE||'light';
+    SRIT.Theme.apply(themeId);
+    // warna kustom hanya untuk tema light/dark; tema lain punya palet sendiri
+    if((themeId==='light'||themeId==='dark')&&s.THEME_PRIMARY)SRIT.Theme.setPrimary(s.THEME_PRIMARY);
+    SRIT.Brand.render();
+  });
+  // 4) restore session
+  try{await SRIT.Auth.restore();}catch(e){note('restore sesi',e);}
+  // pembaruan cermin data berkala (multi-pengguna)
+  setInterval(()=>{if(SRIT.Auth.user)SRIT.Sync.poll();},45000);
+  // 5) default landing = Live TV
+  if(!location.hash)location.hash='#/live';
+  let routed=true;
+  try{SRIT.Router.go();}catch(e){routed=false;note('router',e);}
+  if(D){if(routed)D.ready();else{D.fail(miss);return;}}   // router gagal → tampilkan penyebab, jangan biarkan layar kosong
+  // peringatan non-fatal: menu yang berkasnya cacat & pustaka CDN yang gagal dimuat
+  step('peringatan',()=>{
+    if(miss.length)SRIT.Notify('Berkas belum termuat lengkap: '+miss.map(m=>m.file).join(', ')+'. Menu terkait tidak akan berfungsi.','warn',15000);
+    const lib=['bootstrap','Chart'].filter(k=>!window[k]);
+    if(lib.length)SRIT.Notify('Pustaka '+lib.join(' & ')+' dari CDN belum termuat — tampilan/grafik mungkin tidak lengkap. Periksa koneksi internet.','warn',12000);
+  });
+});
 </script>
 
 </body>
