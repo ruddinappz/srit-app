@@ -1664,7 +1664,7 @@ SRIT.Features.anak={
         {key:'JK',label:'JK',required:true,type:'select',options:[{v:'L'},{v:'P'}]},
         {key:'ASRAMA',label:'Asrama',ref:'Struktur & Data Induk',refTable:'ASRAMA',refField:'NAME'},
         {key:'KAMAR',label:'Kamar',ref:'Struktur & Data Induk',refTable:'KAMAR',refField:'NAME'},
-        {key:'WALI_ASUH',label:'Wali Asuh',ref:'Struktur & Data Induk',refTable:'WALI_ASUH',refField:'NAME'},
+        {key:'WALI_ASUH',label:'Wali Asuh',ref:'Tenaga Kependidikan',refTable:'WALI_ASUH',refField:'NAME'},
         {key:'RFID_UID',label:'RFID UID',hint:'opsional untuk kartu RFID'}
       ],
       sample:[
@@ -3154,6 +3154,25 @@ SRIT.Features.user={
     }catch(e){console.warn('jabatan standar',e);}
   },
 
+  /** Cermin lokal logika server (syncStaffToWali_) agar menu lain (Anak, Penghuni, Kelompok Asuh, dll.) langsung melihat wali tanpa menunggu sinkronisasi. */
+  _syncLocalWali(u,hint){
+    const types=[{re:/wali\s*asuh/i,t:'WALI_ASUH',p:'WS'},{re:/wali\s*asrama/i,t:'WALI_ASRAMA',p:'WR'}];
+    const jn=this._jabName(u.JABATAN),want=types.find(w=>w.re.test(jn));
+    const nn=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+    types.forEach(w=>{
+      const rows=SRIT.Store.read(w.t);let linked=rows.find(r=>r.USER_ID===u.ID);
+      if(want&&want.t===w.t){
+        if(!linked&&hint&&hint[0]===w.t)linked=rows.find(r=>String(r.ID)===hint[1]);
+        if(!linked)linked=rows.find(r=>!r.USER_ID&&nn(r.NAME)===nn(u.NAME));
+        const patch={NAME:u.NAME,USER_ID:u.ID,STATUS:u.STATUS||'AKTIF'};
+        ['ASRAMA','GEDUNG','JENJANG','HP'].forEach(k=>{if(u[k])patch[k]=u[k];});
+        if(linked)Object.assign(linked,patch);else rows.push(Object.assign({ID:w.p+'-'+u.ID,ASRAMA:'',GEDUNG:'',JENJANG:'',HP:''},patch));
+      }else if(linked&&linked.STATUS!=='NONAKTIF'){linked.STATUS='NONAKTIF';}
+      else return;
+      SRIT.Store._set(w.t,rows);   // tanpa antrean: server melakukan hal yang sama
+    });
+  },
+
   render(host){
     SRIT.UI.setPage('Tenaga Kependidikan & Akun','Tenaga Kependidikan');
     this._ensureJabatan();
@@ -3293,9 +3312,11 @@ SRIT.Features.user={
         if(pseudo)row._WALI=u._t+'|'+u._wid;   // petunjuk: sambungkan ke baris wali yang sudah ada (ID wali lama tidak berganti)
         SRIT.Repo.insert('USERS',row);SRIT.Audit.log('CREATE','user',row.ID);
         if(akun&&pw)SRIT.Sync.setPassword(row.ID,pw);
+        this._syncLocalWali(row,pseudo?[u._t,u._wid]:null);
       }else{
         SRIT.Repo.update('USERS',id,row);SRIT.Audit.log('UPDATE','user',id);
         if(akun&&pw)SRIT.Sync.setPassword(id,pw);
+        this._syncLocalWali(SRIT.Repo.getById('USERS',id)||Object.assign({ID:id},row),null);
       }
       m.close();SRIT.Notify(akun?'Tersimpan. Akun login aktif.':'Data tenaga kependidikan tersimpan','ok');this.load();
     };
@@ -4223,21 +4244,46 @@ SRIT.Features['keasramaan-master']={
       onCreate:d=>{const km=SRIT.Repo.getById('KAMAR',d.KAMAR);if(km){if(!d.JENJANG)d.JENJANG=km.JENJANG||'';if(!d.JK)d.JK=km.JK||'';}},
       filters:[{k:'KAMAR',label:'Kamar',options:()=>SRIT.Store.read('KAMAR').map(k=>({v:k.ID,t:k.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'JK',label:'Jenis Kelamin',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'STATUS',label:'Status',options:[{v:'KOSONG',t:'KOSONG'},{v:'TERISI',t:'TERISI'},{v:'RUSAK',t:'RUSAK'}]},{k:'POSISI',label:'Posisi',options:[{v:'ATAS',t:'ATAS'},{v:'BAWAH',t:'BAWAH'}]}],
       cols:[{h:'Kode',k:'KODE'},{h:'Kamar',f:r=>(SRIT.Repo.getById('KAMAR',r.KAMAR)||{}).NAME||'-'},{h:'Jenjang',f:r=>{const jj=r.JENJANG||(SRIT.Repo.getById('KAMAR',r.KAMAR)||{}).JENJANG;return `<span class="badge-soft st-IZIN">${jj||'-'}</span>`;}},{h:'JK',f:r=>{const jk=r.JK||(SRIT.Repo.getById('KAMAR',r.KAMAR)||{}).JK;return jk==='L'?'Putra':jk==='P'?'Putri':'-';}},{h:'Posisi',k:'POSISI'},{h:'Status',f:r=>`<span class="badge-soft ${r.STATUS==='TERISI'?'st-HADIR':r.STATUS==='RUSAK'?'st-ALPA':'st-BELUM'}">${r.STATUS}</span>`},{h:'Penghuni',f:r=>SRIT.nm('ANAK',r.ANAK_ID)}],idPrefix:'TT',fields:[{k:'KAMAR',label:'Kamar',type:'select',col:12,options:()=>SRIT.Store.read('KAMAR').map(k=>({v:k.ID,t:k.NAME}))},{k:'KODE',label:'Kode'},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'JK',label:'Jenis Kelamin',type:'select',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'POSISI',label:'Posisi',type:'select',options:[{v:'ATAS',t:'ATAS'},{v:'BAWAH',t:'BAWAH'}]},{k:'STATUS',label:'Status',type:'select',options:[{v:'KOSONG',t:'KOSONG'},{v:'TERISI',t:'TERISI'},{v:'RUSAK',t:'RUSAK'}]}]},
-    {k:'WALI_ASUH',t:'Wali Asuh',searchFields:['NAME'],
+    {k:'WALI_ASUH',t:'Wali Asuh',managed:true,searchFields:['NAME'],
       filters:[{k:'ASRAMA',label:'Asrama',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'STATUS',label:'Status',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}],
       cols:[{h:'Nama',k:'NAME'},{h:'Asrama',f:r=>(SRIT.Repo.getById('ASRAMA',r.ASRAMA)||{}).NAME||'-'},{h:'Gedung',f:r=>(SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-'},{h:'Jenjang',k:'JENJANG'},{h:'Anak Asuh',f:r=>SRIT.Store.read('ANAK').filter(a=>a.WALI_ASUH===r.ID).length},{h:'Status',f:r=>`<span class="badge-soft st-HADIR">${r.STATUS||'AKTIF'}</span>`}],idPrefix:'WA',fields:[{k:'NAME',label:'Nama',col:12,required:true},{k:'USER_ID',label:'User Akun (opsional)',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('USERS').map(u=>({v:u.ID,t:u.NAME})))},{k:'ASRAMA',label:'Asrama',type:'select',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME})))},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'HP',label:'No. HP'},{k:'STATUS',label:'Status',type:'select',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}]},
-    {k:'WALI_ASRAMA',t:'Wali Asrama',searchFields:['NAME'],
+    {k:'WALI_ASRAMA',t:'Wali Asrama',managed:true,searchFields:['NAME'],
       filters:[{k:'ASRAMA',label:'Asrama',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'STATUS',label:'Status',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}],
       cols:[{h:'Nama',k:'NAME'},{h:'Asrama',f:r=>(SRIT.Repo.getById('ASRAMA',r.ASRAMA)||{}).NAME||'-'},{h:'Gedung',f:r=>(SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-'},{h:'Jenjang',k:'JENJANG'},{h:'Status',f:r=>`<span class="badge-soft st-HADIR">${r.STATUS||'AKTIF'}</span>`}],idPrefix:'WR',fields:[{k:'NAME',label:'Nama',col:12,required:true},{k:'USER_ID',label:'User Akun (opsional)',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('USERS').map(u=>({v:u.ID,t:u.NAME})))},{k:'ASRAMA',label:'Asrama',type:'select',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME})))},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'STATUS',label:'Status',type:'select',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}]},
     {k:'KELOMPOK_ASUH',t:'Kelompok Asuh',searchFields:['NAME'],
       filters:[{k:'ASRAMA',label:'Asrama',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'WALI_ASUH',label:'Wali Asuh',options:()=>SRIT.Store.read('WALI_ASUH').map(w=>({v:w.ID,t:w.NAME}))}],
       cols:[{h:'Nama',k:'NAME'},{h:'Gedung',f:r=>(SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-'},{h:'Jenjang',k:'JENJANG'},{h:'Wali Asuh',f:r=>(SRIT.Repo.getById('WALI_ASUH',r.WALI_ASUH)||{}).NAME||'-'},{h:'Anggota',f:r=>SRIT.Store.read('ANAK').filter(a=>a.KELOMPOK===r.ID).length},{h:'Kapasitas',k:'KAPASITAS'}],idPrefix:'KA',fields:[{k:'NAME',label:'Nama Kelompok',col:12,required:true},{k:'ASRAMA',label:'Asrama',type:'select',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME})))},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'WALI_ASUH',label:'Wali Asuh',type:'select',options:()=>SRIT.Store.read('WALI_ASUH').map(w=>({v:w.ID,t:w.NAME}))},{k:'KAPASITAS',label:'Kapasitas',type:'number'}]}
   ],
+  _managed(body,t){
+    const esc=SRIT.Util.esc,tbl=t.k,S=this._ms||(this._ms={});
+    body.innerHTML=`<div class="alert alert-info d-flex flex-wrap gap-2 align-items-center justify-content-between py-2"><div style="font-size:13px"><i class="bi bi-info-circle"></i> Data <b>${esc(t.t)}</b> kini dikelola di menu <b>Tenaga Kependidikan</b> (satu data dengan akun pengguna). Daftar ini otomatis terhubung ke data Anak, Kamar, Kelompok Asuh, dan fitur lain, jadi di sini hanya ditampilkan.</div>
+      <button class="btn btn-primary btn-sm" id="kmGoUser"><i class="bi bi-person-badge"></i> Kelola di Tenaga Kependidikan</button></div>
+      <div class="card-srit p-3 mb-3"><div class="filter-bar">
+        <div style="flex:1;min-width:200px"><label class="form-label-sm">Cari</label><input class="form-control form-control-sm" id="kmQ" placeholder="Ketik nama\u2026" value="${esc(S.q||'')}"></div>
+        <div style="min-width:150px"><label class="form-label-sm">Status</label><select class="form-select form-select-sm" id="kmSt"><option value="">Semua</option><option ${S.st==='AKTIF'?'selected':''}>AKTIF</option><option ${S.st==='NONAKTIF'?'selected':''}>NONAKTIF</option></select></div>
+      </div></div>
+      <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="kmTbl"></table></div></div>`;
+    const draw=()=>{
+      const q=(S.q||'').trim().toLowerCase(),users=SRIT.Store.read('USERS');
+      const rows=SRIT.Store.read(tbl).filter(r=>(!S.st||(r.STATUS||'AKTIF')===S.st)&&(!q||String(r.NAME||'').toLowerCase().indexOf(q)>=0)).sort((a,b)=>String(a.NAME||'').localeCompare(String(b.NAME||''),'id'));
+      $('#kmTbl').innerHTML=`<thead><tr><th>Nama</th><th>Asrama</th><th>Gedung</th><th>Jenjang</th>${tbl==='WALI_ASUH'?'<th>Anak Asuh</th>':''}<th>Akun login</th><th>Status</th></tr></thead><tbody>${
+        rows.map(r=>{const u=users.find(x=>x.ID===r.USER_ID),has=u&&u.AKUN!=='TIDAK'&&u.EMAIL;
+          return `<tr><td class="fw-semibold">${esc(r.NAME)}</td><td>${esc((SRIT.Repo.getById('ASRAMA',r.ASRAMA)||{}).NAME||'-')}</td><td>${esc((SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-')}</td><td>${esc(r.JENJANG||'-')}</td>
+          ${tbl==='WALI_ASUH'?'<td>'+SRIT.Store.read('ANAK').filter(a=>a.WALI_ASUH===r.ID&&a.STATUS==='AKTIF').length+'</td>':''}
+          <td>${u?(has?'<span class="badge-soft st-HADIR">Punya akun</span>':'<span class="badge-soft st-BELUM">Belum punya akun</span>'):'<span class="badge-soft st-BELUM">Belum terdaftar</span>'}</td>
+          <td><span class="badge-soft ${(r.STATUS||'AKTIF')==='AKTIF'?'st-HADIR':'st-BELUM'}">${esc(r.STATUS||'AKTIF')}</span></td></tr>`;}).join('')||`<tr><td colspan="7" class="text-center text-muted-2 py-4">Belum ada data. Tambahkan lewat menu Tenaga Kependidikan.</td></tr>`}</tbody>`;
+    };
+    $('#kmQ').oninput=e=>{S.q=e.target.value;draw();};
+    $('#kmSt').onchange=e=>{S.st=e.target.value;draw();};
+    $('#kmGoUser').onclick=()=>{location.hash='#/user';};
+    draw();
+  },
   active:0,
   render(host){SRIT.UI.setPage('Struktur & Data Induk Asrama','Keasramaan / Data Induk');
     host.innerHTML=`<ul class="nav nav-pills flex-nowrap mb-3" id="kmTabs" style="overflow-x:auto">${this.tabs.map((t,i)=>`<li class="nav-item"><a class="nav-link ${i===this.active?'active':''} pointer text-nowrap" data-i="${i}">${t.t}</a></li>`).join('')}</ul><div id="kmBody"></div>`;
     $$('#kmTabs a').forEach(a=>a.onclick=()=>{this.active=+a.dataset.i;this.render(host);});
     const t=this.tabs[this.active];
+    if(t.managed){this._managed($('#kmBody'),t);return;}
     regFeature('_km',{title:t.t,table:t.k,perm:'keasramaan-master',module:'keasramaan-master',idPrefix:t.idPrefix,searchFields:t.searchFields||['NAME'],filters:t.filters||[],cols:t.cols,fields:t.fields,onCreate:t.onCreate});
     SRIT.Features._km.render($('#kmBody'));
   },
