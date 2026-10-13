@@ -1195,7 +1195,7 @@ SRIT.MENU=[
   {r:'live',t:'Layar Publik (Live TV)',i:'bi-display'},
 
   {sec:'ADMINISTRASI SISTEM'},
-  {r:'user',t:'Pengguna',i:'bi-person-gear'},
+  {r:'user',t:'Tenaga Kependidikan',i:'bi-person-badge'},
   {r:'jabatan',t:'Jabatan',i:'bi-briefcase'},
   {r:'role',t:'Peran & Hak Akses',i:'bi-key'},
   {r:'audit',t:'Jejak Audit',i:'bi-clipboard-data'},
@@ -3109,63 +3109,216 @@ regFeature('jabatan',{title:'Jabatan',table:'JABATAN',perm:'jabatan',module:'jab
 <script>__srit.n('View_User')</script>
 <script>
 //# sourceURL=View_User.html
-// ---------- USER ----------
+// ---------- TENAGA KEPENDIDIKAN & AKUN (satu data: pegawai sekaligus akun pengguna) ----------
+// Guru, wali asuh, wali asrama, kepala sekolah, keamanan, dll. didata di sini. Setiap orang BOLEH dijadikan akun login
+// (saklar "Jadikan akun pengguna"), tanpa input ulang. Wali Asuh / Wali Asrama otomatis tersambung ke Data Induk (server).
 SRIT.Features.user={
-  state:{page:1,size:25,search:''},
-  render(host){SRIT.UI.setPage('Manajemen Pengguna','Pengguna');
-    host.innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
-      <div style="flex:1;min-width:200px"><label class="form-label-sm">Cari Nama / Email</label>
-        <div style="position:relative">
-          <input class="form-control form-control-sm" id="usSearch" style="padding-right:26px" value="${SRIT.Util.esc(this.state.search||'')}">
-          <button type="button" id="usSearchClear" class="sf-clear-x" style="display:${this.state.search?'flex':'none'}" title="Hapus pencarian"><i class="bi bi-x-circle-fill"></i></button>
-        </div>
+  state:{page:1,size:25,search:'',jab:'',akun:'',status:''},
+  STD_JABATAN:['Kepala Sekolah','Wakasek Keasramaan','Wali Asrama','Wali Asuh','Guru','Tenaga Kesehatan','Petugas Keamanan','Petugas Sarpras','Tenaga Administrasi','Operator Absensi'],
+  ROLE_HINT:[[/super/i,'SUPER_ADMIN'],[/wakasek|wakil/i,'WAKASEK_KEASRAMAAN'],[/kepala\s*sekolah/i,'KEPALA_SEKOLAH'],[/wali\s*asrama/i,'WALI_ASRAMA'],[/wali\s*asuh/i,'WALI_ASUH'],
+    [/guru/i,'GURU'],[/kesehatan|perawat|bidan/i,'TENAGA_KESEHATAN'],[/keamanan|satpam|security/i,'PETUGAS_KEAMANAN'],[/sarpras|sarana/i,'PETUGAS_SARPRAS'],
+    [/operator/i,'OPERATOR_ABSENSI'],[/^\s*(admin|administrator)\s*$/i,'ADMIN']],
+  SCOPE_BY_ROLE:{SUPER_ADMIN:'GLOBAL',ADMIN:'GLOBAL',KEPALA_SEKOLAH:'GLOBAL',WAKASEK_KEASRAMAAN:'GLOBAL',WALI_ASRAMA:'ASRAMA',WALI_ASUH:'WALI_ASUH'},
+
+  _esc:s=>SRIT.Util.esc(String(s==null?'':s)),
+  _hasAkun(u){return u.AKUN!=='TIDAK'&&!!String(u.EMAIL||'').trim();},
+  _jabName(id){return (SRIT.Repo.getById('JABATAN',id)||{}).NAME||'';},
+  _roleFor(jabId){
+    const nm=this._jabName(jabId),roles=SRIT.Store.read('ROLES');
+    for(const [re,rid] of this.ROLE_HINT){if(re.test(nm)&&roles.some(r=>r.ID===rid))return rid;}
+    return roles.some(r=>r.ID==='GURU')?'GURU':(roles[0]||{}).ID||'';
+  },
+  _waliTable(jabId){const n=this._jabName(jabId);return /wali\s*asuh/i.test(n)?'WALI_ASUH':(/wali\s*asrama/i.test(n)?'WALI_ASRAMA':'');},
+  /** Daftar gabungan: semua baris USERS + wali asuh/asrama dari Data Induk yang belum tersambung ke tendik. */
+  _rows(){
+    const users=SRIT.Store.read('USERS'),have={},hint={},names={};
+    const nn=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+    users.forEach(u=>{have[u.ID]=1;if(u._WALI)hint[u._WALI]=1;const t=this._waliTable(u.JABATAN);if(t)names[t+'|'+nn(u.NAME)]=1;});
+    const out=users.map(u=>Object.assign({},u,{_k:'U'}));
+    [['WALI_ASUH','Wali Asuh'],['WALI_ASRAMA','Wali Asrama']].forEach(([t,jn])=>{
+      const jab=SRIT.Store.read('JABATAN').find(j=>String(j.NAME).toLowerCase()===jn.toLowerCase());
+      SRIT.Store.read(t).forEach(w=>{
+        if(w.USER_ID&&have[w.USER_ID])return;
+        // sudah didaftarkan namun tautan di server belum sampai ke perangkat ini: jangan tampil dobel
+        if(hint[t+'|'+w.ID]||names[t+'|'+nn(w.NAME)])return;
+        out.push({_k:'W',_t:t,_wid:w.ID,ID:'w:'+t+':'+w.ID,NAME:w.NAME,JABATAN:jab?jab.ID:'',HP:w.HP||'',ASRAMA:w.ASRAMA||'',GEDUNG:w.GEDUNG||'',JENJANG:w.JENJANG||'',STATUS:w.STATUS||'AKTIF',AKUN:'TIDAK',EMAIL:'',NIP:'',JK:''});
+      });
+    });
+    return out;
+  },
+  _ensureJabatan(){
+    if(this._jabChecked||!SRIT.Auth.can('jabatan:CREATE'))return;this._jabChecked=true;
+    try{
+      const have=SRIT.Store.read('JABATAN').map(j=>String(j.NAME).toLowerCase());
+      this.STD_JABATAN.forEach(n=>{if(have.indexOf(n.toLowerCase())<0)SRIT.Repo.insert('JABATAN',{ID:SRIT.Util.uid('JB'),NAME:n});});
+    }catch(e){console.warn('jabatan standar',e);}
+  },
+
+  render(host){
+    SRIT.UI.setPage('Tenaga Kependidikan & Akun','Tenaga Kependidikan');
+    this._ensureJabatan();
+    const jab=SRIT.Store.read('JABATAN'),S=this.state,esc=this._esc;
+    host.innerHTML=`<div class="card-srit p-3 mb-3">
+      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-2">
+        <div><div class="fw-semibold">Data Tenaga Kependidikan</div>
+          <div class="text-muted-2" style="font-size:12px">Satu data untuk pegawai sekaligus akun login: wali asuh, wali asrama, kepala sekolah, guru, keamanan, dll.</div></div>
+        ${SRIT.Auth.can('user:CREATE')?'<button class="btn btn-primary btn-sm" id="usAdd"><i class="bi bi-plus-lg"></i> Tambah Tenaga Kependidikan</button>':''}
       </div>
-      ${SRIT.Auth.can('user:CREATE')?'<div><button class="btn btn-primary btn-sm" id="usAdd"><i class="bi bi-plus-lg"></i> Tambah Pengguna</button></div>':''}
-    </div></div>
-    <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="usTable"></table></div><div class="p-3 border-top" id="usPag"></div></div>`;
+      <div id="usSumm" class="d-flex flex-wrap gap-2 mb-2"></div>
+      <div class="filter-bar">
+        <div style="flex:1;min-width:200px"><label class="form-label-sm">Cari Nama / NIP / Email</label>
+          <div style="position:relative"><input class="form-control form-control-sm" id="usSearch" style="padding-right:26px" value="${esc(S.search)}" placeholder="Ketik untuk mencari\u2026">
+            <button type="button" id="usSearchClear" class="sf-clear-x" style="display:${S.search?'flex':'none'}" title="Hapus pencarian"><i class="bi bi-x-circle-fill"></i></button></div></div>
+        <div style="min-width:170px"><label class="form-label-sm">Jabatan</label><select class="form-select form-select-sm" id="usJab"><option value="">Semua jabatan</option>${jab.map(j=>`<option value="${esc(j.ID)}" ${S.jab===j.ID?'selected':''}>${esc(j.NAME)}</option>`).join('')}</select></div>
+        <div style="min-width:160px"><label class="form-label-sm">Akun login</label><select class="form-select form-select-sm" id="usAkun"><option value="">Semua</option><option value="ya" ${S.akun==='ya'?'selected':''}>Punya akun</option><option value="tidak" ${S.akun==='tidak'?'selected':''}>Belum punya akun</option></select></div>
+        <div style="min-width:140px"><label class="form-label-sm">Status</label><select class="form-select form-select-sm" id="usStatus"><option value="">Semua</option><option value="AKTIF" ${S.status==='AKTIF'?'selected':''}>Aktif</option><option value="NONAKTIF" ${S.status==='NONAKTIF'?'selected':''}>Nonaktif</option></select></div>
+      </div></div>
+      <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="usTable"></table></div><div class="p-3 border-top" id="usPag"></div></div>`;
     $('#usSearch').oninput=e=>{
       $('#usSearchClear').style.display=e.target.value?'flex':'none';
       clearTimeout(this._searchT);
-      this._searchT=setTimeout(()=>{this.state.search=e.target.value;this.state.page=1;this.load();},350);
+      this._searchT=setTimeout(()=>{S.search=e.target.value;S.page=1;this.load();},350);
     };
-    $('#usSearchClear').onclick=()=>{$('#usSearch').value='';$('#usSearchClear').style.display='none';this.state.search='';this.state.page=1;this.load();};
+    $('#usSearchClear').onclick=()=>{$('#usSearch').value='';$('#usSearchClear').style.display='none';S.search='';S.page=1;this.load();};
+    $('#usJab').onchange=e=>{S.jab=e.target.value;S.page=1;this.load();};
+    $('#usAkun').onchange=e=>{S.akun=e.target.value;S.page=1;this.load();};
+    $('#usStatus').onchange=e=>{S.status=e.target.value;S.page=1;this.load();};
     const add=$('#usAdd');if(add)add.onclick=()=>this.form();
-    this.load();},
+    this.load();
+  },
+
   load(){
-    const r=SRIT.Api.list('USERS',{page:this.state.page,size:this.state.size,search:this.state.search,searchFields:['NAME','EMAIL']});
-    $('#usTable').innerHTML=`<thead><tr><th>Nama</th><th>Email</th><th>Jabatan</th><th>Peran</th><th>Cakupan</th><th>Status</th><th></th></tr></thead><tbody>
-    ${r.rows.map(u=>`<tr>
-      <td class="fw-semibold">${SRIT.Util.esc(u.NAME)}</td><td>${u.EMAIL}</td>
-      <td>${(SRIT.Repo.getById('JABATAN',u.JABATAN)||{}).NAME||'-'}</td>
-      <td><span class="badge-soft ${u.ROLE==='SUPER_ADMIN'?'st-ALPA':'st-IZIN'}">${u.ROLE}</span></td>
-      <td>${u.SCOPE}</td><td><span class="badge-soft ${u.STATUS==='AKTIF'?'st-HADIR':'st-BELUM'}">${u.STATUS}</span></td>
-      <td class="text-end">${SRIT.Auth.can('user:UPDATE')?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="SRIT.Features.user.form('${u.ID}')"><i class="bi bi-pencil"></i></button>`:''}</td>
-    </tr>`).join('')}
+    const S=this.state,esc=this._esc,all=this._rows(),q=S.search.trim().toLowerCase();
+    const sumAkun=all.filter(u=>this._hasAkun(u)&&u.STATUS!=='NONAKTIF').length;
+    $('#usSumm').innerHTML=[['Tenaga kependidikan',all.length,'#1c6ef2'],['Akun login aktif',sumAkun,'#16a34a'],['Belum punya akun',all.filter(u=>!this._hasAkun(u)).length,'#f59e0b']]
+      .map(([l,n,c])=>`<span class="badge-soft" style="background:${c}1a;color:${c};font-size:12px;padding:5px 10px"><b>${n}</b> ${l}</span>`).join('');
+    let rows=all.filter(u=>{
+      if(S.jab&&u.JABATAN!==S.jab)return false;
+      if(S.status&&(u.STATUS||'AKTIF')!==S.status)return false;
+      if(S.akun==='ya'&&!this._hasAkun(u))return false;
+      if(S.akun==='tidak'&&this._hasAkun(u))return false;
+      if(q&&[u.NAME,u.NIP,u.EMAIL,u.HP,this._jabName(u.JABATAN)].every(v=>String(v||'').toLowerCase().indexOf(q)<0))return false;
+      return true;
+    }).sort((a,b)=>String(a.NAME||'').localeCompare(String(b.NAME||''),'id'));
+    const total=rows.length,pages=Math.ceil(total/S.size)||1;if(S.page>pages)S.page=pages;
+    const r={rows:rows.slice((S.page-1)*S.size,S.page*S.size),total,page:S.page,size:S.size,pages};
+    const canU=SRIT.Auth.can('user:UPDATE'),canC=SRIT.Auth.can('user:CREATE');
+    const unit=u=>[(SRIT.Repo.getById('ASRAMA',u.ASRAMA)||{}).NAME,u.JENJANG].filter(Boolean).join(' \u00b7 ')||'-';
+    $('#usTable').innerHTML=`<thead><tr><th>Nama</th><th>Jabatan</th><th>Penempatan</th><th>HP</th><th>Akun login</th><th>Status</th><th></th></tr></thead><tbody>
+    ${r.rows.map(u=>{
+      const has=this._hasAkun(u),pseudo=u._k==='W',idq=esc(u.ID).replace(/'/g,'');
+      const akunCell=pseudo
+        ?'<span class="badge-soft st-BELUM">Belum terdaftar</span><div class="text-muted-2" style="font-size:11px">dari Data Induk</div>'
+        :(has?`<span class="badge-soft st-HADIR">Punya akun</span><div class="text-muted-2" style="font-size:11px">${esc(u.EMAIL)} \u00b7 ${esc((SRIT.Repo.getById('ROLES',u.ROLE)||{}).NAME||u.ROLE||'-')}</div>`
+        :'<span class="badge-soft st-BELUM">Belum punya akun</span>');
+      const acts=pseudo
+        ?(canC?`<button class="btn btn-sm btn-primary py-0" onclick="SRIT.Features.user.form('${idq}')"><i class="bi bi-person-plus"></i> Daftarkan</button>`:'')
+        :(canU?`<div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary py-0" title="Ubah data" onclick="SRIT.Features.user.form('${idq}')"><i class="bi bi-pencil"></i></button>
+            ${has?`<button class="btn btn-outline-secondary py-0" title="Atur ulang kata sandi" onclick="SRIT.Features.user.resetPw('${idq}')"><i class="bi bi-key"></i></button>
+                   <button class="btn btn-outline-secondary py-0" title="Nonaktifkan akun login" onclick="SRIT.Features.user.toggleAkun('${idq}')"><i class="bi bi-person-x"></i></button>`
+                 :`<button class="btn btn-outline-primary py-0" title="Jadikan akun pengguna" onclick="SRIT.Features.user.form('${idq}',true)"><i class="bi bi-person-check"></i> Aktifkan akun</button>`}
+          </div>`:'');
+      return `<tr><td><div class="fw-semibold">${esc(u.NAME)}</div><div class="text-muted-2" style="font-size:11px">${u.NIP?'NIP/NIK '+esc(u.NIP):'&nbsp;'}</div></td>
+        <td>${esc(this._jabName(u.JABATAN)||'-')}</td><td>${esc(unit(u))}</td><td>${esc(u.HP||'-')}</td><td>${akunCell}</td>
+        <td><span class="badge-soft ${(u.STATUS||'AKTIF')==='AKTIF'?'st-HADIR':'st-BELUM'}">${esc(u.STATUS||'AKTIF')}</span></td><td class="text-end">${acts}</td></tr>`;
+    }).join('')||'<tr><td colspan="7" class="text-center text-muted-2 py-4">Belum ada data tenaga kependidikan</td></tr>'}
     </tbody>`;
     $('#usPag').innerHTML=SRIT.UI.pagination(r);
-    $$('#usPag [data-pg]').forEach(a=>a.onclick=()=>{this.state.page=+a.dataset.pg;this.load();});},
-  form(id){
-    const u=id?SRIT.Repo.getById('USERS',id):{};
-    const jab=SRIT.Store.read('JABATAN'),roles=SRIT.Store.read('ROLES');
-    const m=SRIT.Modal.open({title:(id?'Edit':'Tambah')+' Pengguna',
-      body:`<form id="usForm"><div class="row g-2">
-        <div class="col-6"><label class="form-label-sm">Nama</label><input class="form-control form-control-sm" name="NAME" value="${u.NAME||''}" required></div>
-        <div class="col-6"><label class="form-label-sm">Email / Nama Pengguna</label><input class="form-control form-control-sm" name="EMAIL" value="${u.EMAIL||''}" required></div>
-        <div class="col-6"><label class="form-label-sm">Jabatan</label><select class="form-select form-select-sm" name="JABATAN">${jab.map(j=>`<option value="${j.ID}" ${u.JABATAN===j.ID?'selected':''}>${j.NAME}</option>`).join('')}</select></div>
-        <div class="col-6"><label class="form-label-sm">Peran</label><select class="form-select form-select-sm" name="ROLE">${roles.map(rr=>`<option value="${rr.ID}" ${u.ROLE===rr.ID?'selected':''}>${rr.NAME}</option>`).join('')}</select></div>
-        <div class="col-6"><label class="form-label-sm">Cakupan Akses</label><select class="form-select form-select-sm" name="SCOPE">${['GLOBAL','SEKOLAH','ASRAMA','GEDUNG','KAMAR','WALI_ASUH'].map(s=>`<option ${u.SCOPE===s?'selected':''}>${s}</option>`).join('')}</select></div>
-        <div class="col-6"><label class="form-label-sm">Status</label><select class="form-select form-select-sm" name="STATUS"><option ${u.STATUS==='AKTIF'?'selected':''}>AKTIF</option><option ${u.STATUS==='NONAKTIF'?'selected':''}>NONAKTIF</option></select></div>
-        <div class="col-12"><label class="form-label-sm">Kata Sandi ${id?'(kosongkan jika tidak diubah)':''}</label><input type="password" class="form-control form-control-sm" name="PW" ${id?'':'required'}></div>
+    $$('#usPag [data-pg]').forEach(a=>a.onclick=()=>{S.page=+a.dataset.pg;this.load();});
+  },
+
+  _find(id){return this._rows().find(x=>x.ID===id);},
+
+  /** id kosong = baru; id 'w:TABEL:ID' = daftarkan wali dari Data Induk; openAkun = langsung aktifkan bagian akun. */
+  form(id,openAkun){
+    const esc=this._esc,u=id?(this._find(id)||{}):{},pseudo=u._k==='W',isNew=!id||pseudo;
+    const jab=SRIT.Store.read('JABATAN'),roles=SRIT.Store.read('ROLES'),asr=SRIT.Store.read('ASRAMA'),ged=SRIT.Store.read('GEDUNG');
+    const hasAk=!isNew&&this._hasAkun(u),wantAk=hasAk||!!openAkun;
+    const jabId=u.JABATAN||(jab[0]||{}).ID||'',role0=u.ROLE||this._roleFor(jabId);
+    const scopes=['GLOBAL','SEKOLAH','ASRAMA','GEDUNG','KAMAR','WALI_ASUH'];
+    const m=SRIT.Modal.open({size:'modal-lg',title:(isNew?(pseudo?'Daftarkan Tenaga Kependidikan':'Tambah Tenaga Kependidikan'):'Ubah Tenaga Kependidikan'),
+      body:`<form id="usForm" autocomplete="off"><div class="row g-2">
+        <div class="col-12"><div class="fw-semibold" style="font-size:13px"><i class="bi bi-person-vcard"></i> Data pegawai</div></div>
+        <div class="col-md-6"><label class="form-label-sm">Nama lengkap</label><input class="form-control form-control-sm" name="NAME" value="${esc(u.NAME)}" required></div>
+        <div class="col-md-6"><label class="form-label-sm">NIP / NIK (opsional)</label><input class="form-control form-control-sm" name="NIP" value="${esc(u.NIP)}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Jenis kelamin</label><select class="form-select form-select-sm" name="JK"><option value="">-</option><option value="L" ${u.JK==='L'?'selected':''}>Laki-laki</option><option value="P" ${u.JK==='P'?'selected':''}>Perempuan</option></select></div>
+        <div class="col-md-4"><label class="form-label-sm">No. HP / WhatsApp</label><input class="form-control form-control-sm" name="HP" value="${esc(u.HP)}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Status</label><select class="form-select form-select-sm" name="STATUS"><option value="AKTIF" ${(u.STATUS||'AKTIF')==='AKTIF'?'selected':''}>Aktif</option><option value="NONAKTIF" ${u.STATUS==='NONAKTIF'?'selected':''}>Nonaktif</option></select></div>
+        <div class="col-md-6"><label class="form-label-sm">Jabatan</label><select class="form-select form-select-sm" name="JABATAN" id="usFJab" required>${jab.map(j=>`<option value="${esc(j.ID)}" ${jabId===j.ID?'selected':''}>${esc(j.NAME)}</option>`).join('')}</select></div>
+        <div class="col-md-6"><label class="form-label-sm">Jenjang (opsional)</label><select class="form-select form-select-sm" name="JENJANG"><option value="">-</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${u.JENJANG===j?'selected':''}>${j}</option>`).join('')}</select></div>
+        <div class="col-md-6"><label class="form-label-sm">Asrama (opsional)</label><select class="form-select form-select-sm" name="ASRAMA" id="usFAsr"><option value="">-</option>${asr.map(a=>`<option value="${esc(a.ID)}" ${u.ASRAMA===a.ID?'selected':''}>${esc(a.NAME)}</option>`).join('')}</select></div>
+        <div class="col-md-6"><label class="form-label-sm">Gedung (opsional)</label><select class="form-select form-select-sm" name="GEDUNG" id="usFGed"></select></div>
+        <div class="col-12 d-none" id="usWaliNote"><div class="alert alert-info py-2 mb-0" style="font-size:12px"><i class="bi bi-link-45deg"></i> Jabatan ini otomatis tersambung ke Data Induk (<span id="usWaliTbl"></span>) sehingga relasi anak, kamar, dan kelompok asuh tetap berfungsi.</div></div>
+        <div class="col-12 mt-2"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="usAkunSw" ${wantAk?'checked':''}>
+          <label class="form-check-label fw-semibold" for="usAkunSw" style="font-size:13px"><i class="bi bi-person-lock"></i> Jadikan akun pengguna (bisa login ke aplikasi)</label></div></div>
+        <div class="col-12" id="usAkunBox" style="display:${wantAk?'block':'none'}"><div class="row g-2 p-2 rounded" style="border:1px dashed var(--srit-border)">
+          <div class="col-md-6"><label class="form-label-sm">Email / Nama pengguna</label><input class="form-control form-control-sm" name="EMAIL" id="usFEmail" value="${esc(u.EMAIL)}" autocomplete="off"></div>
+          <div class="col-md-6"><label class="form-label-sm">Peran (hak akses)</label><select class="form-select form-select-sm" name="ROLE" id="usFRole">${roles.map(rr=>`<option value="${esc(rr.ID)}" ${role0===rr.ID?'selected':''}>${esc(rr.NAME)}</option>`).join('')}</select></div>
+          <div class="col-md-6"><label class="form-label-sm">Cakupan akses</label><select class="form-select form-select-sm" name="SCOPE" id="usFScope">${scopes.map(s=>`<option ${(u.SCOPE||this.SCOPE_BY_ROLE[role0]||'SEKOLAH')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+          <div class="col-md-6"><label class="form-label-sm">Kata sandi ${hasAk?'<span class="text-muted-2">(kosongkan jika tidak diubah)</span>':'<span class="text-muted-2">(min. 6 karakter)</span>'}</label>
+            <div class="input-group input-group-sm"><input type="text" class="form-control form-control-sm" name="PW" id="usFPw" autocomplete="new-password">
+              <button class="btn btn-outline-secondary" type="button" id="usGen" title="Buat kata sandi acak"><i class="bi bi-magic"></i></button></div></div>
+          <div class="col-12 text-muted-2" style="font-size:11px">Peran terisi otomatis sesuai jabatan dan bisa diubah. Hak akses detail diatur di menu Peran & Hak Akses.</div>
+        </div></div>
       </div></form>`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="usSave">Simpan</button>`});
-    $('#usSave',m.el).onclick=()=>{
-      const f=$('#usForm',m.el);if(!f.reportValidity())return;
-      const d=Object.fromEntries(new FormData(f));
-      const pw=d.PW;delete d.PW; // kata sandi tidak disimpan di browser: dikirim ke server (di-hash di sana)
-      if(id){SRIT.Repo.update('USERS',id,d);SRIT.Audit.log('UPDATE','user',id);if(pw)SRIT.Sync.setPassword(id,pw);}
-      else{d.ID=SRIT.Util.uid('U');d.CREATED_AT=new Date().toISOString();SRIT.Repo.insert('USERS',d);SRIT.Audit.log('CREATE','user',d.ID);if(pw)SRIT.Sync.setPassword(d.ID,pw);}
-      m.close();SRIT.Notify('User tersimpan','ok');this.load();
-    };},
+    const el=m.el;
+    // Gedung mengikuti Asrama; catatan tautan Wali Asuh/Wali Asrama mengikuti Jabatan
+    const fillGed=()=>{const a=$('#usFAsr',el).value,cur=u.GEDUNG||$('#usFGed',el).value;
+      $('#usFGed',el).innerHTML='<option value="">-</option>'+ged.filter(g=>!a||!g.ASRAMA||g.ASRAMA===a).map(g=>`<option value="${esc(g.ID)}" ${cur===g.ID?'selected':''}>${esc(g.NAME)}</option>`).join('');};
+    const noteWali=()=>{const t=this._waliTable($('#usFJab',el).value);$('#usWaliNote',el).classList.toggle('d-none',!t);$('#usWaliTbl',el).textContent=t==='WALI_ASRAMA'?'Wali Asrama':'Wali Asuh';};
+    let roleTouched=!!u.ROLE;
+    $('#usFAsr',el).onchange=()=>{u.GEDUNG='';fillGed();};
+    $('#usFRole',el).onchange=()=>{roleTouched=true;const sc=this.SCOPE_BY_ROLE[$('#usFRole',el).value];if(sc)$('#usFScope',el).value=sc;};
+    $('#usFJab',el).onchange=()=>{noteWali();if(!roleTouched){const r=this._roleFor($('#usFJab',el).value);$('#usFRole',el).value=r;const sc=this.SCOPE_BY_ROLE[r];if(sc)$('#usFScope',el).value=sc;}};
+    $('#usAkunSw',el).onchange=e=>{$('#usAkunBox',el).style.display=e.target.checked?'block':'none';};
+    $('#usGen',el).onclick=()=>{const c='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';let p='';for(let i=0;i<8;i++)p+=c[Math.floor(Math.random()*c.length)];$('#usFPw',el).value=p;};
+    fillGed();noteWali();
+    $('#usSave',el).onclick=()=>{
+      const f=$('#usForm',el);if(!f.reportValidity())return;
+      const d=Object.fromEntries(new FormData(f)),akun=$('#usAkunSw',el).checked,pw=(d.PW||'').trim();
+      const row={NAME:d.NAME.trim(),NIP:(d.NIP||'').trim(),JK:d.JK||'',HP:(d.HP||'').trim(),JABATAN:d.JABATAN,STATUS:d.STATUS,JENJANG:d.JENJANG||'',ASRAMA:d.ASRAMA||'',GEDUNG:d.GEDUNG||'',AKUN:akun?'YA':'TIDAK'};
+      if(akun){
+        const em=(d.EMAIL||'').trim();
+        if(!em){SRIT.Notify('Email / nama pengguna wajib diisi untuk akun login','warn');return;}
+        if(SRIT.Store.read('USERS').some(x=>x.ID!==u.ID&&String(x.EMAIL||'').trim().toLowerCase()===em.toLowerCase())){SRIT.Notify('Email / nama pengguna sudah dipakai orang lain','warn');return;}
+        if((isNew||!hasAk)&&pw.length<6){SRIT.Notify('Kata sandi wajib diisi (minimal 6 karakter)','warn');return;}
+        if(pw&&pw.length<6){SRIT.Notify('Kata sandi minimal 6 karakter','warn');return;}
+        Object.assign(row,{EMAIL:em,ROLE:d.ROLE,SCOPE:d.SCOPE});
+      }
+      if(isNew){
+        row.ID=SRIT.Util.uid('U');row.CREATED_AT=new Date().toISOString();
+        if(!akun){row.EMAIL='';row.ROLE='';row.SCOPE='';}
+        if(pseudo)row._WALI=u._t+'|'+u._wid;   // petunjuk: sambungkan ke baris wali yang sudah ada (ID wali lama tidak berganti)
+        SRIT.Repo.insert('USERS',row);SRIT.Audit.log('CREATE','user',row.ID);
+        if(akun&&pw)SRIT.Sync.setPassword(row.ID,pw);
+      }else{
+        SRIT.Repo.update('USERS',id,row);SRIT.Audit.log('UPDATE','user',id);
+        if(akun&&pw)SRIT.Sync.setPassword(id,pw);
+      }
+      m.close();SRIT.Notify(akun?'Tersimpan. Akun login aktif.':'Data tenaga kependidikan tersimpan','ok');this.load();
+    };
+  },
+
+  resetPw(id){
+    const u=this._find(id);if(!u)return;const esc=this._esc;
+    const m=SRIT.Modal.open({title:'Atur Ulang Kata Sandi',body:`<div class="mb-2"><b>${esc(u.NAME)}</b><div class="text-muted-2" style="font-size:12px">${esc(u.EMAIL)}</div></div>
+      <label class="form-label-sm">Kata sandi baru (min. 6 karakter)</label>
+      <div class="input-group input-group-sm"><input type="text" class="form-control form-control-sm" id="usRpPw" autocomplete="new-password"><button class="btn btn-outline-secondary" id="usRpGen" type="button" title="Buat acak"><i class="bi bi-magic"></i></button></div>`,
+      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="usRpSave">Simpan</button>`});
+    $('#usRpGen',m.el).onclick=()=>{const c='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';let p='';for(let i=0;i<8;i++)p+=c[Math.floor(Math.random()*c.length)];$('#usRpPw',m.el).value=p;};
+    $('#usRpSave',m.el).onclick=()=>{
+      const pw=($('#usRpPw',m.el).value||'').trim();
+      if(pw.length<6){SRIT.Notify('Kata sandi minimal 6 karakter','warn');return;}
+      SRIT.Sync.setPassword(id,pw);SRIT.Audit.log('UPDATE','user',id);m.close();SRIT.Notify('Kata sandi diperbarui','ok');
+    };
+  },
+  toggleAkun(id){
+    const u=this._find(id);if(!u)return;
+    if(!confirm('Nonaktifkan akun login '+u.NAME+'? Data pegawai tetap ada, hanya tidak bisa masuk ke aplikasi. Akun dapat diaktifkan lagi kapan saja.'))return;
+    SRIT.Repo.update('USERS',id,{AKUN:'TIDAK'});SRIT.Audit.log('UPDATE','user',id);SRIT.Notify('Akun login dinonaktifkan','ok');this.load();
+  },
   destroy(){}
 };
 </script>
