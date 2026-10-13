@@ -5772,6 +5772,129 @@ SRIT.LiveTV={
       <div class="gr"><span style="color:#38bdf8">Putra</span><div class="trk"><span style="width:${putra/max*100}%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"></span></div><b>${putra}</b></div>
     </div>`;
   },
+  /** 4 slide infografis PROFIL SISWA (agregat dari d.profil): jenjang & JK, sebaran kecamatan, sekolah asal & usia, kelengkapan data. */
+  profilSlides(pr,P){
+    const E=s=>SRIT.Util.esc(s==null?'':String(s));
+    const none='<div class="text-center" style="color:#9fb6da;padding:14px">Belum ada data</div>';
+    const JJ=['SRD','SRMP','SRMA'],JC={SRD:'#4ade80',SRMP:'#fbbf24',SRMA:'#a855f7'},CL='#38bdf8',CP='#f472b6';
+    const pct=(a,b)=>b?Math.round(a/b*100):0;
+    const pcol=p=>p>=90?'#4ade80':p>=60?'#fbbf24':'#f87171';
+    const leg=items=>`<div class="d-flex flex-wrap gap-3 mb-2" style="font-size:clamp(10px,.85vw,13px)">${items.map(([c,l])=>`<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${c};margin-right:5px"></i>${E(l)}</span>`).join('')}</div>`;
+    const kpi=items=>`<div class="ltv-kpi-flat">${items.map(([l,v,c,small])=>`<div><div class="l">${l}</div><div class="v" style="color:${c};${small?'font-size:clamp(12px,1.3vw,20px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-top:6px':''}">${small?E(v):v}</div></div>`).join('')}</div>`;
+    const donut=(segs,big,small)=>{const tot=segs.reduce((a,s)=>a+s[1],0);if(!tot)return none;let acc=0;
+      const conic=segs.map(([c,v])=>{const a=acc,b=acc+v/tot*360;acc=b;return `${c} ${a}deg ${b}deg`;}).join(',');
+      return `<div class="d-flex align-items-center gap-3 flex-wrap justify-content-center">
+        <div style="width:clamp(90px,11vh,150px);aspect-ratio:1;border-radius:50%;background:conic-gradient(${conic});position:relative;flex-shrink:0">
+          <div style="position:absolute;inset:22%;background:#0c1424;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div style="font-size:clamp(18px,2.4vh,28px);font-weight:800;color:#e8f0ff;line-height:1">${big}</div><div style="font-size:9px;color:#9fb6da">${small}</div></div></div>
+        <div style="font-size:clamp(11px,1vw,14px)">${segs.map(([c,v,l])=>`<div class="d-flex align-items-center gap-2" style="padding:2px 0"><span style="width:11px;height:11px;border-radius:3px;background:${c};display:inline-block"></span>${E(l)} <b>${v}</b> <span style="color:#9fb6da">(${pct(v,tot)}%)</span></div>`).join('')}</div></div>`;};
+    // baris batang tunggal / bertumpuk (parts) dengan label di kiri & total di kanan
+    const barRows=(rows,color,max)=>{if(!rows.length)return none;const mx=max||Math.max(1,...rows.map(r=>r.value));
+      return rows.map(r=>`<div class="ltv-row"><span style="width:36%;max-width:36%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${E(r.nama)}</span><div class="ltv-bar-track"><span style="width:${r.value/mx*100}%;background:${r.color||color}"></span></div><b style="white-space:nowrap;color:${r.color||color}">${r.label!==undefined?r.label:r.value}</b></div>`).join('');};
+    const stackRows=rows=>{if(!rows.length)return none;const mx=Math.max(1,...rows.map(r=>r.total));
+      return rows.map(r=>`<div class="ltv-row"><span style="width:34%;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${E(r.nama)}</span>
+        <div class="ltv-bar-track"><div style="display:flex;height:100%;width:${r.total/mx*100}%">${JJ.map(j=>r[j]?`<i style="display:block;height:100%;width:${r[j]/r.total*100}%;background:${JC[j]}"></i>`:'').join('')}</div></div><b style="white-space:nowrap">${r.total}</b></div>`).join('');};
+    // batang berpasangan Putra/Putri per jenjang
+    const gender=rows=>{const mx=Math.max(1,...rows.flatMap(r=>[r.a,r.b]));const W=rows.length*110,H=150,pT=18,pB=22,bw=34;
+      if(!rows.some(r=>r.a||r.b))return none;
+      return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" class="ltv-hist">${rows.map((r,i)=>{const x=i*110+14;
+        const ha=Math.round((H-pT-pB)*r.a/mx),hb=Math.round((H-pT-pB)*r.b/mx);
+        return `<rect x="${x}" y="${H-pB-ha}" width="${bw}" height="${Math.max(ha,1)}" rx="4" fill="${CL}"/><text x="${x+bw/2}" y="${H-pB-ha-5}" text-anchor="middle" style="fill:#e8f0ff;font-weight:700">${r.a}</text>
+          <rect x="${x+bw+6}" y="${H-pB-hb}" width="${bw}" height="${Math.max(hb,1)}" rx="4" fill="${CP}"/><text x="${x+bw+6+bw/2}" y="${H-pB-hb-5}" text-anchor="middle" style="fill:#e8f0ff;font-weight:700">${r.b}</text>
+          <text x="${x+bw+3}" y="${H-6}" text-anchor="middle">${E(r.label)}</text>`;}).join('')}</svg>`;};
+    // histogram usia bertumpuk per jenjang
+    const usiaHist=rows=>{if(!rows.length)return none;const mx=Math.max(1,...rows.map(r=>r.SRD+r.SRMP+r.SRMA));const bw=26,gap=14,pT=16,pB=20,H=150,W=rows.length*(bw+gap)+gap;
+      return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" class="ltv-hist">${rows.map((r,i)=>{const x=gap+i*(bw+gap);let y=H-pB;const tot=r.SRD+r.SRMP+r.SRMA;
+        const segs=JJ.map(j=>{const h=Math.round((H-pT-pB)*r[j]/mx);if(!h)return '';y-=h;return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="${JC[j]}"/>`;}).join('');
+        return segs+`<text x="${x+bw/2}" y="${y-4}" text-anchor="middle" style="fill:#e8f0ff;font-weight:700">${tot}</text><text x="${x+bw/2}" y="${H-6}" text-anchor="middle">${r.usia}</text>`;}).join('')}</svg>`;};
+    const empty=(arr)=>!arr||!arr.length;
+    const byJ=Object.fromEntries(pr.perJenjang.map(j=>[j.jenjang,j]));
+    const hdr=(icon,color,txt,right)=>`<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2" style="font-size:clamp(11px,1vw,14px)"><span><i class="bi bi-${icon}" style="color:${color}"></i> ${txt}</span><span style="color:#9fb6da">${right||''}</span></div>`;
+
+    // ======== SLIDE A: Jenjang & Jenis Kelamin ========
+    const gJenjang=this.gaugeRow(pr.perJenjang.map(j=>({pct:pct(j.putri,j.total),color:CP,label:j.jenjang+' · % Putri',sub:j.putri+' putri / '+j.putra+' putra'})));
+    const kelasRows=[].concat(...pr.perKelas.map(g=>g.kelas.map(k=>({nama:g.jenjang+' Kelas '+k.kelas,value:k.total,color:JC[g.jenjang],label:k.total+' ('+k.putra+'L/'+k.putri+'P)'}))));
+    const jTable=this.gridTable([
+      {h:'Jenjang',f:r=>`<b style="color:${JC[r.jenjang]}">${r.jenjang}</b>`},
+      {h:'Putra',f:r=>r.putra,foot:rs=>rs.reduce((a,r)=>a+r.putra,0)},
+      {h:'Putri',f:r=>r.putri,foot:rs=>rs.reduce((a,r)=>a+r.putri,0)},
+      {h:'Total',f:r=>`<b>${r.total}</b>`,foot:rs=>rs.reduce((a,r)=>a+r.total,0)},
+      {h:'% Siswa',f:r=>pct(r.total,pr.total)+'%',foot:()=>'100%'}
+    ],pr.perJenjang,'Grand Total');
+    const slideA=`<div class="ltv-kpiwrap">
+      ${hdr('people-fill','#38bdf8','Profil Siswa Aktif — Jenjang & Jenis Kelamin','Data real-time dari database siswa')}
+      <div class="row g-2 g-md-3">
+        <div class="col-12 col-lg-9"><div class="ltv-panel">${kpi([['Total Siswa',pr.total,'#e8f0ff'],['SRD',byJ.SRD.total,JC.SRD],['SRMP',byJ.SRMP.total,JC.SRMP],['SRMA',byJ.SRMA.total,JC.SRMA],['Putra',pr.putra,CL],['Putri',pr.putri,CP]])}</div></div>
+        ${P('Putra / Putri',this.genderPanel(pr.putra,pr.putri),'col-12 col-lg-3')}
+      </div></div>
+      <div class="row g-2 g-md-3">
+        ${P('Komposisi Per Jenjang',donut(JJ.map(j=>[JC[j],byJ[j].total,j]),pr.total,'SISWA'))}
+        ${P('Putra & Putri Per Jenjang',leg([[CL,'Putra'],[CP,'Putri']])+gender(pr.perJenjang.map(j=>({label:j.jenjang,a:j.putra,b:j.putri}))))}
+        ${P('Rincian Per Jenjang',jTable)}
+      </div>
+      <div class="row g-2 g-md-3">
+        ${P('Proporsi Putri Per Jenjang',gJenjang,'col-12 col-lg-6')}
+        ${P('Siswa Per Kelas (Putra/Putri)',barRows(kelasRows,'#38bdf8'),'col-12 col-lg-6')}
+      </div>`;
+
+    // ======== SLIDE B: Sebaran Kecamatan ========
+    const kc=pr.kecamatan,ds=pr.desa,top=kc.rows[0];
+    const kecTable=this.gridTable([
+      {h:'Kecamatan',f:r=>E(r.nama)},
+      {h:'SRD',f:r=>r.SRD||'-'},{h:'SRMP',f:r=>r.SRMP||'-'},{h:'SRMA',f:r=>r.SRMA||'-'},
+      {h:'L',f:r=>r.putra||'-'},{h:'P',f:r=>r.putri||'-'},
+      {h:'Total',f:r=>`<b>${r.total}</b>`}
+    ],kc.rows.concat(kc.sisa?[{nama:'Lainnya ('+kc.sisaJumlah+' kec.)',SRD:0,SRMP:0,SRMA:0,putra:0,putri:0,total:kc.sisa}]:[]),'');
+    const top5=kc.rows.slice(0,5);const palet=['#38bdf8','#4ade80','#fbbf24','#a855f7','#f472b6'];
+    const kecDonut=donut(top5.map((r,i)=>[palet[i],r.total,r.nama]).concat((kc.terisi-top5.reduce((a,r)=>a+r.total,0))>0?[['#64748b',kc.terisi-top5.reduce((a,r)=>a+r.total,0),'Kecamatan lain']]:[]),kc.jumlah,'KECAMATAN');
+    const slideB=`<div class="ltv-kpiwrap">
+      ${hdr('geo-alt-fill','#4ade80','Sebaran Wilayah Asal Siswa','Terisi: '+pct(kc.terisi,pr.total)+'% ('+kc.terisi+' dari '+pr.total+' siswa)')}
+      <div class="row g-2 g-md-3"><div class="col-12"><div class="ltv-panel">${kpi([['Kecamatan Asal',kc.jumlah,'#4ade80'],['Desa / Kelurahan',ds.jumlah,'#38bdf8'],['Data Terisi',pct(kc.terisi,pr.total)+'%',pcol(pct(kc.terisi,pr.total))],['Kecamatan Terbanyak',top?top.nama:'-','#fbbf24',true],['Siswa di Sana',top?top.total:0,'#fbbf24'],['Belum Diisi',kc.kosong,'#9fb6da']])}</div></div></div></div>
+      <div class="row g-2 g-md-3">
+        ${P('Top Kecamatan (Per Jenjang)',leg(JJ.map(j=>[JC[j],j]))+stackRows(kc.rows),'col-12 col-lg-5')}
+        ${P('Rincian Kecamatan × Jenjang',kecTable,'col-12 col-lg-4')}
+        ${P('Porsi 5 Kecamatan Terbesar',kecDonut,'col-12 col-lg-3')}
+      </div>
+      <div class="row g-2 g-md-3">
+        ${P('Top Desa / Kelurahan Asal',barRows(ds.rows.map(r=>({nama:r.nama,value:r.total})),'#38bdf8')+(ds.sisa?`<div class="ltv-row" style="color:#9fb6da"><span>+ ${ds.sisaJumlah} desa lainnya</span><b>${ds.sisa}</b></div>`:''),'col-12 col-lg-6')}
+        ${P('Putra vs Putri Per Kecamatan',leg([[CL,'Putra'],[CP,'Putri']])+(kc.rows.length?kc.rows.slice(0,6).map(r=>`<div class="ltv-row"><span style="width:34%;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${E(r.nama)}</span><div class="ltv-bar-track"><div style="display:flex;height:100%;width:100%"><i style="display:block;height:100%;width:${pct(r.putra,r.total)}%;background:${CL}"></i><i style="display:block;height:100%;width:${pct(r.putri,r.total)}%;background:${CP}"></i></div></div><b style="white-space:nowrap;font-size:.85em">${r.putra} / ${r.putri}</b></div>`).join(''):none),'col-12 col-lg-6')}
+      </div>`;
+
+    // ======== SLIDE C: Sekolah Asal & Usia ========
+    const us=pr.usia,sk=pr.sekolahAsal,uTop=us.perJenjang;
+    const ageGauge=this.gaugeRow(uTop.filter(u=>u.n).map(u=>({pct:Math.min(100,Math.round(u.rata/20*100)),color:JC[u.jenjang],label:u.jenjang+' · '+u.rata+' th',sub:'rentang '+u.min+'–'+u.max+' th ('+u.n+' siswa)'})));
+    const ta=pr.tahunAjaran;
+    const slideC=`<div class="ltv-kpiwrap">
+      ${hdr('mortarboard-fill','#fbbf24','Sekolah Asal, Usia & Tahun Ajaran','Usia dihitung dari tanggal lahir ('+pct(us.terisi,pr.total)+'% terisi)')}
+      <div class="row g-2 g-md-3"><div class="col-12"><div class="ltv-panel">${kpi([['Rata-rata Usia',us.terisi?us.rata+' th':'-','#fbbf24'],['Termuda',us.sebaran.length?us.sebaran[0].usia+' th':'-','#4ade80'],['Tertua',us.sebaran.length?us.sebaran[us.sebaran.length-1].usia+' th':'-','#f87171'],['Jumlah Sekolah Asal',sk.jumlah,'#38bdf8'],['Sekolah Terbanyak',sk.rows[0]?sk.rows[0].nama:'-','#a855f7',true],['Data Terisi',pct(sk.terisi,pr.total)+'%',pcol(pct(sk.terisi,pr.total))]])}</div></div></div></div>
+      <div class="row g-2 g-md-3">
+        ${P('Sebaran Usia (Per Jenjang)',leg(JJ.map(j=>[JC[j],j]))+usiaHist(us.sebaran),'col-12 col-lg-6')}
+        ${P('Rata-rata Usia Per Jenjang',ageGauge,'col-12 col-lg-6')}
+      </div>
+      <div class="row g-2 g-md-3">
+        ${P('Top Sekolah Asal',barRows(sk.rows.map(r=>({nama:r.nama,value:r.total})),'#a855f7')+(sk.sisa?`<div class="ltv-row" style="color:#9fb6da"><span>+ ${sk.sisaJumlah} sekolah lainnya</span><b>${sk.sisa}</b></div>`:''),'col-12 col-lg-8')}
+        ${P('Tahun Ajaran',ta.length?donut(ta.map((t,i)=>[palet[i%palet.length],t.total,t.nama]),ta.length,'TAHUN AJARAN'):none,'col-12 col-lg-4')}
+      </div>`;
+
+    // ======== SLIDE D: Kelengkapan Data ========
+    const kl=pr.kelengkapan;
+    const klRows=kl.fields.slice().sort((a,b)=>a.pct-b.pct).map(f=>({nama:f.label,value:f.pct,color:pcol(f.pct),label:f.pct+'% ('+f.terisi+')'}));
+    const klGauge=this.gaugeRow(kl.perJenjang.filter(j=>j.total).map(j=>({pct:j.pct,color:pcol(j.pct),label:j.jenjang,sub:j.lengkap+'/'+j.total+' lengkap'})));
+    const slideD=`<div class="ltv-kpiwrap">
+      ${hdr('clipboard-check-fill',pcol(kl.rata),'Kelengkapan Data Siswa (12 kolom data diri & orang tua)','Terendah ditampilkan paling atas')}
+      <div class="row g-2 g-md-3"><div class="col-12"><div class="ltv-panel">${kpi([['Rata-rata Kelengkapan',kl.rata+'%',pcol(kl.rata)],['Data Lengkap 12/12',kl.lengkap,'#4ade80'],['Belum Lengkap',pr.total-kl.lengkap,'#fbbf24'],['Belum Terisi Sama Sekali',kl.kosongSemua,'#f87171'],['Total Siswa',pr.total,'#e8f0ff']])}</div></div></div></div>
+      <div class="row g-2 g-md-3">
+        ${P('Kelengkapan Per Kolom',barRows(klRows,'#4ade80',100),'col-12 col-lg-7')}
+        ${P('Kelengkapan Per Jenjang',klGauge+`<div class="mt-2" style="font-size:clamp(10px,.85vw,13px);color:#9fb6da">Hijau ≥ 90% · Kuning ≥ 60% · Merah &lt; 60%</div>`,'col-12 col-lg-5')}
+      </div>`;
+
+    return [
+      {title:'PROFIL SISWA: JENJANG & JK',html:slideA},
+      {title:'SEBARAN KECAMATAN',html:slideB},
+      {title:'SEKOLAH ASAL & USIA',html:slideC},
+      {title:'KELENGKAPAN DATA SISWA',html:slideD}
+    ];
+  },
   async refreshData(){
     const _seq=(this._rseq=(this._rseq||0)+1);let d;
     try{d=await SRIT.Api.getLiveTVSummary(this.fDate||undefined,this.fSesi||undefined);}catch(e){return;}
@@ -5950,10 +6073,14 @@ SRIT.LiveTV={
         ${P('Persentase Baik per Kategori',spGauge,'col-12 col-lg-6')}
       </div>`;
 
+    // slide PROFIL SISWA (agregat) — bisa dimatikan lewat pengaturan LIVETV_SHOW_PROFIL = false
+    let prSl=[];
+    try{if(d.settings.LIVETV_SHOW_PROFIL!==false&&d.profil&&d.profil.total>0)prSl=this.profilSlides(d.profil,P);}catch(e){console.error('Slide profil gagal',e);}
     const slides=[
       {title:'KEHADIRAN KEGIATAN AKTIF',html:slide1},
       {title:'RINCIAN PER GEDUNG',html:slide2},
       {title:'ANALITIK & STRUKTUR',html:slide3},
+      ...prSl,
       {title:'REKAP SELURUH KEGIATAN',html:slide4},
       {title:'PERKEMBANGAN & KEDISIPLINAN',html:slide5},
       {title:'LAYANAN & STATUS',html:slide6},
