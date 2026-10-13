@@ -805,13 +805,35 @@ SRIT.Import = {
   },
   _validate(cfg,rows){
     const labelToKey={};cfg.columns.forEach(c=>labelToKey[c.label.toLowerCase().trim()]=c);
-    return rows.map((raw,i)=>{
+    const uq=cfg.columns.filter(c=>c.unique);
+    const exist={},seen={};
+    uq.forEach(c=>{exist[c.key]={};seen[c.key]={};
+      (SRIT.Store.read(cfg.table)||[]).forEach(r=>{const x=String(r[c.key]??'').trim();if(x)exist[c.key][x]=r.NAMA||r.NAME||r.ID;});});
+    const out=rows.map((raw,i)=>{
       const data={};const errs=[];
       cfg.columns.forEach(c=>{
         // cari nilai berdasarkan label (case-insensitive)
         let v='';for(const k in raw){if(k.toLowerCase().trim()===c.label.toLowerCase().trim()){v=raw[k];break;}}
         v=(v===null||v===undefined)?'':String(v).trim();
         if(c.required&&!v){errs.push(c.label+' kosong');}
+        // normalisasi & validasi tipe (hanya bila terisi → kolom opsional boleh kosong)
+        if(v&&c.type==='digits'){
+          v=v.replace(/[\s.\-']/g,'');
+          if(/e\+?\d+$/i.test(v))errs.push(c.label+' terbaca format ilmiah (set kolom Excel ke Teks)');
+          else if(!/^\d+$/.test(v))errs.push(c.label+' harus berupa angka');
+          else if(c.len&&v.length!==c.len)errs.push(c.label+' harus '+c.len+' digit (terbaca '+v.length+')');
+        }
+        if(v&&c.type==='phone'){
+          v=v.replace(/[\s\-().]/g,'');if(/^\+62/.test(v))v='0'+v.slice(3);else if(/^62\d{8,}/.test(v))v='0'+v.slice(2);
+          if(!/^0\d{8,13}$/.test(v))errs.push(c.label+' tidak valid ('+v+')');
+        }
+        if(v&&c.type==='date'){
+          let iso='';
+          if(/^\d{4}-\d{2}-\d{2}$/.test(v))iso=v;
+          else if(/^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}$/.test(v)){const p=v.split(/[\/\-.]/);iso=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');}
+          else if(/^\d{5}$/.test(v)){const d=new Date(Math.round((+v-25569)*86400000));iso=d.toISOString().slice(0,10);}   // serial tanggal Excel
+          if(!iso||isNaN(new Date(iso).getTime())||new Date(iso+'T00:00:00Z').toISOString().slice(0,10)!==iso)errs.push(c.label+' format tanggal tidak dikenali (pakai dd/mm/yyyy)');else v=iso;
+        }
         // validasi pilihan
         if(v&&c.type==='select'){const o=(typeof c.options==='function'?c.options():c.options).map(x=>String(x.v!==undefined?x.v:(x.t||x)));
           if(!o.includes(v)){errs.push(c.label+' tidak valid ('+v+')');}}
@@ -820,8 +842,13 @@ SRIT.Import = {
           if(found){v=found.ID;}else{errs.push(c.label+' "'+v+'" tidak ditemukan');}}
         data[c.key]=v;
       });
+      uq.forEach(c=>{const x=data[c.key];if(!x)return;
+        if(exist[c.key][x])errs.push(c.label+' '+x+' sudah terdaftar atas nama '+exist[c.key][x]);
+        else if(seen[c.key][x])errs.push(c.label+' '+x+' dobel dengan baris '+seen[c.key][x]);
+        else seen[c.key][x]=i+2;});
       return {_row:i+2,_raw:raw,_data:data,_valid:errs.length===0,_errs:errs};
     });
+    return out;
   },
   _preview(root,cfg,parsed){
     const okN=parsed.filter(r=>r._valid).length,badN=parsed.length-okN;
@@ -1597,7 +1624,7 @@ SRIT.Features.anak={
     const asr=SRIT.Store.read('ASRAMA');
     host.innerHTML=`
       <div class="card-srit p-3 mb-3"><div class="filter-bar">
-        <div style="flex:1;min-width:200px"><label class="form-label-sm">Cari Nama / NIS / Kelas / Asrama / Gedung / Kamar / Wali Asuh</label>
+        <div style="flex:1;min-width:200px"><label class="form-label-sm">Cari Nama / NIS / NISN / NIK / Kelas / Asrama / Gedung / Kamar / Wali Asuh</label>
           <div style="position:relative">
             <input class="form-control form-control-sm" id="anSearch" placeholder="Ketik nama, NIS, kelas, asrama, gedung, kamar, atau wali asuh..." style="padding-right:26px" value="${SRIT.Util.esc(this.state.search||'')}">
             <button type="button" id="anSearchClear" class="sf-clear-x" style="display:${this.state.search?'flex':'none'}" title="Hapus pencarian"><i class="bi bi-x-circle-fill"></i></button>
@@ -1665,11 +1692,24 @@ SRIT.Features.anak={
         {key:'ASRAMA',label:'Asrama',ref:'Struktur & Data Induk',refTable:'ASRAMA',refField:'NAME'},
         {key:'KAMAR',label:'Kamar',ref:'Struktur & Data Induk',refTable:'KAMAR',refField:'NAME'},
         {key:'WALI_ASUH',label:'Wali Asuh',ref:'Tenaga Kependidikan',refTable:'WALI_ASUH',refField:'NAME'},
-        {key:'RFID_UID',label:'RFID UID',hint:'opsional untuk kartu RFID'}
+        {key:'RFID_UID',label:'RFID UID',hint:'opsional untuk kartu RFID'},
+        // ---- Kelengkapan data (semua opsional) ----
+        {key:'NIK',label:'NIK',type:'digits',len:16,unique:true,hint:'16 digit. Format kolom Excel = Teks agar tidak terpotong'},
+        {key:'NO_KK',label:'Nomor KK',type:'digits',len:16,hint:'16 digit. Format kolom Excel = Teks'},
+        {key:'NISN',label:'NISN',type:'digits',len:10,unique:true,hint:'10 digit'},
+        {key:'TEMPAT_LAHIR',label:'Tempat Lahir'},
+        {key:'TGL_LAHIR',label:'Tgl Lahir',type:'date',hint:'dd/mm/yyyy'},
+        {key:'SEKOLAH_ASAL',label:'Sekolah Asal'},
+        {key:'ALAMAT',label:'Alamat'},
+        {key:'DESA',label:'Desa'},
+        {key:'KECAMATAN',label:'Kecamatan'},
+        {key:'ORANG_TUA',label:'Orang Tua',hint:'nama orang tua / wali'},
+        {key:'NO_HP',label:'No HP',type:'phone',hint:'cth: 081234567890'},
+        {key:'TAHUN_AJARAN',label:'Tahun Ajaran',hint:'cth: 2026/2027'}
       ],
       sample:[
-        ['2026999001','Contoh Siswa Satu','SRMP','7A','L','Asrama Putra','Kamar 101','Bpk. Ridwan','RF999001'],
-        ['2026999002','Contoh Siswi Dua','SRMA','10B','P','Asrama Putri','Kamar 201','Ibu Fatimah','RF999002']
+        ['2026999001','Contoh Siswa Satu','SRMP','7A','L','Asrama Putra','Kamar 101','Bpk. Ridwan','RF999001','3517010101140001','3517010101140002','0141234567','Jombang','01/01/2014','SDN Contoh 1','Jl. Mawar No. 1','Contoh','Diwek','Bpk. Contoh','081234567890','2026/2027'],
+        ['2026999002','Contoh Siswi Dua','SRMA','10B','P','Asrama Putri','Kamar 201','Ibu Fatimah','RF999002','','','','','','','','','','','','2026/2027']
       ],
       onRow:(rec,raw)=>{
         rec.STATUS='AKTIF';rec.TANGGAL_MASUK=SRIT.Util.todayISO();
@@ -1681,16 +1721,16 @@ SRIT.Features.anak={
     });
   },
   exportCSV(){
-    const all=SRIT.Api.list('ANAK',{page:1,size:100000,search:this.state.search,searchFields:['NAMA','NIS'],filters:{JENJANG:this.state.jenjang,JK:this.state.jk,ASRAMA:this.state.asrama,STATUS:this.state.status}}).rows;
+    const all=SRIT.Api.list('ANAK',{page:1,size:100000,search:this.state.search,searchFields:['NAMA','NIS','NISN','NIK'],filters:{JENJANG:this.state.jenjang,JK:this.state.jk,ASRAMA:this.state.asrama,STATUS:this.state.status}}).rows;
     if(!all.length){SRIT.Notify('Tidak ada data','warn');return;}
-    let csv='NIS,Nama,Jenjang,Kelas,JK,Asrama,Kamar,WaliAsuh,Status,TanggalMasuk,TanggalKeluar\n';
-    all.forEach(a=>csv+=[a.NIS,a.NAMA,a.JENJANG,a.KELAS,a.JK,(SRIT.Repo.getById('ASRAMA',a.ASRAMA)||{}).NAME,(SRIT.Repo.getById('KAMAR',a.KAMAR)||{}).NAME,(SRIT.Repo.getById('WALI_ASUH',a.WALI_ASUH)||{}).NAME,a.STATUS,a.TANGGAL_MASUK,a.TANGGAL_KELUAR].map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')+'\n');
+    let csv='NIS,Nama,Jenjang,Kelas,JK,Asrama,Kamar,WaliAsuh,Status,TanggalMasuk,TanggalKeluar,NIK,NomorKK,NISN,TempatLahir,TglLahir,SekolahAsal,Alamat,Desa,Kecamatan,OrangTua,NoHP,TahunAjaran\n';
+    all.forEach(a=>csv+=[a.NIS,a.NAMA,a.JENJANG,a.KELAS,a.JK,(SRIT.Repo.getById('ASRAMA',a.ASRAMA)||{}).NAME,(SRIT.Repo.getById('KAMAR',a.KAMAR)||{}).NAME,(SRIT.Repo.getById('WALI_ASUH',a.WALI_ASUH)||{}).NAME,a.STATUS,a.TANGGAL_MASUK,a.TANGGAL_KELUAR,a.NIK,a.NO_KK,a.NISN,a.TEMPAT_LAHIR,a.TGL_LAHIR,a.SEKOLAH_ASAL,a.ALAMAT,a.DESA,a.KECAMATAN,a.ORANG_TUA,a.NO_HP,a.TAHUN_AJARAN].map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')+'\n');
     const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='data_anak_'+SRIT.Util.todayISO()+'.csv';a.click();
     SRIT.Audit.log('EXPORT','anak','ANAK');SRIT.Notify('Data anak diekspor ('+all.length+')','ok');
   },
   load(){
     const r=SRIT.Api.list('ANAK',{page:this.state.page,size:this.state.size,search:this.state.search,
-      searchFields:['NAMA','NIS','KELAS','JENJANG'],
+      searchFields:['NAMA','NIS','NISN','NIK','KELAS','JENJANG'],
       refSearch:[{table:'ASRAMA',field:'ASRAMA'},{table:'GEDUNG',field:'GEDUNG'},{table:'KAMAR',field:'KAMAR'},{table:'WALI_ASUH',field:'WALI_ASUH'}],
       filters:{JENJANG:this.state.jenjang,JK:this.state.jk,ASRAMA:this.state.asrama,STATUS:this.state.status}});
     const t=$('#anTable');
@@ -1707,6 +1747,13 @@ SRIT.Features.anak={
         <span><i class="bi bi-person-heart"></i> ${SRIT.Util.esc(wa)}</span>
       </div>`;
     };
+    const OPT=['NIK','NO_KK','NISN','TEMPAT_LAHIR','TGL_LAHIR','SEKOLAH_ASAL','ALAMAT','DESA','KECAMATAN','ORANG_TUA','NO_HP','TAHUN_AJARAN'];
+    const lengkap=a=>{
+      const n=OPT.filter(k=>String(a[k]??'').trim()!=='').length;
+      const cls=n===OPT.length?'st-HADIR':n===0?'st-ALPA':'st-IZIN';
+      const miss=OPT.filter(k=>String(a[k]??'').trim()==='').join(', ');
+      return `<div class="mt-1"><span class="badge-soft ${cls}" style="font-size:10px" title="${n===OPT.length?'Lengkap':'Belum diisi: '+SRIT.Util.esc(miss)}"><i class="bi bi-clipboard-check"></i> Data ${n}/${OPT.length}</span></div>`;
+    };
     const stat=a=>{
       const off=a.STATUS==='NONAKTIF';
       const tgl=(off?'Keluar '+ (a.TANGGAL_KELUAR?SRIT.Util.fmtDateShort(a.TANGGAL_KELUAR):'-') : (a.TANGGAL_MASUK?'Masuk '+SRIT.Util.fmtDateShort(a.TANGGAL_MASUK):''));
@@ -1715,7 +1762,7 @@ SRIT.Features.anak={
     t.innerHTML=`<thead><tr><th>NIS</th><th>Nama & Keterangan</th><th>Jenjang</th><th>JK</th><th>RFID</th><th>Status</th><th class="text-end">Aksi</th></tr></thead><tbody>
     ${r.rows.length?r.rows.map(a=>`<tr>
       <td class="align-top">${a.NIS}</td>
-      <td><div class="fw-semibold">${SRIT.Util.esc(a.NAMA)}</div>${ket(a)}</td>
+      <td><div class="fw-semibold">${SRIT.Util.esc(a.NAMA)}</div>${ket(a)}${lengkap(a)}</td>
       <td class="align-top"><span class="badge-soft st-IZIN">${a.JENJANG}</span></td>
       <td class="align-top">${a.JK==='L'?'Putra':a.JK==='P'?'Putri':a.JK}</td>
       <td class="align-top"><code style="font-size:11px">${a.RFID_UID}</code></td>
@@ -1734,7 +1781,7 @@ SRIT.Features.anak={
   form(id){
     const a=id?SRIT.Repo.getById('ANAK',id):{};
     const asrama=SRIT.Store.read('ASRAMA'),kamar=SRIT.Store.read('KAMAR');
-    const m=SRIT.Modal.open({title:(id?'Edit':'Tambah')+' Data Anak',
+    const m=SRIT.Modal.open({title:(id?'Edit':'Tambah')+' Data Anak',size:'modal-lg',
       body:`<form id="anForm"><div class="row g-2">
         <div class="col-6"><label class="form-label-sm">NIS</label><input class="form-control form-control-sm" name="NIS" value="${a.NIS||''}" required></div>
         <div class="col-6"><label class="form-label-sm">Nama</label><input class="form-control form-control-sm" name="NAMA" value="${a.NAMA||''}" required></div>
@@ -1745,14 +1792,32 @@ SRIT.Features.anak={
         <div class="col-4"><label class="form-label-sm">Asrama</label><select class="form-select form-select-sm" name="ASRAMA">${asrama.map(x=>`<option value="${x.ID}" ${a.ASRAMA===x.ID?'selected':''}>${x.NAME}</option>`).join('')}</select></div>
         <div class="col-4"><label class="form-label-sm">Kamar</label><select class="form-select form-select-sm" name="KAMAR">${kamar.map(x=>`<option value="${x.ID}" ${a.KAMAR===x.ID?'selected':''}>${x.NAME}</option>`).join('')}</select></div>
         <div class="col-12"><hr class="my-1"></div>
-        <div class="col-4"><label class="form-label-sm">Keterangan</label><select class="form-select form-select-sm" name="STATUS"><option value="AKTIF" ${(!a.STATUS||a.STATUS==='AKTIF')?'selected':''}>Aktif</option><option value="NONAKTIF" ${a.STATUS==='NONAKTIF'?'selected':''}>Tidak Aktif</option></select></div>
+        <div class="col-4"><label class="form-label-sm">Status</label><select class="form-select form-select-sm" name="STATUS"><option value="AKTIF" ${(!a.STATUS||a.STATUS==='AKTIF')?'selected':''}>Aktif</option><option value="NONAKTIF" ${a.STATUS==='NONAKTIF'?'selected':''}>Tidak Aktif</option></select></div>
         <div class="col-4"><label class="form-label-sm">Tanggal Masuk</label><input type="date" class="form-control form-control-sm" name="TANGGAL_MASUK" value="${a.TANGGAL_MASUK||(id?'':SRIT.Util.todayISO())}"></div>
         <div class="col-4"><label class="form-label-sm">Tanggal Keluar</label><input type="date" class="form-control form-control-sm" name="TANGGAL_KELUAR" value="${a.TANGGAL_KELUAR||''}"></div>
+        <div class="col-12"><hr class="my-1"><div class="fw-semibold" style="font-size:12px">Kelengkapan Data <span class="text-muted-2 fw-normal">(opsional — boleh dikosongkan)</span></div></div>
+        <div class="col-md-4"><label class="form-label-sm">NIK</label><input class="form-control form-control-sm" name="NIK" inputmode="numeric" maxlength="16" pattern="\\d{16}" title="16 digit angka" value="${SRIT.Util.esc(a.NIK||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Nomor KK</label><input class="form-control form-control-sm" name="NO_KK" inputmode="numeric" maxlength="16" pattern="\\d{16}" title="16 digit angka" value="${SRIT.Util.esc(a.NO_KK||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">NISN</label><input class="form-control form-control-sm" name="NISN" inputmode="numeric" maxlength="10" pattern="\\d{10}" title="10 digit angka" value="${SRIT.Util.esc(a.NISN||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Tempat Lahir</label><input class="form-control form-control-sm" name="TEMPAT_LAHIR" value="${SRIT.Util.esc(a.TEMPAT_LAHIR||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Tanggal Lahir</label><input type="date" class="form-control form-control-sm" name="TGL_LAHIR" value="${SRIT.Util.esc(a.TGL_LAHIR||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Tahun Ajaran</label><input class="form-control form-control-sm" name="TAHUN_AJARAN" placeholder="2026/2027" value="${SRIT.Util.esc(a.TAHUN_AJARAN||'')}"></div>
+        <div class="col-md-6"><label class="form-label-sm">Sekolah Asal</label><input class="form-control form-control-sm" name="SEKOLAH_ASAL" value="${SRIT.Util.esc(a.SEKOLAH_ASAL||'')}"></div>
+        <div class="col-md-6"><label class="form-label-sm">Alamat</label><input class="form-control form-control-sm" name="ALAMAT" value="${SRIT.Util.esc(a.ALAMAT||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Desa</label><input class="form-control form-control-sm" name="DESA" value="${SRIT.Util.esc(a.DESA||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Kecamatan</label><input class="form-control form-control-sm" name="KECAMATAN" value="${SRIT.Util.esc(a.KECAMATAN||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">Orang Tua / Wali</label><input class="form-control form-control-sm" name="ORANG_TUA" value="${SRIT.Util.esc(a.ORANG_TUA||'')}"></div>
+        <div class="col-md-4"><label class="form-label-sm">No HP Orang Tua</label><input class="form-control form-control-sm" name="NO_HP" type="tel" inputmode="tel" pattern="0\\d{8,13}" title="Diawali 0, 9–14 digit" value="${SRIT.Util.esc(a.NO_HP||'')}"></div>
       </div></form>`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="anSave">Simpan</button>`});
     $('#anSave',m.el).onclick=()=>{
       const f=$('#anForm',m.el);if(!f.reportValidity())return;
       const data=Object.fromEntries(new FormData(f));
+      for(const k of ['NIK','NISN']){
+        const v=String(data[k]||'').trim();if(!v)continue;
+        const dup=SRIT.Store.read('ANAK').find(r=>r.ID!==id&&String(r[k]||'').trim()===v);
+        if(dup){SRIT.Notify(k+' '+v+' sudah terdaftar atas nama '+dup.NAMA,'err');return;}
+      }
       if(id){SRIT.Repo.update('ANAK',id,data);SRIT.Audit.log('UPDATE','anak',id);}
       else{data.ID=SRIT.Util.uid('A');SRIT.Repo.insert('ANAK',data);SRIT.Audit.log('CREATE','anak',data.ID);}
       SRIT.Cache.invalidate('dash');m.close();SRIT.Notify('Data anak tersimpan','ok');this.load();
@@ -2790,7 +2855,6 @@ SRIT.Features.absensi={
   };
 })();
 </script>
-
 
 <script>__srit.n('View_Jadwal')</script>
 <script>
@@ -6162,6 +6226,7 @@ SRIT.LiveTV={
   if(document.body&&document.head)boot();else document.addEventListener('DOMContentLoaded',boot);
 })();
 </script>
+
 <script>__srit.n('JS_Boot')</script>
 <script>
 //# sourceURL=JS_Boot.html
