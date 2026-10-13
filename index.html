@@ -753,6 +753,8 @@ SRIT.Import = {
       if(c.ref)ket='Isi dengan NAMA yang terdaftar di menu '+c.ref;
       guide.push([c.label,c.required?'WAJIB':'opsional',ket]);
     });
+    if(cfg.upsertKey){const kl=(cfg.columns.find(c=>c.key===cfg.upsertKey)||{}).label||cfg.upsertKey;
+      guide.push([''],['CATATAN','','Jika '+kl+' sudah terdaftar, datanya DIPERBARUI (kolom kosong tidak menghapus data lama; kolom WAJIB lain hanya perlu diisi untuk data baru). Jika belum terdaftar, data DIBUAT BARU.']);}
     const wg=XLSX.utils.aoa_to_sheet(guide);wg['!cols']=[{wch:20},{wch:10},{wch:60}];
     XLSX.utils.book_append_sheet(wb,wg,'Petunjuk');
     XLSX.writeFile(wb,'Template_'+cfg.table+'.xlsx');
@@ -766,7 +768,7 @@ SRIT.Import = {
           <label class="btn btn-primary btn-sm mb-0"><i class="bi bi-upload"></i> Pilih File XLSX/CSV<input type="file" id="impFile" accept=".xlsx,.xls,.csv" hidden></label>
           <span class="text-muted-2 small" id="impFileName"></span>
         </div>
-        <div class="alert alert-info py-2" style="font-size:12px"><i class="bi bi-info-circle"></i> Unduh template terlebih dahulu, isi datanya, lalu unggah. Kolom berlabel <b>WAJIB</b> harus diisi. Kolom relasi (Asrama, Kamar, dll) diisi dengan <b>nama</b> yang sudah terdaftar.</div>
+        <div class="alert alert-info py-2" style="font-size:12px"><i class="bi bi-info-circle"></i> Unduh template terlebih dahulu, isi datanya, lalu unggah. Kolom berlabel <b>WAJIB</b> harus diisi. Kolom relasi (Asrama, Kamar, dll) diisi dengan <b>nama</b> yang sudah terdaftar.${cfg.upsertKey?`<br><b>Mode pembaruan:</b> baris dengan ${SRIT.Util.esc((cfg.columns.find(c=>c.key===cfg.upsertKey)||{}).label||cfg.upsertKey)} yang <u>sudah terdaftar</u> akan <b>diperbarui</b> (hanya kolom yang diisi; kolom kosong tidak menghapus data lama), sedangkan yang <u>belum terdaftar</u> akan <b>dibuat baru</b>.`:''}</div>
         <div id="impPreview"></div>`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button><button class="btn btn-success btn-sm" id="impSave" disabled><i class="bi bi-check2-circle"></i> Simpan Data Valid</button>`});
     $('#impDl',m.el).onclick=()=>this.downloadTemplate(cfg);
@@ -790,32 +792,56 @@ SRIT.Import = {
     $('#impSave',m.el).onclick=()=>{
       const valid=parsed.filter(r=>r._valid);
       if(!valid.length){SRIT.Notify('Tidak ada baris valid','warn');return;}
-      let n=0;
-      valid.forEach(r=>{
-        const rec={ID:SRIT.Util.uid(cfg.idPrefix||'ID')};
-        cfg.columns.forEach(c=>{rec[c.key]=r._data[c.key];});
-        if(cfg.onRow)cfg.onRow(rec,r._raw);
-        SRIT.Repo.insert(cfg.table,rec);n++;
-      });
-      SRIT.Audit.log('IMPORT',cfg.module||cfg.table.toLowerCase(),cfg.table,null,{jumlah:n});
+      const res=this._apply(cfg,valid);
+      SRIT.Audit.log('IMPORT',cfg.module||cfg.table.toLowerCase(),cfg.table,null,{jumlah:res.baru+res.update,baru:res.baru,diperbarui:res.update,tanpaPerubahan:res.sama});
       SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
-      m.close();SRIT.Notify(n+' data berhasil diimpor','ok');
+      m.close();
+      SRIT.Notify(cfg.upsertKey?(res.baru+' data baru, '+res.update+' diperbarui'+(res.sama?', '+res.sama+' tanpa perubahan':'')):(res.baru+' data berhasil diimpor'),'ok');
       if(cfg.onDone)cfg.onDone();
     };
+  },
+  // tulis baris valid: BARU → insert; sudah ada (kunci upsert sama) → update kolom yang diisi saja
+  _apply(cfg,valid){
+    const res={baru:0,update:0,sama:0};
+    valid.forEach(r=>{
+      if(r._ex){
+        if(r._action==='SAMA'){res.sama++;return;}
+        const patch=Object.assign({},r._patch);
+        if(cfg.onUpdate)cfg.onUpdate(patch,r._ex,r._raw);
+        SRIT.Repo.update(cfg.table,r._ex.ID,patch);res.update++;return;
+      }
+      const rec={ID:SRIT.Util.uid(cfg.idPrefix||'ID')};
+      cfg.columns.forEach(c=>{rec[c.key]=r._data[c.key];});
+      if(cfg.onRow)cfg.onRow(rec,r._raw);
+      SRIT.Repo.insert(cfg.table,rec);res.baru++;
+    });
+    return res;
   },
   _validate(cfg,rows){
     const labelToKey={};cfg.columns.forEach(c=>labelToKey[c.label.toLowerCase().trim()]=c);
     const uq=cfg.columns.filter(c=>c.unique);
+    const store=SRIT.Store.read(cfg.table)||[];
     const exist={},seen={};
     uq.forEach(c=>{exist[c.key]={};seen[c.key]={};
-      (SRIT.Store.read(cfg.table)||[]).forEach(r=>{const x=String(r[c.key]??'').trim();if(x)exist[c.key][x]=r.NAMA||r.NAME||r.ID;});});
+      store.forEach(r=>{const x=String(r[c.key]??'').trim();if(x)exist[c.key][x]={id:r.ID,name:r.NAMA||r.NAME||r.ID};});});
+    // kunci upsert (mis. NIS): cocokkan dengan data lama tanpa beda huruf besar/kecil
+    const uk=cfg.upsertKey?cfg.columns.find(c=>c.key===cfg.upsertKey):null;
+    const nk=x=>String(x==null?'':x).trim().toUpperCase();
+    const byKey={},seenKey={};
+    if(uk)store.forEach(r=>{const k=nk(r[uk.key]);if(k&&!byKey[k])byKey[k]=r;});
+    const rawOf=(raw,c)=>{let v='';for(const k in raw){if(k.toLowerCase().trim()===c.label.toLowerCase().trim()){v=raw[k];break;}}return(v===null||v===undefined)?'':String(v).trim();};
     const out=rows.map((raw,i)=>{
       const data={};const errs=[];
+      let ex=null;
+      if(uk){const kv=nk(rawOf(raw,uk));
+        if(kv){ex=byKey[kv]||null;
+          if(seenKey[kv])errs.push(uk.label+' '+rawOf(raw,uk)+' dobel dengan baris '+seenKey[kv]+' pada file ini');
+          else seenKey[kv]=i+2;}}
       cfg.columns.forEach(c=>{
         // cari nilai berdasarkan label (case-insensitive)
-        let v='';for(const k in raw){if(k.toLowerCase().trim()===c.label.toLowerCase().trim()){v=raw[k];break;}}
-        v=(v===null||v===undefined)?'':String(v).trim();
-        if(c.required&&!v){errs.push(c.label+' kosong');}
+        let v=rawOf(raw,c);
+        // kolom WAJIB selain kunci hanya diwajibkan untuk data BARU (saat memperbarui boleh dikosongkan)
+        if(c.required&&!v&&!(ex&&c.key!==uk.key)){errs.push(c.label+' kosong');}
         // normalisasi & validasi tipe (hanya bila terisi → kolom opsional boleh kosong)
         if(v&&c.type==='digits'){
           v=v.replace(/[\s.\-']/g,'');
@@ -843,21 +869,33 @@ SRIT.Import = {
         data[c.key]=v;
       });
       uq.forEach(c=>{const x=data[c.key];if(!x)return;
-        if(exist[c.key][x])errs.push(c.label+' '+x+' sudah terdaftar atas nama '+exist[c.key][x]);
+        const own=exist[c.key][x];
+        if(own&&!(ex&&own.id===ex.ID))errs.push(c.label+' '+x+' sudah terdaftar atas nama '+own.name);   // milik data lain
         else if(seen[c.key][x])errs.push(c.label+' '+x+' dobel dengan baris '+seen[c.key][x]);
         else seen[c.key][x]=i+2;});
-      return {_row:i+2,_raw:raw,_data:data,_valid:errs.length===0,_errs:errs};
+      // tentukan aksi: BARU / UPDATE (ada kolom berubah) / SAMA (tidak ada perubahan)
+      let action='BARU',patch=null;
+      if(ex){patch={};
+        cfg.columns.forEach(c=>{if(c.key===uk.key)return;const nv=data[c.key];if(nv!==''&&String(ex[c.key]??'').trim()!==nv)patch[c.key]=nv;});
+        action=Object.keys(patch).length?'UPDATE':'SAMA';}
+      return {_row:i+2,_raw:raw,_data:data,_valid:errs.length===0,_errs:errs,_action:action,_ex:ex,_patch:patch};
     });
     return out;
   },
   _preview(root,cfg,parsed){
     const okN=parsed.filter(r=>r._valid).length,badN=parsed.length-okN;
+    const up=!!cfg.upsertKey;
+    const cnt=a=>parsed.filter(r=>r._valid&&r._action===a).length;
+    const lbl=k=>((cfg.columns.find(c=>c.key===k)||{}).label)||k;
+    const actBadge=r=>r._action==='UPDATE'?`<span class="badge-soft st-IZIN" title="Kolom diperbarui: ${SRIT.Util.esc(Object.keys(r._patch).map(lbl).join(', '))}" style="font-size:11px"><i class="bi bi-arrow-repeat"></i> Update ${Object.keys(r._patch).length} kolom</span>`
+      :r._action==='SAMA'?'<span class="badge-soft st-BELUM" style="font-size:11px" title="Data sudah sama, dilewati"><i class="bi bi-dash-circle"></i> Sama</span>'
+      :'<span class="badge-soft st-HADIR" style="font-size:11px"><i class="bi bi-plus-circle"></i> Baru</span>';
     const head=cfg.columns.map(c=>`<th>${c.label}</th>`).join('');
     $('#impPreview',root).innerHTML=`
-      <div class="d-flex gap-2 mb-2"><span class="badge-soft st-HADIR">${okN} valid</span>${badN?`<span class="badge-soft st-ALPA">${badN} bermasalah</span>`:''}<span class="badge-soft st-BELUM">${parsed.length} total</span></div>
+      <div class="d-flex gap-2 mb-2"><span class="badge-soft st-HADIR">${okN} valid</span>${up?`<span class="badge-soft st-HADIR"><i class="bi bi-plus-circle"></i> ${cnt('BARU')} baru</span><span class="badge-soft st-IZIN"><i class="bi bi-arrow-repeat"></i> ${cnt('UPDATE')} diperbarui</span>${cnt('SAMA')?`<span class="badge-soft st-BELUM">${cnt('SAMA')} tanpa perubahan</span>`:''}`:''}${badN?`<span class="badge-soft st-ALPA">${badN} bermasalah</span>`:''}<span class="badge-soft st-BELUM">${parsed.length} total</span></div>
       <div class="table-responsive" style="max-height:320px"><table class="table table-sm table-srit mb-0"><thead><tr><th>#</th><th>Status</th>${head}</tr></thead><tbody>
       ${parsed.slice(0,100).map(r=>`<tr class="${r._valid?'':'table-danger'}"><td>${r._row}</td>
-        <td>${r._valid?'<i class="bi bi-check-circle-fill text-success"></i>':`<span class="text-danger" title="${SRIT.Util.esc(r._errs.join('; '))}" style="font-size:11px"><i class="bi bi-exclamation-triangle"></i> ${SRIT.Util.esc(r._errs[0]||'')}</span>`}</td>
+        <td>${r._valid?(up?actBadge(r):'<i class="bi bi-check-circle-fill text-success"></i>'):`<span class="text-danger" title="${SRIT.Util.esc(r._errs.join('; '))}" style="font-size:11px"><i class="bi bi-exclamation-triangle"></i> ${SRIT.Util.esc(r._errs[0]||'')}</span>`}</td>
         ${cfg.columns.map(c=>`<td>${SRIT.Util.esc(r._raw[c.label]??r._data[c.key]??'')}</td>`).join('')}</tr>`).join('')}
       </tbody></table></div>${parsed.length>100?'<div class="text-muted-2 small mt-1">Menampilkan 100 baris pertama…</div>':''}`;
   }
@@ -1682,7 +1720,8 @@ SRIT.Features.anak={
   },
   importXLSX(){
     SRIT.Import.open({
-      table:'ANAK',title:'Data Anak / Siswa',module:'anak',idPrefix:'A',
+      table:'ANAK',title:'Data Anak / Siswa',module:'anak',idPrefix:'A',upsertKey:'NIS',   // NIS sudah ada → diperbarui; belum ada → dibuat baru
+      
       columns:[
         {key:'NIS',label:'NIS',required:true},
         {key:'NAMA',label:'Nama',required:true},
@@ -1717,6 +1756,8 @@ SRIT.Features.anak={
         const km=SRIT.Repo.getById('KAMAR',rec.KAMAR);if(km){rec.GEDUNG=km.GEDUNG;rec.LANTAI=km.LANTAI;}
         if(!rec.RFID_UID)rec.RFID_UID='RF'+Date.now().toString().slice(-6);
       },
+      // pembaruan: bila kamar berubah, gedung & lantai mengikuti kamar baru (status, tgl masuk & RFID lama dibiarkan)
+      onUpdate:(patch)=>{if(patch.KAMAR){const km=SRIT.Repo.getById('KAMAR',patch.KAMAR);if(km){patch.GEDUNG=km.GEDUNG;patch.LANTAI=km.LANTAI;}}},
       onDone:()=>this.load()
     });
   },
@@ -1813,7 +1854,7 @@ SRIT.Features.anak={
     $('#anSave',m.el).onclick=()=>{
       const f=$('#anForm',m.el);if(!f.reportValidity())return;
       const data=Object.fromEntries(new FormData(f));
-      for(const k of ['NIK','NISN']){
+      for(const k of ['NIS','NIK','NISN']){
         const v=String(data[k]||'').trim();if(!v)continue;
         const dup=SRIT.Store.read('ANAK').find(r=>r.ID!==id&&String(r[k]||'').trim()===v);
         if(dup){SRIT.Notify(k+' '+v+' sudah terdaftar atas nama '+dup.NAMA,'err');return;}
