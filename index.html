@@ -5926,26 +5926,72 @@ SRIT.Router={
 .lv-btn.on{background:rgba(52,211,153,.3)}
 #ltvFilter{position:fixed;bottom:110px;right:12px;z-index:1601;display:none;background:#0e1830;border:1px solid var(--ln);border-radius:12px;padding:14px;width:min(300px,90vw);box-shadow:0 12px 40px rgba(0,0,0,.5)}
 #ltvFilter label{font-size:12px;color:var(--mu);display:block;margin:6px 0 3px}
-/* ---- HP (mobile-live): tanpa skala, halaman bertumpuk ---- */
-.lv-mob{overflow-y:auto!important}
-.lv-mob .lv-stage{position:relative;width:100%;height:auto;transform:none!important}
-.lv-mob .lv-head,.lv-mob .lv-bar{height:auto;flex-wrap:wrap;padding:10px 14px;gap:10px}
-.lv-mob .lv-ptitle,.lv-mob .lv-tabs,.lv-mob .lv-foot>b{display:none}
-.lv-mob .lv-clock{font-size:24px}.lv-mob .lv-school b{font-size:18px}
-.lv-mob .lv-body{flex:none}
-.lv-mob .lv-pg{position:relative;opacity:1;visibility:visible;display:block;padding:10px 12px}
-.lv-mob .lv-pg>*{margin-bottom:12px;min-height:200px}
-.lv-mob .lv-pg>.lv-k{min-height:100px}
-.lv-mob .lv-pg::before{content:attr(data-t);display:block;font-size:20px;font-weight:700;margin:10px 0 12px;color:var(--acc)}
-.lv-mob .sb{grid-template-columns:100px 1fr 80px;font-size:14px}
-.lv-mob .lv-k .v{font-size:36px}
-.lv-mob .lv-foot{height:40px}
-.lv-mob .lv-admin{opacity:1;pointer-events:auto;bottom:0;left:0;right:0;flex-wrap:wrap;justify-content:center;background:#0a1428;border-top:1px solid var(--ln);padding:8px;gap:6px}
-.lv-mob .lv-btn{white-space:nowrap;padding:7px 10px}
-.lv-mob .lv-stage{padding-bottom:96px}
-.lv-mob .lv-fg{flex-wrap:wrap}
+/* ---- HP / layar sempit: halaman bertumpuk, KPI 2 kolom, filter lengket, grafik terbaca ---- */
+.lv-mob{overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch}
+.lv-mob .lv-stage{position:relative;width:100%!important;height:auto!important;min-height:100%;transform:none!important;left:0!important;top:0!important;padding-bottom:68px}
+.lv-mob .lv-head{height:auto;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:6px 10px;padding:10px 14px}
+.lv-mob .lv-logo{width:40px;height:40px;font-size:17px;border-radius:10px}
+.lv-mob .lv-school b{font-size:15px;white-space:normal;overflow:visible;line-height:1.2}
+.lv-mob .lv-school small{display:block;font-size:11px;letter-spacing:.2px;margin-top:2px}
+.lv-mob .lv-ptitle,.lv-mob .lv-tabs{display:none}
+.lv-mob .lv-clockbox{min-width:0}
+.lv-mob .lv-clock{font-size:20px}
+.lv-mob .lv-date{font-size:11px}
+.lv-mob .lv-status{grid-column:1/-1;justify-self:start;padding:3px 10px;font-size:11px}
+.lv-mob .lv-bar{height:auto;flex-direction:column;align-items:stretch;gap:6px;padding:8px 12px;position:sticky;top:0;z-index:20;background:rgba(7,14,28,.96);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.lv-mob .lv-fg{flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none}
+.lv-mob .lv-fg::-webkit-scrollbar{display:none}
+.lv-mob .lv-fg>span:not(.lv-chip){font-size:12px;flex:none;min-width:80px;margin:0}
+.lv-mob .lv-chip{padding:5px 11px;font-size:13px;flex:none}
+.lv-mob .lv-body{flex:none;position:static}
+.lv-mob .lv-pg{position:relative;inset:auto;opacity:1;visibility:visible;transition:none;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none!important;grid-auto-rows:auto;gap:10px;padding:4px 12px 12px}
+.lv-mob .lv-pg::before{content:attr(data-t);grid-column:1/-1;display:block;font-size:18px;font-weight:700;margin:16px 0 2px;color:var(--acc)}
+.lv-mob .lv-pg>*{grid-column:1/-1!important;grid-row:auto!important;min-height:0;margin:0}
+.lv-mob .lv-pg>.lv-k{grid-column:auto!important;min-height:88px;padding:11px 14px}
+.lv-mob .lv-pg>.lv-k.lv-wide{grid-column:1/-1!important}
+.lv-mob .lv-k .l{font-size:12px}
+.lv-mob .lv-k .v{font-size:28px;margin-top:3px}
+.lv-mob .lv-k .v small{font-size:14px}
+.lv-mob .lv-k .s{font-size:11.5px;line-height:1.3}
+.lv-mob .lv-k .sp{display:none}
+.lv-mob .lv-k.lv-wide .sp{display:block;height:36px}
+.lv-mob .lv-p{min-height:0;padding:14px}
+.lv-mob .lv-empty{padding:24px 12px}
+.lv-mob .lv-p h4{font-size:16px}
+.lv-mob .lv-p .lv-sub{font-size:12px}
+.lv-mob .lv-pb{overflow-x:auto}
+.lv-mob .lv-scroll{overflow:visible}
+.lv-mob .lv-pb>svg{height:auto}
+.lv-mob .lv-leg{font-size:12px}
+.lv-mob .sb{grid-template-columns:minmax(72px,30%) 1fr auto!important;gap:8px;font-size:13.5px;padding:5px 0}
+.lv-mob .sb .rt{white-space:nowrap}
+.lv-mob .lv-t{font-size:13px}
+.lv-mob .lv-t th{font-size:11px;padding:5px;white-space:normal}
+.lv-mob .lv-t td{padding:7px 5px;white-space:normal}
+.lv-mob .lv-t td.tx{max-width:none}
+.lv-mob .sb>span[style*="font-size:20px"]{white-space:normal!important;font-size:16px!important;line-height:1.25}
+.lv-mob .lv-b{font-size:10.5px;padding:2px 7px;white-space:normal;text-align:center;line-height:1.25}
+.lv-mob .lv-t td{font-size:12.5px}
+.lv-mob .in{font-size:14px}
+.lv-mob .hm .c b{font-size:28px}
 .lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:column;align-items:stretch}
-.lv-mob .lv-pb>div[style*="gap:20px"]>svg{align-self:center;height:220px}
+.lv-mob .lv-pb>div[style*="gap:20px"]>svg{align-self:center;height:210px}
+.lv-mob .lv-foot{height:40px}
+.lv-mob .lv-foot>b{display:none}
+.lv-mob .lv-admin{opacity:1;pointer-events:auto;position:fixed;bottom:0;left:0;right:0;flex-wrap:nowrap;justify-content:center;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(10,20,40,.96);border-top:1px solid var(--ln)}
+.lv-mob .lv-admin .lv-btn{flex:1;max-width:170px;padding:9px 10px;font-size:13px;white-space:nowrap}
+.lv-mob .lv-admin #ltvBelBtn,.lv-mob .lv-admin #ltvAutoBtn,.lv-mob .lv-admin .lv-btn[onclick*="prev()"],.lv-mob .lv-admin .lv-btn[onclick*="next()"],.lv-mob .lv-admin .lv-btn[onclick*="fullscreen()"]{display:none}
+.lv-mob #ltvFilter{bottom:64px;left:12px;right:12px;width:auto}
+@media (min-width:600px){
+.lv-mob .lv-pg{grid-template-columns:repeat(4,minmax(0,1fr))}
+.lv-mob .lv-pg>.lv-k.lv-wide{grid-column:auto!important}
+.lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:row;align-items:center}
+}
+@media (max-height:480px){
+.lv-mob .lv-bar{position:static}
+.lv-mob .lv-admin{position:static;padding:6px 10px}
+.lv-mob .lv-stage{padding-bottom:0}
+}
 .lv-mob:not(.lv-act){cursor:auto}
 </style>
 <script>
@@ -5975,8 +6021,8 @@ SRIT.LiveTV={
     if(!this._bound){
       this._bound=true;
       const act=()=>{const r=$('#liveTvRoot');if(!r)return;r.classList.add('lv-act');clearTimeout(this._at);this._at=setTimeout(()=>{const f=$('#ltvFilter');if(!f||f.style.display!=='block')r.classList.remove('lv-act');},4000);};
-      window.addEventListener('orientationchange',()=>setTimeout(()=>{this.syncMode();this.fit();},300));document.addEventListener('mousemove',act);document.addEventListener('touchstart',act,{passive:true});document.addEventListener('keydown',act);
-      window.addEventListener('resize',()=>{clearTimeout(this._rt);this._rt=setTimeout(()=>{this.syncMode();this.fit();this.setupAutoScroll();},150);});
+      window.addEventListener('orientationchange',()=>setTimeout(()=>this.onResize(),300));document.addEventListener('mousemove',act);document.addEventListener('touchstart',act,{passive:true});document.addEventListener('keydown',act);
+      window.addEventListener('resize',()=>{clearTimeout(this._rt);this._rt=setTimeout(()=>this.onResize(),150);});
       document.addEventListener('keydown',e=>{
         const r=$('#liveTvRoot');if(!r||!r.classList.contains('show')||/INPUT|SELECT|TEXTAREA/.test((e.target||{}).tagName||''))return;
         if(e.key==='ArrowRight')this.next();else if(e.key==='ArrowLeft')this.prev();
@@ -6032,11 +6078,24 @@ SRIT.LiveTV={
     if(this.data)this.render();
     this.goto(this.slide);
   },
+  onResize(){ /* ganti mode bila perlu; di mode HP gambar ulang grafik jika lebar layar berubah banyak */
+    const w0=this._rw;this._rw=innerWidth;this.syncMode();
+    if(this.mobile&&w0&&Math.abs(innerWidth-w0)>40&&this.data)this.render();
+    this.fit();this.setupAutoScroll();
+  },
+  mobFix(){ /* HP: jika jumlah KPI berurutan ganjil, KPI terakhir dilebarkan penuh agar tidak ada sel kosong */
+    if(!this.mobile)return;
+    $$('#ltvPages .lv-pg').forEach(pg=>{let run=[];const flush=()=>{if(run.length%2===1)run[run.length-1].classList.add('lv-wide');run=[];};
+      [...pg.children].forEach(el=>{if(el.classList.contains('lv-k'))run.push(el);else flush();});flush();});
+  },
   fit(){
     const st=$('#ltvStage');if(!st)return;
-    if(this.mobile){st.style.transform='';st.style.left='';st.style.top='';return;}
-    const s=Math.min(innerWidth/1920,innerHeight/1080);
-    st.style.transform='scale('+s+')';st.style.left=((innerWidth-1920*s)/2)+'px';st.style.top=((innerHeight-1080*s)/2)+'px';
+    if(this.mobile){st.style.transform='';st.style.left='';st.style.top='';st.style.width='';st.style.height='';return;}
+    /* panggung mengisi PENUH layar: skala dari sisi pembatas, sisi lain diperluas (tanpa bar hitam) */
+    const W=document.documentElement.clientWidth||innerWidth,H=document.documentElement.clientHeight||innerHeight;
+    const s=Math.min(W/1920,H/1080);
+    st.style.width=(W/s)+'px';st.style.height=(H/s)+'px';
+    st.style.transform='scale('+s+')';st.style.left='0px';st.style.top='0px';
   },
   /* ---------- rangka ---------- */
   buildShell(){
@@ -6131,7 +6190,7 @@ SRIT.LiveTV={
   },
   /** garis multi-seri. series:[{name,color,vals:[v|null],dim}] labels:[str]; fmt untuk sumbu-y */
   line(series,labels,o={}){
-    const W=760,H=o.h||330,pl=50,pr=96,pt=14,pb=32,all=series.flatMap(s=>s.vals).filter(v=>v!=null);
+    const mb=this.mobile,W=mb?(innerWidth<500?430:Math.min(760,innerWidth-48)):760,H=o.h||(mb?300:330),pl=mb?44:50,pr=mb?92:96,pt=14,pb=32,all=series.flatMap(s=>s.vals).filter(v=>v!=null);
     if(!all.length)return this.emp('Belum ada data tren');
     let lo=o.min!=null?o.min:Math.min(...all),hi=o.max!=null?o.max:Math.max(...all);
     if(!o.fmt){ // sumbu persen: 0–100, tiap garis kisi = kelipatan bulat
@@ -6157,7 +6216,7 @@ SRIT.LiveTV={
   },
   /** kolom sederhana. vals:[n], labels:[str] */
   cols(vals,labels,color,o={}){
-    const W=620,H=o.h||300,pl=34,pb=30,pt=24,n=vals.length,mx=Math.max(1,...vals),bw=Math.min(64,(W-pl)/n*.62),st=(W-pl)/n;
+    const W=this.mobile?(innerWidth<500?400:Math.min(620,innerWidth-48)):620,H=o.h||300,pl=34,pb=30,pt=24,n=vals.length,mx=Math.max(1,...vals),bw=Math.min(64,(W-pl)/n*.62),st=(W-pl)/n;
     let s=`<line x1="${pl}" x2="${W}" y1="${H-pb}" y2="${H-pb}" stroke="#21314f"/>`;
     vals.forEach((v,i)=>{const h=(H-pt-pb)*v/mx,x=pl+st*i+(st-bw)/2,y=H-pb-h;
       s+=`<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h,v?3:0)}" rx="5" fill="${color}"/><text x="${x+bw/2}" y="${y-7}" text-anchor="middle" style="fill:#e8eefc;font-size:16px;font-weight:700">${v}</text><text x="${x+bw/2}" y="${H-9}" text-anchor="middle" style="fill:#8fa3c7;font-size:13px">${labels[i]}</text>`;});
@@ -6242,7 +6301,7 @@ SRIT.LiveTV={
     root.style.setProperty('--lv-dur',this.rotateSec()+'s');
     this._ins=ins;
     $('#ltvPT').innerHTML=this.PAGES[this.slide][0]+'<em>'+(this.slide+1)+' / '+this.PAGES.length+'</em>';
-    this.fit();
+    this.fit();this.mobFix();
     requestAnimationFrame(()=>this.setupAutoScroll());
   },
   setupAutoScroll(){
