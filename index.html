@@ -5679,6 +5679,20 @@ SRIT.Features.settings={
         <div class="text-muted-2 mb-2" style="font-size:11px">Berlaku untuk percobaan login berikutnya, tidak memutus sesi yang sedang aktif.</div>
         <button class="btn btn-primary btn-sm mt-2" id="setSaveSecurity"><i class="bi bi-save"></i> Simpan Keamanan</button>
       </div></div>
+      ${SRIT.Auth.isSuper()?`<div class="col-12"><div class="card-srit p-3" id="setBackupCard">
+        <h6 class="section-title mb-2"><i class="bi bi-database-check me-1"></i> Cadangan & Pemulihan Database</h6>
+        <div class="text-muted-2 mb-3" style="font-size:12px">Mencakup seluruh data induk: siswa, tenaga kependidikan & akun, struktur asrama, jadwal, layanan, pengaturan, dan data wajah. Data absensi harian tersimpan di spreadsheet bulanan terpisah sehingga tidak ikut. Cadangan otomatis dibuat setiap tanggal 1 (disimpan ${40} terbaru).</div>
+        <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
+          <div style="min-width:200px"><label class="form-label-sm">Catatan cadangan (opsional)</label><input class="form-control form-control-sm" id="setBkLabel" maxlength="30" placeholder="cth: sebelum_naik_kelas"></div>
+          <button class="btn btn-primary btn-sm" id="setBkCreate"><i class="bi bi-cloud-arrow-up"></i> Buat Cadangan Sekarang</button>
+          <button class="btn btn-outline-secondary btn-sm" id="setBkExport"><i class="bi bi-download"></i> Unduh Cadangan (.json)</button>
+          <button class="btn btn-outline-danger btn-sm" id="setBkImport"><i class="bi bi-upload"></i> Pulihkan dari File (.json)</button>
+          <input type="file" id="setBkFile" accept=".json,application/json" style="display:none">
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-1"><div class="fw-semibold" style="font-size:13px">Cadangan di Google Drive</div><a class="small pointer" id="setBkRefresh"><i class="bi bi-arrow-clockwise"></i> Muat ulang</a></div>
+        <div id="setBkList" class="table-responsive"><div class="text-muted-2 py-2" style="font-size:12px">Memuat\u2026</div></div>
+        <div class="alert alert-warning py-2 mt-3 mb-0" style="font-size:12px"><i class="bi bi-shield-exclamation"></i> Berkas .json berisi data pribadi siswa dan hash kata sandi. Simpan di tempat aman dan jangan dibagikan.</div>
+      </div></div>`:''}
     </div>`;
 
     const on=(id,evt,fn)=>{const el=document.getElementById(id);if(el)el[evt]=fn;};
@@ -5732,6 +5746,14 @@ SRIT.Features.settings={
       SRIT.Notify('Warna utama dikembalikan ke default','ok');
       this.load();
     });
+    if(SRIT.Auth.isSuper()){
+      on('setBkCreate','onclick',()=>this._bkCreate());
+      on('setBkExport','onclick',()=>this._bkExport());
+      on('setBkRefresh','onclick',()=>this._bkList());
+      on('setBkImport','onclick',()=>$('#setBkFile').click());
+      const fi=$('#setBkFile');if(fi)fi.onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)this._bkFile(f);};
+      this._bkList();
+    }
     on('setSaveSecurity','onclick',()=>{
       const sh=Math.min(168,Math.max(1,parseInt($('#setSessHours').value,10)||8));
       const mf=Math.min(20,Math.max(3,parseInt($('#setMaxFail').value,10)||5));
@@ -5740,6 +5762,74 @@ SRIT.Features.settings={
       SRIT.Notify('Pengaturan keamanan tersimpan','ok');
       this.load();
     });
+  },
+  // ---------- Cadangan & Pemulihan (Super Admin) ----------
+  _bkBusy(id,on,txt){const b=document.getElementById(id);if(!b)return;if(on){b.dataset.h=b.innerHTML;b.disabled=true;b.innerHTML='<span class="spinner-border spinner-border-sm"></span> '+(txt||'Memproses\u2026');}else{b.disabled=false;if(b.dataset.h)b.innerHTML=b.dataset.h;}},
+  async _bkList(){
+    const box=document.getElementById('setBkList');if(!box)return;box.innerHTML='<div class="text-muted-2 py-2" style="font-size:12px">Memuat\u2026</div>';
+    try{
+      const r=await SRIT.Server.call('apiBackupList'),esc=SRIT.Util.esc;
+      box.innerHTML=r.files.length?`<table class="table table-srit mb-0"><thead><tr><th>Nama berkas</th><th>Dibuat</th><th></th></tr></thead><tbody>${r.files.map(f=>`<tr><td style="word-break:break-all">${esc(f.name)}</td><td>${esc(String(f.created).replace('T',' '))}</td><td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-secondary py-0" target="_blank" rel="noopener" href="${esc(f.url)}">Buka</a> <button class="btn btn-sm btn-outline-danger py-0" data-bk="${esc(f.id)}" data-nm="${esc(f.name)}">Pulihkan</button></td></tr>`).join('')}</tbody></table>`
+        :'<div class="text-muted-2 py-2" style="font-size:12px">Belum ada cadangan. Klik "Buat Cadangan Sekarang".</div>';
+      box.querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>this._bkRestoreDrive(b.dataset.bk,b.dataset.nm));
+    }catch(e){box.innerHTML='<div class="text-danger py-2" style="font-size:12px">'+SRIT.Util.esc(e.message||'Gagal memuat daftar cadangan')+'</div>';}
+  },
+  async _bkCreate(){
+    this._bkBusy('setBkCreate',true,'Menyalin\u2026');
+    try{const r=await SRIT.Server.call('apiBackupCreate',($('#setBkLabel').value||'').trim());SRIT.Notify('Cadangan dibuat: '+r.name,'ok',5000);$('#setBkLabel').value='';this._bkList();}
+    catch(e){SRIT.Notify(e.message||'Gagal membuat cadangan','err');}
+    this._bkBusy('setBkCreate',false);
+  },
+  async _bkExport(){
+    this._bkBusy('setBkExport',true,'Menyiapkan\u2026');
+    try{
+      const r=await SRIT.Server.call('apiBackupExport');
+      const blob=new Blob([JSON.stringify(r)],{type:'application/json'}),a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);a.download='srit_cadangan_'+String(r.createdAt||'').replace(/[:T]/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),8000);
+      SRIT.Notify('Cadangan diunduh ('+Object.keys(r.tables).length+' tabel)','ok');
+    }catch(e){SRIT.Notify(e.message||'Gagal mengunduh cadangan','err');}
+    this._bkBusy('setBkExport',false);
+  },
+  _bkFile(file){
+    if(file.size>25*1024*1024){SRIT.Notify('Berkas terlalu besar (maks 25 MB)','warn');return;}
+    const rd=new FileReader();
+    rd.onerror=()=>SRIT.Notify('Gagal membaca berkas','err');
+    rd.onload=()=>{
+      let p;try{p=JSON.parse(rd.result);}catch(e){SRIT.Notify('Berkas bukan JSON yang valid','err');return;}
+      if(!p||p.format!=='SRIT-BACKUP'||!p.tables){SRIT.Notify('Berkas ini bukan cadangan SRIT','err');return;}
+      const names=Object.keys(p.tables),rows=names.reduce((s,t)=>s+(p.counts&&p.counts[t]!=null?p.counts[t]:((p.tables[t].rows||[]).length)),0),esc=SRIT.Util.esc;
+      const top=names.map(t=>[t,(p.counts&&p.counts[t])!=null?p.counts[t]:(p.tables[t].rows||[]).length]).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t,n])=>esc(t)+' ('+n+')').join(', ');
+      this._bkConfirm({title:'Pulihkan dari File',
+        info:`<div><b>${esc(file.name)}</b></div><div class="text-muted-2" style="font-size:12px">Dibuat: ${esc(String(p.createdAt||'-').replace('T',' '))} \u00b7 ${names.length} tabel \u00b7 ${rows.toLocaleString('id-ID')} baris</div><div class="text-muted-2" style="font-size:12px">Terbanyak: ${top}</div>`,
+        run:c=>SRIT.Server.call('apiBackupRestoreJson',p,c)});
+    };
+    rd.readAsText(file);
+  },
+  _bkRestoreDrive(id,name){
+    this._bkConfirm({title:'Pulihkan dari Google Drive',info:`<div><b style="word-break:break-all">${SRIT.Util.esc(name)}</b></div><div class="text-muted-2" style="font-size:12px">Salinan SRIT_DB_MASTER di folder cadangan.</div>`,run:c=>SRIT.Server.call('apiBackupRestoreDrive',id,c)});
+  },
+  _bkConfirm({title,info,run}){
+    const m=SRIT.Modal.open({title,body:`<div class="alert alert-danger py-2" style="font-size:13px"><b><i class="bi bi-exclamation-octagon"></i> Tindakan berisiko.</b> Seluruh data induk saat ini akan <b>DIGANTI</b> dengan isi cadangan. Sebelum diganti, sistem otomatis membuat salinan pengaman bernama <i>SEBELUM_PEMULIHAN</i> di Google Drive.</div>
+      <div class="mb-2">${info}</div>
+      <ul class="small text-muted-2 ps-3 mb-2"><li>Data absensi harian (spreadsheet bulanan) tidak diubah.</li><li>Akun & kata sandi ikut kembali ke kondisi cadangan; semua pengguna mungkin perlu login ulang.</li><li>Pemulihan ditolak bila cadangan tidak memuat akun Super Admin aktif.</li></ul>
+      <label class="form-label-sm">Ketik <b>PULIHKAN</b> untuk melanjutkan</label><input class="form-control form-control-sm" id="bkConf" autocomplete="off" placeholder="PULIHKAN">
+      <div id="bkRes" class="mt-2"></div>`,
+      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal" id="bkCancel">Batal</button><button class="btn btn-danger btn-sm" id="bkGo" disabled><i class="bi bi-arrow-counterclockwise"></i> Pulihkan Sekarang</button>`});
+    const go=$('#bkGo',m.el),inp=$('#bkConf',m.el);
+    inp.oninput=()=>{go.disabled=inp.value.trim()!=='PULIHKAN';};
+    go.onclick=async()=>{
+      go.disabled=true;inp.disabled=true;go.innerHTML='<span class="spinner-border spinner-border-sm"></span> Memulihkan\u2026 jangan tutup halaman';
+      try{
+        const r=await run(inp.value.trim());
+        $('#bkRes',m.el).innerHTML=`<div class="alert alert-success py-2 mb-0" style="font-size:13px"><b>Pemulihan selesai.</b> ${r.tables} tabel (${Number(r.rows).toLocaleString('id-ID')} baris) dipulihkan.<div class="text-muted-2" style="font-size:12px">Salinan pengaman: ${SRIT.Util.esc(r.safetyName)}</div><div class="mt-1">Halaman akan dimuat ulang\u2026</div></div>`;
+        go.style.display='none';$('#bkCancel',m.el).style.display='none';
+        setTimeout(()=>location.reload(),2500);
+      }catch(e){
+        $('#bkRes',m.el).innerHTML='<div class="alert alert-danger py-2 mb-0" style="font-size:13px">'+SRIT.Util.esc(e.message||'Pemulihan gagal')+'</div>';
+        go.innerHTML='<i class="bi bi-arrow-counterclockwise"></i> Coba Lagi';go.disabled=false;inp.disabled=false;
+      }
+    };
   },
   _save(patch){const s=SRIT.Store.readObj('SETTINGS');SRIT.Store.writeObj('SETTINGS',{...s,...patch});SRIT.Cache.invalidate('livetv');SRIT.Audit.log('UPDATE','settings','SETTINGS');},
   destroy(){}
