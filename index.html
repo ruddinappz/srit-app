@@ -5961,7 +5961,7 @@ SRIT.LiveTV={
   PAGES:[['Ringkasan Eksekutif','Ringkasan'],['Profil Peserta Didik','Profil'],['Absensi & Kehadiran','Kehadiran'],['Kesehatan','Kesehatan'],['Kedisiplinan & Pembinaan','Disiplin'],['Aset & Sarana Prasarana','Aset'],['Operasional Hari Ini','Operasional']],
   /* ---------- siklus hidup ---------- */
   show(mobile){
-    this.mobile=!!mobile;this.slide=0;this.fDate='';this.fSesi='';this.fJJ='';this.fJK='';this._rounds=0;this.data=null;
+    this._forceMobile=!!mobile;this.mobile=this._forceMobile||this.isNarrow();this.slide=0;this.fDate='';this.fSesi='';this.fJJ='';this.fJK='';this._rounds=0;this.data=null;
     try{this.autoJJ=localStorage.getItem('ltvAutoJJ')==='1';}catch(e){this.autoJJ=false;}
     $('#appShell').style.display='none';$('#loginRoot').style.display='none';
     const root=$('#liveTvRoot');root.classList.add('show');root.classList.toggle('lv-mob',this.mobile);root.style.display='flex';
@@ -5975,8 +5975,8 @@ SRIT.LiveTV={
     if(!this._bound){
       this._bound=true;
       const act=()=>{const r=$('#liveTvRoot');if(!r)return;r.classList.add('lv-act');clearTimeout(this._at);this._at=setTimeout(()=>{const f=$('#ltvFilter');if(!f||f.style.display!=='block')r.classList.remove('lv-act');},4000);};
-      document.addEventListener('mousemove',act);document.addEventListener('touchstart',act,{passive:true});document.addEventListener('keydown',act);
-      window.addEventListener('resize',()=>{clearTimeout(this._rt);this._rt=setTimeout(()=>{this.fit();this.setupAutoScroll();},150);});
+      window.addEventListener('orientationchange',()=>setTimeout(()=>{this.syncMode();this.fit();},300));document.addEventListener('mousemove',act);document.addEventListener('touchstart',act,{passive:true});document.addEventListener('keydown',act);
+      window.addEventListener('resize',()=>{clearTimeout(this._rt);this._rt=setTimeout(()=>{this.syncMode();this.fit();this.setupAutoScroll();},150);});
       document.addEventListener('keydown',e=>{
         const r=$('#liveTvRoot');if(!r||!r.classList.contains('show')||/INPUT|SELECT|TEXTAREA/.test((e.target||{}).tagName||''))return;
         if(e.key==='ArrowRight')this.next();else if(e.key==='ArrowLeft')this.prev();
@@ -6021,6 +6021,17 @@ SRIT.LiveTV={
   fullscreen(){const el=document.documentElement;if(!document.fullscreenElement)el.requestFullscreen&&el.requestFullscreen();else document.exitFullscreen();},
   armBell(){SRIT.Bell.unlock();SRIT.Bell.start();this._updateBelBtn();},
   _updateBelBtn(){const b=$('#ltvBelBtn');if(!b)return;if(SRIT.Bell._unlocked){b.innerHTML='Bel aktif';b.classList.add('on');}},
+  /* layar sempit (HP, tablet potret) -> layout bertumpuk; selain itu panggung 1920x1080 diskalakan */
+  isNarrow(){return innerWidth<820||Math.min(innerWidth,innerHeight)<600;},
+  syncMode(){
+    const root=$('#liveTvRoot');if(!root||!root.classList.contains('show'))return;
+    const m=!!this._forceMobile||this.isNarrow();
+    if(m===this.mobile)return;
+    this.mobile=m;root.classList.toggle('lv-mob',m);
+    this.startRotation();this.fit();
+    if(this.data)this.render();
+    this.goto(this.slide);
+  },
   fit(){
     const st=$('#ltvStage');if(!st)return;
     if(this.mobile){st.style.transform='';st.style.left='';st.style.top='';return;}
