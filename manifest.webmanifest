@@ -1,6 +1,6 @@
 {
- "name": "SRIT ABSENSI — Command Center",
- "short_name": "SRIT",
+ "name": "SRITi — Sistem Rekam Informasi Terintegrasi",
+ "short_name": "SRITi",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
