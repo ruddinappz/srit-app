@@ -16,7 +16,7 @@
 <script>
 /* SRIT — diagnostik pemuatan: bila halaman tampak putih/kosong, tampilkan PENYEBABNYA di layar (juga di HP tanpa konsol). */
 window.__srit=(function(){
-  var S={errs:[],booted:false,cur:'Index',parts:[],t0:Date.now(),server:null},EXPECT={"JS_Util": ["SRIT", "SRIT.Util"], "JS_Data": ["SRIT.LS", "SRIT.Server", "SRIT.Store", "SRIT.Repo", "SRIT.Cache", "SRIT.Sync", "SRIT.Audit"], "JS_UI": ["SRIT.Notify", "SRIT.Loading", "SRIT.Modal", "SRIT.SS", "SRIT.Import"], "JS_Auth": ["SRIT.Auth"], "JS_Api": ["SRIT.Api"], "JS_Theme": ["SRIT.Theme", "SRIT.Brand"], "JS_Shell": ["SRIT.UI", "SRIT.MENU", "SRIT.Features"], "View_Shared": ["simpleFeature", "regFeature", "SRIT.anakKet", "SRIT.anakRefSearch"], "JS_Router": ["SRIT.Router"], "View_LiveTV": ["SRIT.LiveTV"], "View_Dashboard": ["SRIT.Features.dashboard"], "View_Anak": ["SRIT.Features.anak"], "View_Absensi": ["SRIT.Features.absensi"], "View_AbsensiKamera": ["SRIT.Features.absensi._showCamError"], "View_Jadwal": ["SRIT.Features.jadwal"], "View_Kegiatan": ["SRIT.Features.kegiatan"], "View_JadwalPiket": ["SRIT.Features.jadwal-piket"], "View_Jabatan": ["SRIT.Features.jabatan"], "View_User": ["SRIT.Features.user"], "View_Role": ["SRIT.Features.role"], "View_Analytics": ["SRIT.Features.analytics"], "View_Laporan": ["SRIT.Features.laporan"], "View_Keasramaan": ["SRIT.Features.keasramaan", "SRIT.Features.ops-module"], "View_StrukturMaster": ["SRIT.Features.keasramaan-master"], "View_Sarpras": ["SRIT.Features.sarpras"], "View_Program": ["SRIT.Features.program"], "View_Izin": ["SRIT.Features.izin"], "View_Tamu": ["SRIT.Features.tamu"], "View_TataTertib": ["SRIT.Features.tatatertib"], "View_Pelanggaran": ["SRIT.Features.pelanggaran"], "View_Pembinaan": ["SRIT.Features.pembinaan"], "View_Insiden": ["SRIT.Features.insiden"], "View_Inspeksi": ["SRIT.Features.inspeksi"], "View_Refleksi": ["SRIT.Features.refleksi"], "View_Penghuni": ["SRIT.Features.penghuni"], "View_Penilaian": ["SRIT.Features.penilaian"], "View_Profiling": ["SRIT.Features.profiling"], "View_Peta": ["SRIT.Features.peta"], "View_Alert": ["SRIT.Features.alert-center"], "View_Audit": ["SRIT.Features.audit"], "View_Settings": ["SRIT.Features.settings"]},CORE=["JS_Util", "JS_Data", "JS_UI", "JS_Auth", "JS_Api", "JS_Theme", "JS_Shell", "View_Shared", "JS_Router", "View_LiveTV"];
+  var S={errs:[],booted:false,cur:'Index',parts:[],t0:Date.now(),server:null},EXPECT={"JS_Util": ["SRIT", "SRIT.Util"], "JS_Data": ["SRIT.LS", "SRIT.Server", "SRIT.Store", "SRIT.Repo", "SRIT.Cache", "SRIT.Sync", "SRIT.Audit"], "JS_UI": ["SRIT.Notify", "SRIT.Loading", "SRIT.Modal", "SRIT.SS", "SRIT.Import"], "JS_Auth": ["SRIT.Auth"], "JS_Api": ["SRIT.Api"], "JS_Theme": ["SRIT.Theme", "SRIT.Brand"], "JS_Shell": ["SRIT.UI", "SRIT.MENU", "SRIT.Features"], "View_Shared": ["simpleFeature", "regFeature", "SRIT.anakKet", "SRIT.anakRefSearch"], "JS_Router": ["SRIT.Router"], "View_LiveTV": ["SRIT.LiveTV"], "View_Dashboard": ["SRIT.Features.dashboard"], "View_Anak": ["SRIT.Features.anak"], "View_Absensi": ["SRIT.Features.absensi"], "View_AbsensiKamera": ["SRIT.Features.absensi._showCamError"], "View_Jadwal": ["SRIT.Features.jadwal"], "View_Kegiatan": ["SRIT.Features.kegiatan"], "View_JadwalPiket": ["SRIT.Features.jadwal-piket"], "View_JurnalPiket": ["SRIT.Features.jurnal-piket"], "View_Jabatan": ["SRIT.Features.jabatan"], "View_User": ["SRIT.Features.user"], "View_Role": ["SRIT.Features.role"], "View_Analytics": ["SRIT.Features.analytics"], "View_Laporan": ["SRIT.Features.laporan"], "View_Keasramaan": ["SRIT.Features.keasramaan", "SRIT.Features.ops-module"], "View_StrukturMaster": ["SRIT.Features.keasramaan-master"], "View_Sarpras": ["SRIT.Features.sarpras"], "View_Program": ["SRIT.Features.program"], "View_Izin": ["SRIT.Features.izin"], "View_Tamu": ["SRIT.Features.tamu"], "View_TataTertib": ["SRIT.Features.tatatertib"], "View_Pelanggaran": ["SRIT.Features.pelanggaran"], "View_Pembinaan": ["SRIT.Features.pembinaan"], "View_Insiden": ["SRIT.Features.insiden"], "View_Inspeksi": ["SRIT.Features.inspeksi"], "View_Refleksi": ["SRIT.Features.refleksi"], "View_Penghuni": ["SRIT.Features.penghuni"], "View_Penilaian": ["SRIT.Features.penilaian"], "View_Profiling": ["SRIT.Features.profiling"], "View_Peta": ["SRIT.Features.peta"], "View_Alert": ["SRIT.Features.alert-center"], "View_Audit": ["SRIT.Features.audit"], "View_Settings": ["SRIT.Features.settings"]},CORE=["JS_Util", "JS_Data", "JS_UI", "JS_Auth", "JS_Api", "JS_Theme", "JS_Shell", "View_Shared", "JS_Router", "View_LiveTV"];
   S.n=function(name){S.cur=name;S.parts.push(name);};
   function get(p){try{return p.split('.').reduce(function(o,k){return o==null?undefined:o[k];},window);}catch(e){return undefined;}}
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -1103,6 +1103,7 @@ SRIT.MENU=[
   {r:'jadwal',t:'Jadwal Rutin',i:'bi-calendar3'},
   {r:'kegiatan',t:'Kegiatan Khusus',i:'bi-list-check'},
   {r:'jadwal-piket',t:'Jadwal Piket',i:'bi-shield-check'},
+  {r:'jurnal-piket',t:'Jurnal & Serah Terima Piket',i:'bi-journal-bookmark'},
   {r:'bel',t:'Bel Otomatis',i:'bi-bell-fill'},
   {r:'program',t:'Program Pembinaan',i:'bi-stars'},
 
@@ -2885,6 +2886,346 @@ regFeature('kegiatan',{title:'Kegiatan Khusus',table:'KEGIATAN',perm:'kegiatan',
 regFeature('jadwal-piket',{title:'Jadwal Piket',table:'JADWAL_PIKET',perm:'jadwal-piket',idPrefix:'PK',searchFields:['LOKASI','SHIFT'],
   cols:[{h:'Petugas',f:r=>(SRIT.Repo.getById('USERS',r.USER)||{}).NAME||'-'},{h:'Tanggal',f:r=>SRIT.Util.fmtDateShort(r.TANGGAL)},{h:'Shift',k:'SHIFT'},{h:'Lokasi',k:'LOKASI'},{h:'Status',f:r=>`<span class="badge-soft st-HADIR">${r.STATUS}</span>`}],
   fields:[{k:'USER',label:'Petugas',type:'select',col:12,options:()=>SRIT.Store.read('USERS').map(u=>({v:u.ID,t:u.NAME}))},{k:'TANGGAL',label:'Tanggal',type:'date',default:SRIT.Util.todayISO(),required:true},{k:'SHIFT',label:'Shift',type:'select',options:[{v:'PAGI',t:'PAGI'},{v:'SIANG',t:'SIANG'},{v:'MALAM',t:'MALAM'}]},{k:'LOKASI',label:'Lokasi',required:true},{k:'STATUS',label:'Status',type:'select',options:[{v:'AKTIF',t:'AKTIF'},{v:'STANDBY',t:'STANDBY'},{v:'SELESAI',t:'SELESAI'}]}]});
+</script>
+
+<script>__srit.n('View_JurnalPiket')</script>
+<script>
+//# sourceURL=View_JurnalPiket.html
+// ---------- JURNAL HARIAN & SERAH TERIMA PIKET WALI ASRAMA ----------
+// Mengikuti Lembar Kerja 2 (Modul "Permasalahan di Asrama"): satu lembar per shift, diisi selama shift berlangsung.
+//  A identitas shift · B cek kehadiran per kamar (awal/akhir) · C catatan kejadian · D anak perlu perhatian khusus · E serah terima
+// Bersifat rahasia: hanya peran yang diberi izin menu "Jurnal & Serah Terima Piket" yang dapat membuka.
+SRIT.Features['jurnal-piket']=(function(){
+  const SHIFT={PAGI:'Pagi',SIANG:'Siang',MALAM:'Malam'};
+  const PILAR={KESEHATAN:'K · Kesehatan',KESELAMATAN:'S · Keselamatan',PERLINDUNGAN:'P · Perlindungan'};
+  const TINGKAT={RINGAN:'R · Ringan',SEDANG:'Sd · Sedang',BERAT:'B · Berat'};
+  const PRIO={RINGAN:'LOW',SEDANG:'HIGH',BERAT:'CRITICAL'};
+  const LAPOR={SATGAS_SR:'Satgas SR',KEPALA_SEKOLAH:'Kepala Sekolah',SATGAS_PUSAT:'Satgas Pusat'};
+  const STATUS={BERLANGSUNG:{t:'Berlangsung',cls:'st-IZIN'},DISERAHKAN:{t:'Diserahkan',cls:'st-SAKIT'},DIKETAHUI:{t:'Diketahui koordinator',cls:'st-HADIR'}};
+  const BARANG_DEFAULT=['Kunci kamar / blok','Kotak P3K','Buku catatan dan form piket sebelumnya','Alat komunikasi / nomor kontak darurat','Lain-lain'];
+  const esc=s=>SRIT.Util.esc(s);
+  const p2=n=>String(n).padStart(2,'0');
+  const nowT=()=>{const d=new Date();return p2(d.getHours())+':'+p2(d.getMinutes());};
+  const nowLocal=()=>{const d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'T'+nowT();};
+  const parse=(v,def)=>{try{const o=JSON.parse(v);return Array.isArray(o)?o:def;}catch(e){return def;}};
+  const shiftNow=()=>{const h=new Date().getHours();return h<14?'PAGI':h<20?'SIANG':'MALAM';};
+  const dstr=iso=>SRIT.Util.fmtDateShort(iso);
+  const sel=(o,cur)=>Object.keys(o).map(k=>`<option value="${k}" ${String(cur||'')===k?'selected':''}>${typeof o[k]==='string'?o[k]:o[k].t}</option>`).join('');
+  const kamarName=id=>(SRIT.Repo.getById('KAMAR',id)||{}).NAME||'';
+  const hunian=kid=>SRIT.Store.read('ANAK').filter(a=>a.KAMAR===kid&&a.STATUS==='AKTIF').length;
+  const kamarScope=(asr,ged)=>{
+    const gs=SRIT.Store.read('GEDUNG').filter(g=>g.ASRAMA===asr&&(!ged||g.ID===ged)).map(g=>g.ID);
+    return SRIT.Store.read('KAMAR').filter(k=>gs.indexOf(k.GEDUNG)>=0).sort((a,b)=>String(a.NAME).localeCompare(String(b.NAME),'id',{numeric:true}));
+  };
+  const selBadge=d=>d===null?'<span class="text-muted-2">–</span>':`<span class="badge-soft ${d?'st-ALPA':'st-HADIR'}">${d}</span>`;
+  const selisih=r=>(r.akhir===''||r.akhir==null||r.seharusnya===''||r.seharusnya==null)?null:(+r.seharusnya)-(+r.akhir);
+
+  const F={
+    state:{page:1,size:20,search:'',status:'',shift:''},
+    cur:null,_host:null,_dirty:false,_t:null,_anakMap:{},
+    can(a){return SRIT.Auth.can('jurnal-piket:'+a);},
+    render(host){SRIT.UI.setPage('Jurnal & Serah Terima Piket','Jurnal Piket');this._host=host;
+      if(this.cur)this.renderEditor();else this.renderList();},
+
+    /* ===================== DAFTAR ===================== */
+    renderList(){
+      const host=this._host,s=this.state;host.onclick=host.oninput=host.onchange=null;
+      const all=SRIT.Store.read('JURNAL_PIKET'),nb=all.filter(r=>r.STATUS==='BERLANGSUNG').length,nw=all.filter(r=>r.STATUS==='DISERAHKAN').length;
+      host.innerHTML=`<div class="row g-2 mb-3">
+        <div class="col-6"><div class="card-srit p-2 text-center"><div class="text-muted-2" style="font-size:11px">Shift berlangsung</div><div class="fw-bold" style="font-size:20px">${nb}</div></div></div>
+        <div class="col-6"><div class="card-srit p-2 text-center"><div class="text-muted-2" style="font-size:11px">Menunggu diketahui koordinator</div><div class="fw-bold" style="font-size:20px">${nw}</div></div></div></div>
+      <div class="card-srit p-3 mb-3"><div class="filter-bar">
+        <div style="flex:1;min-width:170px"><label class="form-label-sm">Cari</label><input class="form-control form-control-sm" id="jpQ" placeholder="Petugas atau blok" value="${esc(s.search)}"></div>
+        <div><label class="form-label-sm">Shift</label><select class="form-select form-select-sm" id="jpShift"><option value="">Semua</option>${sel(SHIFT,s.shift)}</select></div>
+        <div><label class="form-label-sm">Status</label><select class="form-select form-select-sm" id="jpStatus"><option value="">Semua</option>${sel(STATUS,s.status)}</select></div>
+        ${this.can('CREATE')?'<div><button class="btn btn-primary btn-sm" id="jpNew"><i class="bi bi-play-circle"></i> Mulai Shift</button></div>':''}
+      </div><div class="text-muted-2 mt-2" style="font-size:12px">Satu lembar per shift. Isi selama shift berlangsung agar waktu kejadian akurat; serahkan ke petugas berikutnya. Isi jurnal bersifat rahasia.</div></div>
+      <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="jpTable"></table></div><div class="p-3 border-top" id="jpPag"></div></div>`;
+      $('#jpQ').oninput=e=>{clearTimeout(this._qt);this._qt=setTimeout(()=>{s.search=e.target.value;s.page=1;this.loadList();},300);};
+      $('#jpShift').onchange=e=>{s.shift=e.target.value;s.page=1;this.loadList();};
+      $('#jpStatus').onchange=e=>{s.status=e.target.value;s.page=1;this.loadList();};
+      const nw2=$('#jpNew');if(nw2)nw2.onclick=()=>this.startForm();
+      this.loadList();
+    },
+    loadList(){
+      const s=this.state,q=(s.search||'').toLowerCase();
+      let rows=SRIT.Store.read('JURNAL_PIKET').filter(r=>(!s.shift||r.SHIFT===s.shift)&&(!s.status||r.STATUS===s.status)&&(!q||[r.NAMA_PETUGAS,r.BLOK].some(v=>String(v||'').toLowerCase().includes(q))));
+      rows.sort((a,b)=>String(b.TANGGAL).localeCompare(String(a.TANGGAL))||String(b.JAM_MULAI||'').localeCompare(String(a.JAM_MULAI||'')));
+      const total=rows.length,pages=Math.ceil(total/s.size)||1;if(s.page>pages)s.page=pages;
+      const page=rows.slice((s.page-1)*s.size,s.page*s.size);
+      $('#jpTable').innerHTML=`<thead><tr><th>Tanggal / Shift</th><th>Petugas</th><th>Blok</th><th>Kejadian</th><th>Selisih akhir</th><th>Status</th><th></th></tr></thead><tbody>
+      ${page.length?page.map(r=>{
+        const kj=parse(r.CATATAN_KEJADIAN,[]).filter(x=>x.uraian),cek=parse(r.CEK_KAMAR,[]);
+        const sl=cek.reduce((n,x)=>{const d=selisih(x);return n+(d&&d>0?d:0);},0);
+        const berat=kj.filter(x=>x.tingkat&&x.tingkat!=='RINGAN').length;
+        return `<tr><td class="text-nowrap fw-semibold">${dstr(r.TANGGAL)}<div class="text-muted-2 fw-normal" style="font-size:11px">${SHIFT[r.SHIFT]||r.SHIFT||''} ${esc(r.JAM_MULAI||'')}${r.JAM_SELESAI?'–'+esc(r.JAM_SELESAI):''}</div></td>
+        <td>${esc(r.NAMA_PETUGAS||'-')}</td><td>${esc(r.BLOK||'-')}</td>
+        <td>${r.NIHIL==='YA'?'<span class="badge-soft st-BELUM">NIHIL</span>':kj.length?`<span class="badge-soft ${berat?'st-ALPA':'st-IZIN'}">${kj.length} kejadian${berat?' · '+berat+' sedang/berat':''}</span>`:'<span class="text-muted-2">–</span>'}</td>
+        <td>${sl?`<span class="badge-soft st-ALPA">${sl} anak</span>`:cek.length&&r.STATUS!=='BERLANGSUNG'?'<span class="badge-soft st-HADIR">Lengkap</span>':'<span class="text-muted-2">–</span>'}</td>
+        <td><span class="badge-soft ${(STATUS[r.STATUS]||{}).cls||'st-BELUM'}">${(STATUS[r.STATUS]||{}).t||esc(r.STATUS)}</span></td>
+        <td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary py-0" onclick="SRIT.Features['jurnal-piket'].open('${r.ID}')"><i class="bi bi-journal-text"></i> Buka</button>
+        <button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Cetak" onclick="SRIT.Features['jurnal-piket'].cetak('${r.ID}')"><i class="bi bi-printer"></i></button></td></tr>`;}).join(''):'<tr><td colspan="7"><div class="empty-state"><i class="bi bi-journal-bookmark d-block"></i>Belum ada jurnal piket. Klik “Mulai Shift”.</div></td></tr>'}</tbody>`;
+      $('#jpPag').innerHTML=SRIT.UI.pagination({rows:page,total,page:s.page,size:s.size,pages});
+      $$('#jpPag [data-pg]').forEach(a=>a.onclick=()=>{s.page=+a.dataset.pg;this.loadList();});
+    },
+
+    /* ===================== MULAI SHIFT ===================== */
+    startForm(){
+      const asrama=SRIT.Store.read('ASRAMA').filter(a=>a.STATUS!=='NONAKTIF');
+      const uid=(SRIT.Auth.user||{}).ID,today=SRIT.Util.todayISO();
+      const pk=SRIT.Store.read('JADWAL_PIKET').find(p=>p.USER===uid&&p.TANGGAL===today)||{};
+      const m=SRIT.Modal.open({title:'Mulai Shift Piket',body:`<form id="jpStart" onsubmit="return false"><div class="row g-2">
+        <div class="col-6"><label class="form-label-sm">Tanggal</label><input type="date" class="form-control form-control-sm" name="TANGGAL" value="${today}" required></div>
+        <div class="col-6"><label class="form-label-sm">Shift</label><select class="form-select form-select-sm" name="SHIFT">${sel(SHIFT,pk.SHIFT||shiftNow())}</select></div>
+        <div class="col-6"><label class="form-label-sm">Jam mulai</label><input type="time" class="form-control form-control-sm" name="JAM_MULAI" value="${nowT()}"></div>
+        <div class="col-6"><label class="form-label-sm">Asrama</label><select class="form-select form-select-sm" name="ASRAMA" id="jpAsr">${asrama.map(a=>`<option value="${a.ID}">${esc(a.NAME)}</option>`).join('')}</select></div>
+        <div class="col-12"><label class="form-label-sm">Gedung / blok tanggung jawab</label><select class="form-select form-select-sm" name="GEDUNG" id="jpGed"></select></div>
+        <div class="col-12"><label class="form-label-sm">Keterangan blok / kamar</label><input class="form-control form-control-sm" name="BLOK" id="jpBlok" value="${esc(pk.LOKASI||'')}" placeholder="mis. Blok A lantai 1–2"></div>
+        <div class="col-12 text-muted-2" style="font-size:12px">Daftar kamar dan jumlah penghuni akan terisi otomatis; hapus kamar yang bukan tanggung jawab Anda pada langkah berikutnya.</div>
+      </div></form>`,footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="jpGo">Mulai</button>`});
+      const el=m.el,fillGed=()=>{const a=$('#jpAsr',el).value;$('#jpGed',el).innerHTML='<option value="">Semua gedung di asrama ini</option>'+SRIT.Store.read('GEDUNG').filter(g=>g.ASRAMA===a).map(g=>`<option value="${g.ID}">${esc(g.NAME)}</option>`).join('');};
+      fillGed();$('#jpAsr',el).onchange=fillGed;
+      $('#jpGed',el).onchange=e=>{const g=SRIT.Repo.getById('GEDUNG',e.target.value);if(g&&!$('#jpBlok',el).value)$('#jpBlok',el).value=g.NAME;};
+      $('#jpGo',el).onclick=()=>{
+        const fm=$('#jpStart',el);if(!fm.reportValidity())return;const f=Object.fromEntries(new FormData(fm));
+        if(!f.ASRAMA){SRIT.Notify('Pilih asrama','err');return;}
+        const kamar=kamarScope(f.ASRAMA,f.GEDUNG);
+        const cek=kamar.map(k=>({kamarId:k.ID,kamar:k.NAME,seharusnya:hunian(k.ID),awal:'',akhir:'',ket:''}));
+        const row={ID:SRIT.Util.uid('JP'),TANGGAL:f.TANGGAL,SHIFT:f.SHIFT,JAM_MULAI:f.JAM_MULAI||nowT(),JAM_SELESAI:'',ASRAMA:f.ASRAMA,GEDUNG:f.GEDUNG||'',BLOK:String(f.BLOK||'').trim(),
+          PETUGAS:(SRIT.Auth.user||{}).ID||'',NAMA_PETUGAS:(SRIT.Auth.user||{}).NAME||'',JML_ANAK:cek.reduce((n,x)=>n+x.seharusnya,0),
+          CEK_KAMAR:JSON.stringify(cek),CATATAN_KEJADIAN:'[]',NIHIL:'',PERHATIAN:'[]',BELUM_SELESAI:'',PESAN:'',
+          BARANG:JSON.stringify(BARANG_DEFAULT.map(n=>({item:n,ada:'',ket:''}))),PENERIMA:'',JAM_SERAH:'',STATUS:'BERLANGSUNG',DIKETAHUI_OLEH:'',DIKETAHUI_PADA:''};
+        SRIT.Repo.insert('JURNAL_PIKET',row);SRIT.Audit.log('CREATE','jurnal-piket',row.ID);m.close();
+        SRIT.Notify('Shift dimulai. Lakukan cek kehadiran awal.','ok');this.open(row.ID);
+      };
+    },
+
+    /* ===================== EDITOR ===================== */
+    open(id){
+      const r=SRIT.Repo.getById('JURNAL_PIKET',id);if(!r){SRIT.Notify('Jurnal tidak ditemukan','err');return;}
+      this.cur={...r,CEK:parse(r.CEK_KAMAR,[]),KJ:parse(r.CATATAN_KEJADIAN,[]),PH:parse(r.PERHATIAN,[]),BR:parse(r.BARANG,[])};
+      this._dirty=false;this.renderEditor();
+    },
+    close(){this._flush();this.cur=null;this.renderList();},
+    ro(){const c=this.cur;return !c||c.STATUS!=='BERLANGSUNG'||!this.can('UPDATE');},
+    _serialize(){
+      const c=this.cur;
+      return {SHIFT:c.SHIFT,JAM_MULAI:c.JAM_MULAI||'',JAM_SELESAI:c.JAM_SELESAI||'',BLOK:c.BLOK||'',
+        JML_ANAK:c.CEK.reduce((n,x)=>n+(+x.seharusnya||0),0),CEK_KAMAR:JSON.stringify(c.CEK),CATATAN_KEJADIAN:JSON.stringify(c.KJ),
+        NIHIL:c.NIHIL||'',PERHATIAN:JSON.stringify(c.PH),BELUM_SELESAI:c.BELUM_SELESAI||'',PESAN:c.PESAN||'',BARANG:JSON.stringify(c.BR),
+        PENERIMA:c.PENERIMA||'',JAM_SERAH:c.JAM_SERAH||''};
+    },
+    _persist(){
+      this._dirty=true;clearTimeout(this._t);
+      this._t=setTimeout(()=>this._flush(),600);
+      const e=$('#jpSaved');if(e)e.textContent='menyimpan…';
+    },
+    _flush(){
+      clearTimeout(this._t);if(!this.cur||!this._dirty||this.ro())return;
+      SRIT.Repo.update('JURNAL_PIKET',this.cur.ID,this._serialize());this._dirty=false;
+      const e=$('#jpSaved');if(e)e.textContent='tersimpan '+nowT();
+    },
+    _anakOpts(){
+      const c=this.cur;this._anakMap={};
+      const list=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF'&&(c.GEDUNG?a.GEDUNG===c.GEDUNG:a.ASRAMA===c.ASRAMA)).slice(0,600);
+      return list.map(a=>{const l=a.NAMA+' ('+(kamarName(a.KAMAR)||'-')+')';this._anakMap[l]=a.ID;return `<option value="${esc(l)}"></option>`;}).join('');
+    },
+    _prev(){
+      const c=this.cur;
+      return SRIT.Store.read('JURNAL_PIKET').filter(r=>r.ID!==c.ID&&r.ASRAMA===c.ASRAMA&&r.STATUS!=='BERLANGSUNG'&&(String(r.TANGGAL)+(r.JAM_MULAI||''))<=(String(c.TANGGAL)+(c.JAM_MULAI||'')))
+        .sort((a,b)=>(String(b.TANGGAL)+(b.JAM_MULAI||'')).localeCompare(String(a.TANGGAL)+(a.JAM_MULAI||'')))[0];
+    },
+    renderEditor(){
+      const c=this.cur,host=this._host,ro=this.ro(),dis=ro?'disabled':'',st=STATUS[c.STATUS]||{t:c.STATUS,cls:'st-BELUM'};
+      const prev=this._prev(),prevPH=prev?parse(prev.PERHATIAN,[]):[];
+      const anakDL=this._anakOpts();
+      const num=(a,i,f,v)=>`<input type="number" min="0" class="form-control form-control-sm" style="width:68px;padding:2px 6px" data-a="${a}" data-i="${i}" data-f="${f}" value="${v===''||v==null?'':esc(v)}" ${dis}>`;
+      const cekRows=c.CEK.map((x,i)=>{const d=selisih(x);return `<tr>
+        <td class="fw-semibold text-nowrap">${esc(x.kamar)}</td><td>${num('CEK',i,'seharusnya',x.seharusnya)}</td><td>${num('CEK',i,'awal',x.awal)}</td><td>${num('CEK',i,'akhir',x.akhir)}</td>
+        <td data-sel="${i}">${selBadge(d)}</td>
+        <td><input class="form-control form-control-sm" style="min-width:130px;padding:2px 6px" list="jpKet" data-a="CEK" data-i="${i}" data-f="ket" value="${esc(x.ket||'')}" ${dis}></td>
+        <td>${ro?'':`<button class="btn btn-sm btn-link text-danger p-0" data-act="delCek" data-i="${i}" title="Hapus kamar dari daftar"><i class="bi bi-x-lg"></i></button>`}</td></tr>`;}).join('');
+      const kjCards=c.KJ.map((x,i)=>`<div class="border rounded p-2 mb-2"><div class="row g-2">
+        <div class="col-4 col-md-2"><label class="form-label-sm">Jam</label><input type="time" class="form-control form-control-sm" data-a="KJ" data-i="${i}" data-f="jam" value="${esc(x.jam||'')}" ${dis}></div>
+        <div class="col-8 col-md-4"><label class="form-label-sm">Nama anak &amp; kamar</label><input class="form-control form-control-sm" list="jpAnak" data-a="KJ" data-i="${i}" data-f="anak" value="${esc(x.anak||'')}" ${dis}></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Pilar</label><select class="form-select form-select-sm" data-a="KJ" data-i="${i}" data-f="pilar" ${dis}><option value="">–</option>${sel(PILAR,x.pilar)}</select></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Klasifikasi</label><select class="form-select form-select-sm" data-a="KJ" data-i="${i}" data-f="tingkat" ${dis}><option value="">–</option>${sel(TINGKAT,x.tingkat)}</select></div>
+        <div class="col-12"><label class="form-label-sm">Kejadian / temuan (yang terlihat dan terdengar, bukan dugaan)</label><textarea class="form-control form-control-sm" rows="2" data-a="KJ" data-i="${i}" data-f="uraian" ${dis}>${esc(x.uraian||'')}</textarea></div>
+        <div class="col-12"><label class="form-label-sm">Tindakan awal yang dilakukan</label><textarea class="form-control form-control-sm" rows="2" data-a="KJ" data-i="${i}" data-f="tindakan" ${dis}>${esc(x.tindakan||'')}</textarea></div>
+        <div class="col-7 col-md-5"><label class="form-label-sm">Dilaporkan kepada</label><select class="form-select form-select-sm" data-a="KJ" data-i="${i}" data-f="lapor" ${dis}><option value="">Belum / tidak perlu</option>${sel(LAPOR,x.lapor)}</select></div>
+        <div class="col-5 col-md-3"><label class="form-label-sm">Jam lapor</label><input type="time" class="form-control form-control-sm" data-a="KJ" data-i="${i}" data-f="jamLapor" value="${esc(x.jamLapor||'')}" ${dis}></div>
+        <div class="col-12 col-md-4 d-flex align-items-end gap-1 flex-wrap">
+          ${x.insiden?'<span class="badge-soft st-HADIR"><i class="bi bi-check2"></i> Tercatat sebagai kasus</span>':(SRIT.Auth.can('insiden:CREATE')?`<button class="btn btn-sm btn-outline-primary" data-act="kasus" data-i="${i}"><i class="bi bi-shield-exclamation"></i> Catat sebagai kasus</button>`:'')}
+          ${ro?'':`<button class="btn btn-sm btn-outline-danger" data-act="delKj" data-i="${i}" title="Hapus"><i class="bi bi-trash"></i></button>`}</div>
+        ${(x.tingkat&&x.tingkat!=='RINGAN'&&!x.lapor)?'<div class="col-12"><div style="font-size:12px;color:var(--srit-danger)"><b>Kasus '+(x.tingkat==='BERAT'?'berat (batas lapor 1×24 jam)':'sedang (batas lapor 2×24 jam)')+' — laporkan ke Satgas SR / Kepala Sekolah.</b></div></div>':''}
+      </div></div>`).join('');
+      const phRows=c.PH.map((x,i)=>`<div class="border rounded p-2 mb-2"><div class="row g-2">
+        <div class="col-12 col-md-5"><label class="form-label-sm">Nama &amp; kamar</label><input class="form-control form-control-sm" list="jpAnak" data-a="PH" data-i="${i}" data-f="anak" value="${esc(x.anak||'')}" ${dis}></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Sejak kapan</label><input type="date" class="form-control form-control-sm" data-a="PH" data-i="${i}" data-f="sejak" value="${esc(x.sejak||'')}" ${dis}></div>
+        <div class="col-6 col-md-4"><label class="form-label-sm">Pihak yang menangani</label><input class="form-control form-control-sm" data-a="PH" data-i="${i}" data-f="pihak" value="${esc(x.pihak||'')}" ${dis}></div>
+        <div class="col-12 col-md-6"><label class="form-label-sm">Hal yang sedang dipantau</label><textarea class="form-control form-control-sm" rows="2" data-a="PH" data-i="${i}" data-f="hal" ${dis}>${esc(x.hal||'')}</textarea></div>
+        <div class="col-12 col-md-6"><label class="form-label-sm">Yang perlu dilakukan shift berikutnya</label><textarea class="form-control form-control-sm" rows="2" data-a="PH" data-i="${i}" data-f="tindak" ${dis}>${esc(x.tindak||'')}</textarea></div>
+        ${ro?'':`<div class="col-12 text-end"><button class="btn btn-sm btn-outline-danger py-0" data-act="delPh" data-i="${i}"><i class="bi bi-trash"></i></button></div>`}</div></div>`).join('');
+      const brRows=c.BR.map((x,i)=>`<tr><td>${esc(x.item)}</td><td><div class="btn-group btn-group-sm"><input type="radio" class="btn-check" name="br${i}" id="br${i}a" data-a="BR" data-i="${i}" data-f="ada" value="YA" ${x.ada==='YA'?'checked':''} ${dis}><label class="btn btn-outline-success py-0" for="br${i}a">Ada</label><input type="radio" class="btn-check" name="br${i}" id="br${i}t" data-a="BR" data-i="${i}" data-f="ada" value="TIDAK" ${x.ada==='TIDAK'?'checked':''} ${dis}><label class="btn btn-outline-danger py-0" for="br${i}t">Tidak</label></div></td>
+        <td><input class="form-control form-control-sm" style="min-width:120px;padding:2px 6px" data-a="BR" data-i="${i}" data-f="ket" value="${esc(x.ket||'')}" ${dis}></td></tr>`).join('');
+      host.innerHTML=`<datalist id="jpAnak">${anakDL}</datalist><datalist id="jpKet"><option value="Izin"><option value="Sakit"><option value="Di UKS"><option value="Tidak diketahui"></datalist>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <button class="btn btn-light btn-sm" data-act="back"><i class="bi bi-arrow-left"></i> Daftar</button>
+        <div class="fw-bold">${dstr(c.TANGGAL)} · ${SHIFT[c.SHIFT]||c.SHIFT}</div><span class="badge-soft ${st.cls}">${st.t}</span>
+        <span class="text-muted-2" id="jpSaved" style="font-size:11px"></span>
+        <div class="ms-auto d-flex flex-wrap gap-1"><button class="btn btn-outline-secondary btn-sm" data-act="print"><i class="bi bi-printer"></i> Cetak</button>
+          ${c.STATUS==='BERLANGSUNG'&&this.can('UPDATE')?'<button class="btn btn-primary btn-sm" data-act="serah"><i class="bi bi-send-check"></i> Serahkan Shift</button>':''}
+          ${c.STATUS==='DISERAHKAN'&&this.can('APPROVE')?'<button class="btn btn-success btn-sm" data-act="tahu"><i class="bi bi-check2-circle"></i> Ketahui (Koordinator)</button>':''}
+          ${c.STATUS!=='BERLANGSUNG'&&this.can('APPROVE')?'<button class="btn btn-outline-warning btn-sm" data-act="reopen">Buka kembali</button>':''}</div></div>
+      ${prev?`<div class="card-srit p-2 mb-3" style="font-size:12px"><b>Dari shift sebelumnya</b> (${dstr(prev.TANGGAL)} ${SHIFT[prev.SHIFT]||''}, ${esc(prev.NAMA_PETUGAS||'-')}):
+        ${prev.BELUM_SELESAI?`<div>Belum selesai: ${esc(prev.BELUM_SELESAI)}</div>`:''}${prev.PESAN?`<div>Pesan: ${esc(prev.PESAN)}</div>`:''}
+        <div>${prevPH.length?prevPH.length+' anak perlu perhatian khusus':'Tidak ada anak perlu perhatian khusus yang tercatat'}.${(!ro&&prevPH.length&&!c.PH.length)?' <button class="btn btn-sm btn-outline-primary py-0 ms-1" data-act="copyPh">Salin ke bagian D</button>':''}</div></div>`:''}
+      <div class="card-srit p-3 mb-3"><div class="fw-semibold mb-2">A. Identitas shift</div><div class="row g-2">
+        <div class="col-6 col-md-3"><label class="form-label-sm">Shift</label><select class="form-select form-select-sm" data-top="SHIFT" ${dis}>${sel(SHIFT,c.SHIFT)}</select></div>
+        <div class="col-3 col-md-2"><label class="form-label-sm">Mulai</label><input type="time" class="form-control form-control-sm" data-top="JAM_MULAI" value="${esc(c.JAM_MULAI||'')}" ${dis}></div>
+        <div class="col-3 col-md-2"><label class="form-label-sm">Selesai</label><input type="time" class="form-control form-control-sm" data-top="JAM_SELESAI" value="${esc(c.JAM_SELESAI||'')}" ${dis}></div>
+        <div class="col-12 col-md-5"><label class="form-label-sm">Petugas piket</label><input class="form-control form-control-sm" value="${esc(c.NAMA_PETUGAS||'')}" disabled></div>
+        <div class="col-12 col-md-8"><label class="form-label-sm">Blok / kamar tanggung jawab</label><input class="form-control form-control-sm" data-top="BLOK" value="${esc(c.BLOK||'')}" ${dis}></div>
+        <div class="col-12 col-md-4"><label class="form-label-sm">Jumlah anak dalam tanggung jawab</label><input class="form-control form-control-sm" id="jpJml" value="${c.CEK.reduce((n,x)=>n+(+x.seharusnya||0),0)} anak" disabled></div></div></div>
+      <div class="card-srit p-3 mb-3"><div class="d-flex flex-wrap align-items-center gap-2 mb-2"><div class="fw-semibold">B. Cek kehadiran (awal dan akhir shift)</div>
+        ${ro?'':'<div class="ms-auto d-flex gap-1"><button class="btn btn-outline-secondary btn-sm py-0" data-act="allAwal">Semua hadir (awal)</button><button class="btn btn-outline-secondary btn-sm py-0" data-act="allAkhir">Semua hadir (akhir)</button></div>'}</div>
+        <div class="table-responsive"><table class="table table-sm table-srit mb-0"><thead><tr><th>Kamar</th><th>Seharusnya</th><th>Awal</th><th>Akhir</th><th>Selisih</th><th>Keterangan selisih</th><th></th></tr></thead><tbody>${cekRows||'<tr><td colspan="7" class="text-muted-2">Belum ada kamar.</td></tr>'}</tbody></table></div>
+        <div class="text-muted-2 mt-1" style="font-size:11px">Selisih = seharusnya − hadir akhir. Isi keterangan (izin / sakit / di UKS / tidak diketahui) untuk setiap selisih. Anak yang tidak diketahui keberadaannya wajib segera dilaporkan.</div></div>
+      <div class="card-srit p-3 mb-3"><div class="d-flex flex-wrap align-items-center gap-2 mb-2"><div class="fw-semibold">C. Catatan kejadian selama shift</div>
+        <label class="ms-auto" style="font-size:13px"><input type="checkbox" class="me-1" data-top="NIHIL" ${c.NIHIL==='YA'?'checked':''} ${(dis||c.KJ.length)?'disabled':''}>NIHIL (tidak ada kejadian)</label></div>
+        <div class="text-muted-2 mb-2" style="font-size:12px">Catat apa adanya, tanpa penilaian terhadap anak. Pilar: K Kesehatan, S Keselamatan, P Perlindungan. Klasifikasi: R Ringan, Sd Sedang, B Berat.</div>
+        ${kjCards||(c.NIHIL==='YA'?'<div class="text-muted-2">NIHIL.</div>':'<div class="text-muted-2 mb-2">Belum ada kejadian.</div>')}
+        ${ro?'':'<button class="btn btn-outline-primary btn-sm" data-act="addKj"><i class="bi bi-plus-lg"></i> Tambah kejadian (jam sekarang)</button>'}</div>
+      <div class="card-srit p-3 mb-3"><div class="fw-semibold mb-1">D. Anak yang perlu perhatian khusus / sedang dalam pendampingan</div><div class="text-muted-2 mb-2" style="font-size:12px">Agar shift berikutnya melanjutkan pemantauan, bukan memulai dari nol.</div>
+        ${phRows||'<div class="text-muted-2 mb-2">Belum ada.</div>'}${ro?'':'<button class="btn btn-outline-primary btn-sm" data-act="addPh"><i class="bi bi-plus-lg"></i> Tambah anak</button>'}</div>
+      <div class="card-srit p-3 mb-3"><div class="fw-semibold mb-2">E. Serah terima shift</div><div class="row g-2">
+        <div class="col-12 col-md-6"><label class="form-label-sm">Hal yang belum selesai dan perlu dilanjutkan</label><textarea class="form-control form-control-sm" rows="3" data-top="BELUM_SELESAI" ${dis}>${esc(c.BELUM_SELESAI||'')}</textarea></div>
+        <div class="col-12 col-md-6"><label class="form-label-sm">Pesan khusus untuk petugas berikutnya</label><textarea class="form-control form-control-sm" rows="3" data-top="PESAN" ${dis}>${esc(c.PESAN||'')}</textarea></div>
+        <div class="col-12"><div class="table-responsive"><table class="table table-sm table-srit mb-0"><thead><tr><th>Barang / dokumen yang diserahterimakan</th><th>Ada / tidak</th><th>Catatan</th></tr></thead><tbody>${brRows}</tbody></table></div></div>
+        <div class="col-8 col-md-6"><label class="form-label-sm">Petugas yang menerima</label><input class="form-control form-control-sm" list="jpUsers" data-top="PENERIMA" value="${esc(c.PENERIMA||'')}" ${dis}><datalist id="jpUsers">${SRIT.Store.read('USERS').map(u=>`<option value="${esc(u.NAME)}"></option>`).join('')}</datalist></div>
+        <div class="col-4 col-md-3"><label class="form-label-sm">Jam serah terima</label><input type="time" class="form-control form-control-sm" data-top="JAM_SERAH" value="${esc(c.JAM_SERAH||'')}" ${dis}></div>
+        ${c.DIKETAHUI_OLEH?`<div class="col-12 text-muted-2" style="font-size:12px">Diketahui koordinator: ${esc(c.DIKETAHUI_OLEH)} · ${esc(String(c.DIKETAHUI_PADA||'').replace('T',' '))}</div>`:''}</div></div>`;
+      this._bind();
+    },
+    _bind(){
+      const host=this._host,self=this;
+      host.oninput=host.onchange=e=>{
+        const t=e.target,c=self.cur;if(!c||self.ro())return;
+        if(t.dataset.top){const k=t.dataset.top;c[k]=t.type==='checkbox'?(t.checked?'YA':''):t.value;self._persist();if(k==='NIHIL'&&e.type==='change'){self._flush2();self.renderEditor();}return;}
+        if(t.dataset.a){
+          const A=t.dataset.a,arr=({CEK:c.CEK,KJ:c.KJ,PH:c.PH,BR:c.BR})[A],i=+t.dataset.i,row=arr&&arr[i];if(!row)return;
+          const f=t.dataset.f;let v=t.value;
+          if(t.type==='number')v=(v===''?'':Math.max(0,parseInt(v,10)||0));
+          row[f]=v;
+          if(f==='anak')row.anakId=self._anakMap[v]||'';
+          self._persist();
+          // perbarui selisih di tempat (tanpa render ulang agar fokus ketikan tidak hilang)
+          if(A==='CEK'&&(f==='seharusnya'||f==='awal'||f==='akhir')){
+            const cell=host.querySelector('[data-sel="'+i+'"]');if(cell)cell.innerHTML=selBadge(selisih(row));
+            const jm=host.querySelector('#jpJml');if(jm)jm.value=c.CEK.reduce((n,x)=>n+(+x.seharusnya||0),0)+' anak';
+          }
+          // peringatan batas lapor bergantung pada klasifikasi/pelaporan: render ulang hanya saat pilihan (select) berubah
+          if(e.type==='change'&&A==='KJ'&&(f==='tingkat'||f==='lapor')){self._flush2();self.renderEditor();}
+        }
+      };
+      host.onclick=e=>{
+        const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,i=+b.dataset.i,c=self.cur;
+        if(a==='back'){self.close();return;}
+        if(a==='print'){self._flush();self.cetak(c.ID);return;}
+        if(a==='serah'){self.serah();return;}
+        if(a==='tahu'){self.tahu();return;}
+        if(a==='reopen'){self.reopen();return;}
+        if(self.ro())return;
+        if(a==='delCek')c.CEK.splice(i,1);
+        else if(a==='allAwal')c.CEK.forEach(x=>{x.awal=x.seharusnya;});
+        else if(a==='allAkhir')c.CEK.forEach(x=>{x.akhir=x.seharusnya;});
+        else if(a==='addKj'){c.KJ.push({jam:nowT(),anak:'',anakId:'',pilar:'',tingkat:'',uraian:'',tindakan:'',lapor:'',jamLapor:''});c.NIHIL='';}
+        else if(a==='delKj'){if(!confirm('Hapus catatan kejadian ini?'))return;c.KJ.splice(i,1);}
+        else if(a==='addPh')c.PH.push({anak:'',anakId:'',hal:'',sejak:SRIT.Util.todayISO(),tindak:'',pihak:''});
+        else if(a==='delPh')c.PH.splice(i,1);
+        else if(a==='copyPh'){const pv=self._prev();if(pv)c.PH=parse(pv.PERHATIAN,[]).map(x=>({...x}));}
+        else if(a==='kasus'){self._flush();self.kasus(i);return;}
+        else return;
+        self._flush2();self.renderEditor();
+      };
+    },
+    _flush2(){this._dirty=true;this._flush();},
+    // ---- hubungan ke Insiden & Kasus ----
+    kasus(i){
+      const c=this.cur,x=c.KJ[i];if(!x||x.insiden)return;
+      if(!x.uraian){SRIT.Notify('Isi uraian kejadian lebih dulu','err');return;}
+      const tgl=c.TANGGAL,temu=tgl+'T'+(x.jam||'00:00');
+      let lapor='';if(x.lapor&&x.jamLapor){let d=tgl;if(x.jam&&x.jamLapor<x.jam){const n=new Date(tgl+'T00:00');n.setDate(n.getDate()+1);d=n.getFullYear()+'-'+p2(n.getMonth()+1)+'-'+p2(n.getDate());}lapor=d+'T'+x.jamLapor;}
+      const tk=x.tingkat||'RINGAN',aid=x.anakId||this._anakMap[x.anak]||'';
+      const row={ID:SRIT.Util.uid('IN'),TANGGAL:tgl,WAKTU_TEMU:temu,KATEGORI:'LAINNYA',PILAR:x.pilar||'',KEJADIAN:x.uraian,TINDAKAN:x.tindakan||'',TINGKAT:tk,PRIORITAS:PRIO[tk],
+        ANAK:aid,NAMA_ANAK:aid?((SRIT.Repo.getById('ANAK',aid)||{}).NAMA||''):'',WAJIB_JENIS:'',DILAPORKAN_KE:x.lapor||'',WAKTU_LAPOR:lapor,KE_PUSAT:'',TAHAP:1,STATUS:'LAPORAN',
+        PELAPOR:c.NAMA_PETUGAS||'',PETUGAS:'',BATAS_LAPOR:'',DEADLINE:''};
+      if(SRIT.Kasus){const b=SRIT.Kasus.batas(row);if(b){row.BATAS_LAPOR=SRIT.Kasus.toLocal(b);row.DEADLINE=row.BATAS_LAPOR.slice(0,10);}}
+      SRIT.Repo.insert('INSIDEN',row);SRIT.Audit.log('CREATE','insiden',row.ID);SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
+      x.insiden=row.ID;this._flush2();this.renderEditor();
+      SRIT.Notify('Kasus dicatat di Insiden & Kasus. Lengkapi kategori dan jenis wajib-teruskan di sana.','ok');
+    },
+    // ---- alur status ----
+    serah(){
+      const c=this.cur;this._flush();
+      const err=[];
+      if(!c.CEK.length)err.push('Daftar kamar kosong');
+      const blank=c.CEK.filter(x=>x.awal===''||x.awal==null||x.akhir===''||x.akhir==null);
+      if(blank.length)err.push('Cek kehadiran awal/akhir belum lengkap ('+blank.length+' kamar)');
+      const noKet=c.CEK.filter(x=>{const d=selisih(x);return d&&!String(x.ket||'').trim();});
+      if(noKet.length)err.push('Selisih kehadiran tanpa keterangan: '+noKet.map(x=>x.kamar).join(', '));
+      const isi=c.KJ.filter(x=>String(x.uraian||'').trim());
+      if(!isi.length&&c.NIHIL!=='YA')err.push('Catatan kejadian kosong: isi kejadian atau centang NIHIL');
+      if(c.KJ.length&&isi.length!==c.KJ.length)err.push('Ada catatan kejadian tanpa uraian');
+      if(!String(c.PENERIMA||'').trim())err.push('Nama petugas penerima belum diisi');
+      if(err.length){SRIT.Notify('Belum bisa diserahterimakan:\n• '+err.join('\n• '),'err',7000);return;}
+      const lap=isi.filter(x=>(x.tingkat==='SEDANG'||x.tingkat==='BERAT')&&!x.lapor);
+      if(lap.length&&!confirm('Ada '+lap.length+' kejadian sedang/berat yang belum tercatat pelaporannya. Batas lapor bersifat mengikat. Tetap serahkan shift?'))return;
+      if(!confirm('Serahkan shift ini? Isi tidak dapat diubah setelah diserahkan.'))return;
+      const patch={STATUS:'DISERAHKAN',JAM_SELESAI:c.JAM_SELESAI||nowT(),JAM_SERAH:c.JAM_SERAH||nowT()};
+      Object.assign(c,patch);SRIT.Repo.update('JURNAL_PIKET',c.ID,Object.assign(this._serialize(),patch));
+      SRIT.Audit.log('UPDATE','jurnal-piket',c.ID,{STATUS:'BERLANGSUNG'},{STATUS:'DISERAHKAN'});SRIT.Notify('Shift diserahterimakan','ok');this.renderEditor();
+    },
+    tahu(){
+      const c=this.cur,patch={STATUS:'DIKETAHUI',DIKETAHUI_OLEH:(SRIT.Auth.user||{}).NAME||'',DIKETAHUI_PADA:nowLocal()};
+      Object.assign(c,patch);SRIT.Repo.update('JURNAL_PIKET',c.ID,patch);SRIT.Audit.log('UPDATE','jurnal-piket',c.ID,{STATUS:'DISERAHKAN'},{STATUS:'DIKETAHUI'});
+      SRIT.Notify('Jurnal diketahui koordinator','ok');this.renderEditor();
+    },
+    reopen(){
+      const c=this.cur;if(!confirm('Buka kembali jurnal ini untuk diedit?'))return;
+      const old=c.STATUS,patch={STATUS:'BERLANGSUNG',DIKETAHUI_OLEH:'',DIKETAHUI_PADA:''};
+      Object.assign(c,patch);SRIT.Repo.update('JURNAL_PIKET',c.ID,patch);SRIT.Audit.log('UPDATE','jurnal-piket',c.ID,{STATUS:old},{STATUS:'BERLANGSUNG'});this.renderEditor();
+    },
+
+    /* ===================== CETAK ===================== */
+    cetak(id){
+      const r=SRIT.Repo.getById('JURNAL_PIKET',id);if(!r){SRIT.Notify('Jurnal tidak ditemukan','err');return;}
+      const set=SRIT.Store.readObj('SETTINGS')||{},cek=parse(r.CEK_KAMAR,[]),kj=parse(r.CATATAN_KEJADIAN,[]),ph=parse(r.PERHATIAN,[]),br=parse(r.BARANG,[]);
+      const td='style="border:1px solid #333;padding:4px 6px;vertical-align:top"',th='style="border:1px solid #333;padding:4px 6px;background:#eef2f8"';
+      const tbl=(head,body)=>`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px"><thead><tr>${head.map(h=>`<th ${th}>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
+      const asr=(SRIT.Repo.getById('ASRAMA',r.ASRAMA)||{}).NAME||'';
+      const html=`<div id="jpPrint" style="font-family:Segoe UI,Arial,sans-serif;color:#111;font-size:13px">
+        <div style="text-align:center;border-bottom:3px double #333;padding-bottom:8px;margin-bottom:12px"><h4 style="margin:0">FORM CATATAN HARIAN DAN SERAH TERIMA PIKET WALI ASRAMA</h4><div><b>${esc(set.SCHOOL_NAME||'')}</b></div><small>Rahasia — hanya untuk wali asrama, wali asuh, Satgas SR, dan kepala sekolah</small></div>
+        <table style="width:100%;margin-bottom:10px;font-size:12px"><tr><td width="22%">Hari / Tanggal</td><td>: ${esc(r.TANGGAL)}</td><td width="22%">Shift</td><td>: ${SHIFT[r.SHIFT]||''} (${esc(r.JAM_MULAI||'..')} – ${esc(r.JAM_SELESAI||'..')})</td></tr>
+        <tr><td>Wali asrama piket</td><td>: ${esc(r.NAMA_PETUGAS||'')}</td><td>Jumlah anak</td><td>: ${r.JML_ANAK||0} anak</td></tr><tr><td>Asrama / blok</td><td colspan="3">: ${esc(asr)} ${esc(r.BLOK||'')}</td></tr></table>
+        <b>B. Cek Kehadiran Peserta Didik</b>${tbl(['Kamar','Seharusnya','Hadir awal','Hadir akhir','Selisih','Keterangan selisih'],cek.map(x=>{const d=selisih(x);return `<tr><td ${td}>${esc(x.kamar)}</td><td ${td} align="center">${x.seharusnya}</td><td ${td} align="center">${x.awal}</td><td ${td} align="center">${x.akhir}</td><td ${td} align="center">${d===null?'':d}</td><td ${td}>${esc(x.ket||'')}</td></tr>`;}).join('')||`<tr><td ${td} colspan="6">&nbsp;</td></tr>`)}
+        <b>C. Catatan Kejadian Selama Shift</b>${tbl(['Jam','Kejadian / temuan','Nama anak & kamar','Pilar','Tindakan awal','Klasifikasi','Dilaporkan kepada','Jam lapor'],
+          (kj.map(x=>`<tr><td ${td}>${esc(x.jam||'')}</td><td ${td}>${esc(x.uraian||'')}</td><td ${td}>${esc(x.anak||'')}</td><td ${td}>${esc((PILAR[x.pilar]||'').slice(0,1))}</td><td ${td}>${esc(x.tindakan||'')}</td><td ${td}>${esc((TINGKAT[x.tingkat]||'').split(' ')[0])}</td><td ${td}>${esc(LAPOR[x.lapor]||'')}</td><td ${td}>${esc(x.jamLapor||'')}</td></tr>`).join(''))||`<tr><td ${td}>${r.NIHIL==='YA'?'NIHIL':'&nbsp;'}</td><td ${td} colspan="7">&nbsp;</td></tr>`)}
+        <b>D. Peserta Didik yang Perlu Perhatian Khusus / Sedang Dalam Pendampingan</b>${tbl(['Nama & kamar','Hal yang dipantau','Sejak','Yang perlu dilakukan shift berikutnya','Pihak yang menangani'],ph.map(x=>`<tr><td ${td}>${esc(x.anak||'')}</td><td ${td}>${esc(x.hal||'')}</td><td ${td}>${esc(x.sejak||'')}</td><td ${td}>${esc(x.tindak||'')}</td><td ${td}>${esc(x.pihak||'')}</td></tr>`).join('')||`<tr><td ${td} colspan="5">&nbsp;</td></tr>`)}
+        <b>E. Serah Terima Shift</b>
+        <div style="margin:4px 0">Hal yang belum selesai dan perlu dilanjutkan: ${esc(r.BELUM_SELESAI||'-')}</div><div style="margin:4px 0 8px">Pesan khusus untuk petugas berikutnya: ${esc(r.PESAN||'-')}</div>
+        ${tbl(['Barang / dokumen yang diserahterimakan','Ada','Tidak ada','Catatan'],br.map(x=>`<tr><td ${td}>${esc(x.item)}</td><td ${td} align="center">${x.ada==='YA'?'✓':''}</td><td ${td} align="center">${x.ada==='TIDAK'?'✓':''}</td><td ${td}>${esc(x.ket||'')}</td></tr>`).join(''))}
+        <div style="display:flex;justify-content:space-between;text-align:center;margin-top:18px;font-size:12px">
+          <div>Petugas yang menyerahkan<br><br><br><br>(${esc(r.NAMA_PETUGAS||'................')})<br>Jam: ${esc(r.JAM_SERAH||'......')}</div>
+          <div>Petugas yang menerima<br><br><br><br>(${esc(r.PENERIMA||'................')})</div>
+          <div>Mengetahui,<br>Koordinator Wali Asrama<br><br><br>(${esc(r.DIKETAHUI_OLEH||'................')})</div></div></div>`;
+      const m=SRIT.Modal.open({title:'Form Catatan Harian dan Serah Terima Piket',size:'modal-xl',body:html,footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button><button class="btn btn-primary btn-sm" id="jpPrintBtn"><i class="bi bi-printer"></i> Cetak / PDF</button>`});
+      $('#jpPrintBtn',m.el).onclick=()=>{const w=window.open('','_blank');w.document.write('<html><head><title>Jurnal Piket</title></head><body>'+$('#jpPrint',m.el).outerHTML+'</body></html>');w.document.close();w.focus();w.print();SRIT.Audit.log('PRINT','jurnal-piket',id);};
+    },
+    destroy(){this._flush();clearTimeout(this._t);this.cur=null;if(this._host){this._host.onclick=this._host.oninput=this._host.onchange=null;}}
+  };
+  return F;
+})();
 </script>
 
 <script>__srit.n('JS_Bell')</script>
@@ -4709,15 +5050,238 @@ regFeature('pembinaan',{title:'Pembinaan',table:'PEMBINAAN',perm:'pembinaan',mod
 <script>__srit.n('View_Insiden')</script>
 <script>
 //# sourceURL=View_Insiden.html
-// Insiden / Case Management (alur penanganan)
-regFeature('insiden',{title:'Insiden & Manajemen Kasus',table:'INSIDEN',perm:'insiden',module:'insiden',idPrefix:'IN',searchFields:['KEJADIAN','KATEGORI'],detail:true,
-  filters:[{k:'PRIORITAS',label:'Prioritas',options:['LOW','MEDIUM','HIGH','CRITICAL'].map(v=>({v,t:v}))},{k:'KATEGORI',label:'Kategori',options:['KEAMANAN','KESEHATAN','KONFLIK','PERUNDUNGAN','KEKERASAN','PELECEHAN','INTOLERANSI','KEHILANGAN','KERUSAKAN','KETIDAKHADIRAN','DARURAT','LAINNYA'].map(v=>({v,t:v}))}],
-  cols:[{h:'Tanggal',f:r=>SRIT.Util.fmtDateShort(r.TANGGAL)},{h:'Kategori',k:'KATEGORI'},{h:'Prioritas',f:r=>{const c={LOW:'st-HADIR',MEDIUM:'st-SAKIT',HIGH:'st-ALPA',CRITICAL:'st-ALPA'}[r.PRIORITAS]||'st-BELUM';return `<span class="badge-soft ${c}">${r.PRIORITAS}</span>`;}},{h:'Kejadian',k:'KEJADIAN'},{h:'Status',f:r=>`<span class="badge-soft ${r.STATUS==='PENYELESAIAN'||r.STATUS==='SELESAI'?'st-BELUM':'st-IZIN'}">${r.STATUS}</span>`}],
-  rowActions:[
-    {id:'tangani',label:'Tangani',icon:'bi-tools',cls:'btn-outline-primary',show:r=>r.STATUS==='LAPORAN'||r.STATUS==='VERIFIKASI',run:_setStatus('INSIDEN','STATUS','PENANGANAN')},
-    {id:'selesai',label:'Selesaikan',icon:'bi-check-lg',cls:'btn-outline-success',show:r=>r.STATUS!=='SELESAI',run:_setStatus('INSIDEN','STATUS','SELESAI')}
-  ],
-  fields:[{k:'TANGGAL',label:'Tanggal',type:'date',default:SRIT.Util.todayISO()},{k:'KATEGORI',label:'Kategori',type:'select',options:['KEAMANAN','KESEHATAN','KONFLIK','PERUNDUNGAN','KEKERASAN','PELECEHAN','INTOLERANSI','KEHILANGAN','KERUSAKAN','KETIDAKHADIRAN','DARURAT','LAINNYA'].map(v=>({v,t:v}))},{k:'PRIORITAS',label:'Prioritas',type:'select',options:['LOW','MEDIUM','HIGH','CRITICAL'].map(v=>({v,t:v}))},{k:'KEJADIAN',label:'Kejadian',type:'textarea',col:12,required:true},{k:'PELAPOR',label:'Pelapor'},{k:'PETUGAS',label:'Petugas Penanganan'},{k:'TINDAKAN',label:'Tindakan',type:'textarea',col:12},{k:'DEADLINE',label:'Deadline',type:'date'},{k:'STATUS',label:'Status',type:'select',options:['LAPORAN','VERIFIKASI','PENANGANAN','KOORDINASI','TINDAK LANJUT','MONITORING','PENYELESAIAN','SELESAI'].map(v=>({v,t:v}))}]});
+// ---------- INSIDEN & MANAJEMEN KASUS ----------
+// Mengikuti Modul "Permasalahan di Asrama" (Bab I, Integrasi Modul 5):
+// 3 pilar (Kesehatan/Keselamatan/Perlindungan) · klasifikasi Ringan/Sedang/Berat · batas lapor mengikat
+// (berat 1×24 jam, sedang 2×24 jam) · 6 tahap manajemen kasus · eskalasi Satgas SR → Kepala Sekolah → Satgas Pusat.
+// PRIORITAS dan STATUS lama tetap diisi otomatis (dari Tingkat dan Tahap) agar Beranda, Pusat Peringatan, Live TV, dan laporan lama tetap berjalan.
+SRIT.Kasus=(function(){
+  const TINGKAT={
+    RINGAN:{t:'Ringan',cls:'st-HADIR',prio:'LOW',oleh:'Satgas SR (selesai di sekolah)'},
+    SEDANG:{t:'Sedang',cls:'st-SAKIT',prio:'HIGH',oleh:'Satgas SR dengan supervisi Satgas Pusat'},
+    BERAT:{t:'Berat',cls:'st-ALPA',prio:'CRITICAL',oleh:'Satgas Pusat'}
+  };
+  const TAHAP=['','Proses awal','Asesmen','Rencana penanganan','Pelaksanaan penanganan','Monitoring & evaluasi','Pengakhiran'];
+  const TAHAP_PERAN=['','Menerima, mencatat, dan menyerahkan informasi ke Satgas SR; amankan anak bila darurat','Memberi data pengamatan harian; tidak melakukan asesmen sendiri','Memberi masukan tentang keseharian anak di asrama','Menjaga keberlangsungan penanganan dalam rutinitas harian anak','Mengisi catatan perkembangan secara berkala','Melaporkan bila kondisi anak kembali memburuk'];
+  const STATUS_OF={1:'LAPORAN',2:'VERIFIKASI',3:'KOORDINASI',4:'PENANGANAN',5:'MONITORING',6:'SELESAI'};
+  const TAHAP_OF={LAPORAN:1,VERIFIKASI:2,KOORDINASI:3,PENANGANAN:4,'TINDAK LANJUT':4,MONITORING:5,PENYELESAIAN:6,SELESAI:6};
+  const WAJIB={
+    KEKERASAN:'Dugaan kekerasan, pelecehan, atau eksploitasi',
+    MELUKAI_DIRI:'Indikasi melukai diri, ide bunuh diri, atau gangguan mental berat',
+    KABUR:'Anak tidak diketahui keberadaannya atau kabur dari asrama',
+    TENDIK:'Melibatkan pegawai, guru, atau tenaga kependidikan',
+    MEDIS:'Kondisi medis darurat atau perlu rujukan',
+    BERULANG:'Kasus berulang yang tidak selesai dengan pembinaan biasa'
+  };
+  // jenis wajib-teruskan yang diperlakukan 1×24 jam (kekerasan, melukai diri, anak hilang, melibatkan tenaga kependidikan)
+  const WAJIB_24=['KEKERASAN','MELUKAI_DIRI','KABUR','TENDIK'];
+  const PILAR={KESEHATAN:'Kesehatan',KESELAMATAN:'Keselamatan',PERLINDUNGAN:'Perlindungan'};
+  const KATEGORI=['KESEHATAN','KESEHATAN MENTAL','NAPZA','GIZI','PENYAKIT MENULAR','DARURAT','KECELAKAAN','KEAMANAN','KONFLIK','PERUNDUNGAN','INTOLERANSI','KEHILANGAN','KERUSAKAN','KETIDAKHADIRAN','KEKERASAN','PELECEHAN','KEAMANAN DIGITAL','PENELANTARAN','MASALAH KELUARGA','LAINNYA'];
+  const PILAR_OF={KESEHATAN:'KESEHATAN','KESEHATAN MENTAL':'KESEHATAN',NAPZA:'KESEHATAN',GIZI:'KESEHATAN','PENYAKIT MENULAR':'KESEHATAN',DARURAT:'KESEHATAN',
+    KECELAKAAN:'KESELAMATAN',KEAMANAN:'KESELAMATAN',KONFLIK:'KESELAMATAN',PERUNDUNGAN:'KESELAMATAN',INTOLERANSI:'KESELAMATAN',KEHILANGAN:'KESELAMATAN',KERUSAKAN:'KESELAMATAN',KETIDAKHADIRAN:'KESELAMATAN',
+    KEKERASAN:'PERLINDUNGAN',PELECEHAN:'PERLINDUNGAN','KEAMANAN DIGITAL':'PERLINDUNGAN',PENELANTARAN:'PERLINDUNGAN','MASALAH KELUARGA':'PERLINDUNGAN'};
+  const LAPOR_KE={SATGAS_SR:'Satgas SR',KEPALA_SEKOLAH:'Kepala Sekolah',SATGAS_PUSAT:'Satgas Pusat'};
+  const p2=n=>String(n).padStart(2,'0');
+  const toLocal=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'T'+p2(d.getHours())+':'+p2(d.getMinutes());
+  const nowLocal=()=>toLocal(new Date());
+  const parseDt=s=>{if(!s)return null;const d=new Date(String(s).length<=10?s+'T00:00':s);return isNaN(d)?null:d;};
+  const tahapOf=r=>(+r.TAHAP>=1&&+r.TAHAP<=6)?+r.TAHAP:(TAHAP_OF[r.STATUS]||1);
+  const tingkatOf=r=>TINGKAT[r.TINGKAT]?r.TINGKAT:({LOW:'RINGAN',MEDIUM:'RINGAN',HIGH:'SEDANG',CRITICAL:'BERAT'}[r.PRIORITAS]||'RINGAN');
+  const aktif=r=>tahapOf(r)<6;
+  const jamBatas=r=>{
+    if(r.WAJIB_JENIS&&WAJIB_24.indexOf(r.WAJIB_JENIS)>=0)return 24;
+    const t=TINGKAT[r.TINGKAT]?r.TINGKAT:'';
+    return t==='BERAT'?24:t==='SEDANG'?48:0;
+  };
+  const batas=r=>{const h=jamBatas(r),d=parseDt(r.WAKTU_TEMU);return(h&&d)?new Date(d.getTime()+h*3600000):null;};
+  const fmtDur=h=>{h=Math.abs(h);const j=Math.floor(h),m=Math.round((h-j)*60);return (j?j+' j ':'')+(m||!j?m+' m':'').trim();};
+  // status pelaporan terhadap batas waktu
+  function lapor(r,now){
+    now=now||new Date();const b=batas(r);if(!b)return {k:'NA'};
+    const l=parseDt(r.WAKTU_LAPOR);
+    if(l)return l<=b?{k:'TEPAT'}:{k:'TERLAMBAT',jam:(l-b)/3600000};
+    return now>b?{k:'LEWAT',jam:(now-b)/3600000}:{k:'MENUNGGU',sisa:(b-now)/3600000};
+  }
+  const laporBadge=r=>{
+    const s=lapor(r);
+    if(s.k==='TEPAT')return '<span class="badge-soft st-HADIR">Dilaporkan tepat waktu</span>';
+    if(s.k==='TERLAMBAT')return '<span class="badge-soft st-ALPA">Lapor terlambat '+fmtDur(s.jam)+'</span>';
+    if(s.k==='LEWAT')return '<span class="badge-soft st-ALPA"><i class="bi bi-exclamation-triangle-fill"></i> Lewat batas '+fmtDur(s.jam)+'</span>';
+    if(s.k==='MENUNGGU')return '<span class="badge-soft '+(s.sisa<6?'st-SAKIT':'st-IZIN')+'">Sisa '+fmtDur(s.sisa)+'</span>';
+    return '<span class="text-muted-2">–</span>';
+  };
+  const fmtDT=s=>{const d=parseDt(s);return d?d.toLocaleDateString('id-ID',{day:'2-digit',month:'short'})+' '+p2(d.getHours())+'.'+p2(d.getMinutes()):'-';};
+  function ringkas(rows){
+    rows=rows||SRIT.Store.read('INSIDEN');const a=rows.filter(aktif),now=new Date();
+    return {aktif:a.length,lewat:a.filter(r=>lapor(r,now).k==='LEWAT').length,
+      wajibBelum:a.filter(r=>r.WAJIB_JENIS&&!r.WAKTU_LAPOR).length,
+      pusat:a.filter(r=>tingkatOf(r)!=='RINGAN'&&r.KE_PUSAT!=='YA'&&TINGKAT[r.TINGKAT]).length};
+  }
+  return {TINGKAT,TAHAP,TAHAP_PERAN,STATUS_OF,TAHAP_OF,WAJIB,WAJIB_24,PILAR,KATEGORI,PILAR_OF,LAPOR_KE,toLocal,nowLocal,parseDt,tahapOf,tingkatOf,aktif,jamBatas,batas,lapor,laporBadge,fmtDur,fmtDT,ringkas};
+})();
+
+SRIT.Features.insiden={
+  state:{page:1,size:20,search:'',tingkat:'',pilar:'',tampil:'AKTIF'},
+  render(host){SRIT.UI.setPage('Insiden & Manajemen Kasus','Insiden');this._host=host;
+    const s=this.state,K=SRIT.Kasus,sm=K.ringkas();
+    host.innerHTML=`<div class="row g-2 mb-3">
+      <div class="col-6 col-md-3"><div class="card-srit p-2 text-center"><div class="text-muted-2" style="font-size:11px">Kasus aktif</div><div class="fw-bold" style="font-size:20px">${sm.aktif}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card-srit p-2 text-center" style="${sm.lewat?'border-color:var(--srit-danger)':''}"><div class="text-muted-2" style="font-size:11px">Lewat batas lapor</div><div class="fw-bold" style="font-size:20px;${sm.lewat?'color:var(--srit-danger)':''}">${sm.lewat}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card-srit p-2 text-center"><div class="text-muted-2" style="font-size:11px">Wajib-teruskan belum dilapor</div><div class="fw-bold" style="font-size:20px;${sm.wajibBelum?'color:var(--srit-danger)':''}">${sm.wajibBelum}</div></div></div>
+      <div class="col-6 col-md-3"><div class="card-srit p-2 text-center"><div class="text-muted-2" style="font-size:11px">Sedang/Berat belum ke Satgas Pusat</div><div class="fw-bold" style="font-size:20px">${sm.pusat}</div></div></div>
+    </div>
+    <div class="card-srit p-3 mb-3"><div class="filter-bar">
+      <div style="flex:1;min-width:170px"><label class="form-label-sm">Cari</label><input class="form-control form-control-sm" id="ksSearch" placeholder="Kejadian, anak, kategori" value="${SRIT.Util.esc(s.search||'')}"></div>
+      <div><label class="form-label-sm">Tingkat</label><select class="form-select form-select-sm" id="ksTingkat"><option value="">Semua</option>${Object.keys(K.TINGKAT).map(k=>`<option value="${k}" ${s.tingkat===k?'selected':''}>${K.TINGKAT[k].t}</option>`).join('')}</select></div>
+      <div><label class="form-label-sm">Pilar</label><select class="form-select form-select-sm" id="ksPilar"><option value="">Semua</option>${Object.keys(K.PILAR).map(k=>`<option value="${k}" ${s.pilar===k?'selected':''}>${K.PILAR[k]}</option>`).join('')}</select></div>
+      <div><label class="form-label-sm">Tampilkan</label><select class="form-select form-select-sm" id="ksTampil">${[['AKTIF','Aktif'],['LEWAT','Lewat batas lapor'],['SELESAI','Selesai'],['SEMUA','Semua']].map(o=>`<option value="${o[0]}" ${s.tampil===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
+      ${SRIT.Auth.can('insiden:CREATE')?'<div><button class="btn btn-primary btn-sm" id="ksAdd"><i class="bi bi-plus-lg"></i> Catat Kejadian</button></div>':''}
+    </div>
+    <div class="text-muted-2 mt-2" style="font-size:12px">Batas lapor mengikat: kasus berat 1×24 jam, sedang 2×24 jam sejak ditemukan. Amankan anak lebih dulu, catat dan laporkan kemudian. Jaga kerahasiaan.</div></div>
+    <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="ksTable"></table></div><div class="p-3 border-top" id="ksPag"></div></div>`;
+    $('#ksSearch').oninput=e=>{clearTimeout(this._t);this._t=setTimeout(()=>{s.search=e.target.value;s.page=1;this.load();},300);};
+    $('#ksTingkat').onchange=e=>{s.tingkat=e.target.value;s.page=1;this.load();};
+    $('#ksPilar').onchange=e=>{s.pilar=e.target.value;s.page=1;this.load();};
+    $('#ksTampil').onchange=e=>{s.tampil=e.target.value;s.page=1;this.load();};
+    const add=$('#ksAdd');if(add)add.onclick=()=>this.form();
+    this.load();
+  },
+  _rows(){
+    const s=this.state,K=SRIT.Kasus,q=(s.search||'').toLowerCase(),now=new Date();
+    let rows=SRIT.Store.read('INSIDEN').filter(r=>{
+      if(s.tingkat&&K.tingkatOf(r)!==s.tingkat)return false;
+      if(s.pilar&&(r.PILAR||K.PILAR_OF[r.KATEGORI])!==s.pilar)return false;
+      const a=K.aktif(r);
+      if(s.tampil==='AKTIF'&&!a)return false;
+      if(s.tampil==='SELESAI'&&a)return false;
+      if(s.tampil==='LEWAT'&&!(a&&K.lapor(r,now).k==='LEWAT'))return false;
+      if(q&&![r.KEJADIAN,r.KATEGORI,r.NAMA_ANAK,r.PELAPOR,r.PETUGAS].some(v=>String(v||'').toLowerCase().includes(q)))return false;
+      return true;});
+    const w=r=>(K.aktif(r)?2:0)+(K.lapor(r,now).k==='LEWAT'?1:0);
+    return rows.sort((a,b)=>w(b)-w(a)||String(b.WAKTU_TEMU||b.TANGGAL).localeCompare(String(a.WAKTU_TEMU||a.TANGGAL)));
+  },
+  load(){
+    const s=this.state,K=SRIT.Kasus,esc=SRIT.Util.esc,all=this._rows();
+    const total=all.length,pages=Math.ceil(total/s.size)||1;if(s.page>pages)s.page=pages;
+    const rows=all.slice((s.page-1)*s.size,s.page*s.size);
+    const canU=SRIT.Auth.can('insiden:UPDATE'),canD=SRIT.Auth.can('insiden:DELETE');
+    $('#ksTable').innerHTML=`<thead><tr><th>Ditemukan</th><th>Anak</th><th>Kasus</th><th>Tingkat</th><th>Batas lapor</th><th>Tahap</th><th></th></tr></thead><tbody>
+    ${rows.length?rows.map(r=>{
+      const tk=K.tingkatOf(r),T=K.TINGKAT[tk],th=K.tahapOf(r),pl=r.PILAR||K.PILAR_OF[r.KATEGORI]||'';
+      const pusat=(r.TINGKAT&&tk!=='RINGAN')?(r.KE_PUSAT==='YA'?'<span class="badge-soft st-HADIR">Sudah ke Satgas Pusat</span>':'<span class="badge-soft st-SAKIT">Perlu eskalasi ke Satgas Pusat</span>'):'';
+      return `<tr>
+      <td class="text-nowrap">${r.WAKTU_TEMU?K.fmtDT(r.WAKTU_TEMU):SRIT.Util.fmtDateShort(r.TANGGAL)}</td>
+      <td>${r.ANAK?esc(SRIT.nm('ANAK',r.ANAK)||r.NAMA_ANAK):(esc(r.NAMA_ANAK)||'<span class="text-muted-2">–</span>')}</td>
+      <td style="min-width:200px"><div class="fw-semibold">${esc(r.KATEGORI||'-')}${pl?` <span class="text-muted-2 fw-normal" style="font-size:11px">· ${K.PILAR[pl]||pl}</span>`:''}</div><div style="font-size:12px">${esc(String(r.KEJADIAN||'').slice(0,110))}${String(r.KEJADIAN||'').length>110?'…':''}</div>
+        ${r.WAJIB_JENIS?`<div><span class="badge-soft st-ALPA" style="font-size:10px">Wajib diteruskan</span></div>`:''}</td>
+      <td><span class="badge-soft ${T.cls}">${T.t}</span>${r.TINGKAT?'':'<div class="text-muted-2" style="font-size:10px">dari prioritas lama</div>'}</td>
+      <td>${K.laporBadge(r)}${r.DILAPORKAN_KE?`<div class="text-muted-2" style="font-size:11px">ke ${K.LAPOR_KE[r.DILAPORKAN_KE]||esc(r.DILAPORKAN_KE)}${r.WAKTU_LAPOR?' · '+K.fmtDT(r.WAKTU_LAPOR):''}</div>`:(r.WAJIB_JENIS&&K.aktif(r)?'<div style="font-size:11px;color:var(--srit-danger)">belum dilaporkan</div>':'')}${pusat?`<div class="mt-1">${pusat}</div>`:''}</td>
+      <td style="min-width:130px"><span class="badge-soft ${th===6?'st-BELUM':'st-IZIN'}">${th}/6 ${K.TAHAP[th]}</span></td>
+      <td class="text-end text-nowrap">
+        <button class="btn btn-sm btn-outline-info py-0" title="Detail" onclick="SRIT.Features.insiden.detail('${r.ID}')"><i class="bi bi-eye"></i></button>
+        ${canU&&th<6?`<button class="btn btn-sm btn-outline-primary py-0 ms-1" title="Lanjut ke tahap berikutnya" onclick="SRIT.Features.insiden.maju('${r.ID}')"><i class="bi bi-arrow-right-circle"></i></button>`:''}
+        ${canU?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Edit" onclick="SRIT.Features.insiden.form('${r.ID}')"><i class="bi bi-pencil"></i></button>`:''}
+        ${canD?`<button class="btn btn-sm btn-outline-danger py-0 ms-1" title="Hapus" onclick="SRIT.Features.insiden.del('${r.ID}')"><i class="bi bi-trash"></i></button>`:''}</td></tr>`;}).join(''):'<tr><td colspan="7"><div class="empty-state"><i class="bi bi-shield-check d-block"></i>Tidak ada kasus pada tampilan ini</div></td></tr>'}</tbody>`;
+    $('#ksPag').innerHTML=SRIT.UI.pagination({rows,total,page:s.page,size:s.size,pages});
+    $$('#ksPag [data-pg]').forEach(a=>a.onclick=()=>{s.page=+a.dataset.pg;this.load();});
+  },
+  maju(id){
+    const r=SRIT.Repo.getById('INSIDEN',id);if(!r)return;const K=SRIT.Kasus,th=K.tahapOf(r);if(th>=6)return;
+    const n=th+1;
+    if(n===6&&!confirm('Akhiri penanganan? Lakukan hanya bila kondisi anak sudah stabil.'))return;
+    SRIT.Repo.update('INSIDEN',id,{TAHAP:n,STATUS:K.STATUS_OF[n]});SRIT.Audit.log('UPDATE','insiden',id,{TAHAP:th},{TAHAP:n});
+    SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');SRIT.Notify('Tahap '+n+': '+K.TAHAP[n],'ok');this.load();
+  },
+  del(id){
+    if(!confirm('Hapus data kasus ini? Tindakan ini tidak dapat dibatalkan.'))return;
+    SRIT.Repo.remove('INSIDEN',id);SRIT.Audit.log('DELETE','insiden',id);SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');SRIT.Notify('Kasus dihapus','warn');this.load();
+  },
+  detail(id){
+    const r=SRIT.Repo.getById('INSIDEN',id);if(!r)return;const K=SRIT.Kasus,esc=SRIT.Util.esc,tk=K.tingkatOf(r),T=K.TINGKAT[tk],th=K.tahapOf(r),pl=r.PILAR||K.PILAR_OF[r.KATEGORI]||'';
+    const b=K.batas(r);
+    const row=(l,v)=>`<tr><td class="text-muted-2" style="width:38%">${l}</td><td class="fw-semibold">${v||'-'}</td></tr>`;
+    const steps=[1,2,3,4,5,6].map(n=>`<li class="${n===th?'fw-bold':n<th?'text-muted-2':''}" style="margin:2px 0">${n<th?'<i class="bi bi-check-circle-fill text-success"></i>':n===th?'<i class="bi bi-arrow-right-circle-fill text-primary"></i>':'<i class="bi bi-circle"></i>'} ${n}. ${K.TAHAP[n]}${n===th?`<div class="text-muted-2 fw-normal" style="font-size:11px;margin-left:22px">Peran wali asrama: ${K.TAHAP_PERAN[n]}</div>`:''}</li>`).join('');
+    SRIT.Modal.open({title:'Detail Kasus',size:'modal-lg',body:`<table class="table table-sm table-srit mb-3"><tbody>
+      ${row('Ditemukan',r.WAKTU_TEMU?K.fmtDT(r.WAKTU_TEMU):SRIT.Util.fmtDateShort(r.TANGGAL))}
+      ${row('Anak',r.ANAK?esc(SRIT.nm('ANAK',r.ANAK)||r.NAMA_ANAK):esc(r.NAMA_ANAK))}
+      ${row('Kategori / pilar',esc(r.KATEGORI||'-')+(pl?' · '+(K.PILAR[pl]||pl):''))}
+      ${row('Kejadian',esc(r.KEJADIAN).replace(/\n/g,'<br>'))}
+      ${row('Tindakan awal / lanjutan',esc(r.TINDAKAN).replace(/\n/g,'<br>'))}
+      ${row('Wajib diteruskan',r.WAJIB_JENIS?esc(K.WAJIB[r.WAJIB_JENIS]||r.WAJIB_JENIS):'Tidak')}
+      ${row('Klasifikasi',`<span class="badge-soft ${T.cls}">${T.t}</span> <span class="fw-normal text-muted-2" style="font-size:12px">ditangani: ${T.oleh}</span>`)}
+      ${row('Batas lapor',b?(K.jamBatas(r)+' jam → '+K.fmtDT(K.toLocal(b))+' '+K.laporBadge(r)):'Tidak ditetapkan')}
+      ${row('Dilaporkan kepada',r.DILAPORKAN_KE?(K.LAPOR_KE[r.DILAPORKAN_KE]||esc(r.DILAPORKAN_KE))+(r.WAKTU_LAPOR?' · '+K.fmtDT(r.WAKTU_LAPOR):''):'Belum dilaporkan')}
+      ${row('Eskalasi ke Satgas Pusat',tk==='RINGAN'?'Tidak diperlukan (selesai di sekolah)':(r.KE_PUSAT==='YA'?'Sudah':'Belum — wajib untuk kasus '+K.TINGKAT[tk].t.toLowerCase()))}
+      ${row('Pelapor / petugas',esc([r.PELAPOR,r.PETUGAS].filter(Boolean).join(' / ')))}
+      </tbody></table>
+      <div class="fw-semibold mb-1" style="font-size:13px">Tahap manajemen kasus</div><ul class="list-unstyled mb-2" style="font-size:13px">${steps}</ul>
+      <div class="text-muted-2" style="font-size:11px">Alur: wali asrama menemukan dan mengamankan → Satgas SR mencatat, memverifikasi, asesmen awal → Kepala Sekolah menetapkan klasifikasi (case conference) → ringan selesai di sekolah; sedang dan berat dieskalasikan ke Satgas Pusat.</div>`,
+      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button>`});
+  },
+  form(id){
+    const K=SRIT.Kasus,esc=SRIT.Util.esc,self=this;
+    const r=id?SRIT.Repo.getById('INSIDEN',id):{};
+    if(id&&!r){SRIT.Notify('Data tidak ditemukan','err');return;}
+    const kat=K.KATEGORI.slice();if(r.KATEGORI&&kat.indexOf(r.KATEGORI)<0)kat.unshift(r.KATEGORI);
+    const anakList=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF');
+    const temu=id?(r.WAKTU_TEMU||''):K.nowLocal();   // data lama tanpa jam temu: jangan mengarang jam (agar tidak muncul batas lapor palsu)
+    const tk0=r.TINGKAT||(id?K.tingkatOf(r):'RINGAN'),th0=id?K.tahapOf(r):1;
+    const opt=(arr,cur)=>arr.map(o=>`<option value="${o[0]}" ${String(cur||'')===String(o[0])?'selected':''}>${o[1]}</option>`).join('');
+    const m=SRIT.Modal.open({title:(id?'Edit':'Catat')+' Kejadian / Kasus',size:'modal-lg',
+      body:`<form id="ksForm" onsubmit="return false"><div class="row g-2">
+        <div class="col-12"><div class="p-2 rounded border" style="font-size:12px"><b>Kenali → Amankan → Dengarkan → Catat → Laporkan → Dampingi.</b> Amankan anak dulu, catat kemudian. Tuliskan yang terlihat dan terdengar, bukan dugaan. Jangan menginterogasi atau menggali sendiri; asesmen dilakukan tenaga berkompeten.</div></div>
+        <div class="col-12 col-md-5"><label class="form-label-sm">Waktu ditemukan / dilaporkan ke wali asrama</label><input type="datetime-local" class="form-control form-control-sm" name="WAKTU_TEMU" value="${esc(temu)}" ${(!id||r.WAKTU_TEMU)?'required':''}></div>
+        <div class="col-12 col-md-7"><label class="form-label-sm">Anak terkait (opsional)</label><select class="form-select form-select-sm" name="ANAK"><option value="">— tidak terkait satu anak / lebih dari satu —</option>${anakList.map(a=>`<option value="${a.ID}" ${r.ANAK===a.ID?'selected':''}>${esc(a.NAMA)} (${esc(a.NIS)})</option>`).join('')}</select></div>
+        <div class="col-6"><label class="form-label-sm">Kategori</label><select class="form-select form-select-sm" name="KATEGORI">${kat.map(k=>`<option ${r.KATEGORI===k?'selected':''}>${esc(k)}</option>`).join('')}</select></div>
+        <div class="col-6"><label class="form-label-sm">Pilar</label><select class="form-select form-select-sm" name="PILAR">${opt(Object.keys(K.PILAR).map(k=>[k,K.PILAR[k]]),r.PILAR||K.PILAR_OF[r.KATEGORI||kat[0]])}</select></div>
+        <div class="col-12"><label class="form-label-sm">Kejadian / temuan</label><textarea class="form-control form-control-sm" name="KEJADIAN" rows="3" required>${esc(r.KEJADIAN||'')}</textarea></div>
+        <div class="col-12"><label class="form-label-sm">Tindakan awal yang dilakukan</label><textarea class="form-control form-control-sm" name="TINDAKAN" rows="2">${esc(r.TINDAKAN||'')}</textarea></div>
+        <div class="col-12"><label class="form-label-sm">Termasuk yang wajib diteruskan ke Satgas SR / Kepala Sekolah?</label><select class="form-select form-select-sm" name="WAJIB_JENIS"><option value="">Tidak / belum jelas</option>${Object.keys(K.WAJIB).map(k=>`<option value="${k}" ${r.WAJIB_JENIS===k?'selected':''}>${K.WAJIB[k]}</option>`).join('')}</select></div>
+        <div class="col-12"><label class="form-label-sm">Klasifikasi (usulan wali asrama; ditetapkan Kepala Sekolah melalui case conference)</label>
+          <div class="btn-group btn-group-sm w-100" role="group">${Object.keys(K.TINGKAT).map(k=>`<input type="radio" class="btn-check" name="TINGKAT" id="ksT_${k}" value="${k}" ${tk0===k?'checked':''}><label class="btn btn-outline-primary" for="ksT_${k}">${K.TINGKAT[k].t}</label>`).join('')}</div></div>
+        <div class="col-12"><div id="ksHint" class="p-2 rounded border" style="font-size:12px"></div></div>
+        <div class="col-6 col-md-4"><label class="form-label-sm">Dilaporkan kepada</label><select class="form-select form-select-sm" name="DILAPORKAN_KE"><option value="">Belum dilaporkan</option>${opt(Object.keys(K.LAPOR_KE).map(k=>[k,K.LAPOR_KE[k]]),r.DILAPORKAN_KE)}</select></div>
+        <div class="col-6 col-md-5"><label class="form-label-sm">Waktu lapor</label><div class="input-group input-group-sm"><input type="datetime-local" class="form-control form-control-sm" name="WAKTU_LAPOR" value="${esc(r.WAKTU_LAPOR||'')}"><button type="button" class="btn btn-outline-secondary" id="ksNow">Sekarang</button></div></div>
+        <div class="col-12 col-md-3"><label class="form-label-sm">Sudah ke Satgas Pusat?</label><select class="form-select form-select-sm" name="KE_PUSAT"><option value="">Belum</option><option value="YA" ${r.KE_PUSAT==='YA'?'selected':''}>Sudah</option></select></div>
+        <div class="col-12 col-md-6"><label class="form-label-sm">Tahap manajemen kasus</label><select class="form-select form-select-sm" name="TAHAP">${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${th0===n?'selected':''}>${n}. ${K.TAHAP[n]}</option>`).join('')}</select></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Pelapor</label><input class="form-control form-control-sm" name="PELAPOR" value="${esc(r.PELAPOR||(SRIT.Auth.user||{}).NAME||'')}"></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Petugas penanganan</label><input class="form-control form-control-sm" name="PETUGAS" value="${esc(r.PETUGAS||'')}"></div>
+      </div></form>`,
+      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="ksSave">Simpan</button>`});
+    const el=m.el,F=()=>Object.fromEntries(new FormData($('#ksForm',el)));
+    const hint=()=>{
+      const f=F(),tmp={TINGKAT:f.TINGKAT,WAJIB_JENIS:f.WAJIB_JENIS,WAKTU_TEMU:f.WAKTU_TEMU,WAKTU_LAPOR:f.WAKTU_LAPOR},b=K.batas(tmp),T=K.TINGKAT[f.TINGKAT];
+      $('#ksHint',el).innerHTML=(T?`<div><b>Ditangani oleh:</b> ${T.oleh}${f.TINGKAT!=='RINGAN'?'. <b>Wajib dieskalasikan ke Satgas Pusat.</b>':'.'}</div>`:'')+
+        (b?`<div><b>Batas lapor:</b> ${K.jamBatas(tmp)} jam sejak ditemukan → <b>${K.fmtDT(K.toLocal(b))}</b> ${K.laporBadge(tmp)}</div>`:'<div class="text-muted-2">Batas lapor berlaku untuk kasus sedang (2×24 jam) dan berat (1×24 jam), serta jenis wajib-teruskan tertentu (1×24 jam).</div>')+
+        (f.WAJIB_JENIS&&!f.DILAPORKAN_KE?'<div style="color:var(--srit-danger)"><b>Kasus wajib diteruskan — segera laporkan ke Satgas SR / Kepala Sekolah.</b></div>':'');
+    };
+    $('select[name=KATEGORI]',el).onchange=e=>{const p=K.PILAR_OF[e.target.value];if(p)$('select[name=PILAR]',el).value=p;};
+    // usulan awal: jenis wajib-teruskan berisiko tinggi → klasifikasi Berat (dapat diubah)
+    $('select[name=WAJIB_JENIS]',el).onchange=e=>{if(K.WAJIB_24.indexOf(e.target.value)>=0)$('#ksT_BERAT',el).checked=true;hint();};
+    $('select[name=DILAPORKAN_KE]',el).onchange=e=>{const w=$('input[name=WAKTU_LAPOR]',el);if(e.target.value&&!w.value)w.value=K.nowLocal();hint();};
+    $('#ksNow',el).onclick=()=>{$('input[name=WAKTU_LAPOR]',el).value=K.nowLocal();hint();};
+    $$('#ksForm input,#ksForm select',el).forEach(i=>{i.addEventListener('change',hint);});
+    hint();
+    $('#ksSave',el).onclick=()=>{
+      const fm=$('#ksForm',el);if(!fm.reportValidity())return;
+      const f=F(),tk=f.TINGKAT||'RINGAN',th=+f.TAHAP||1;
+      const tmp={TINGKAT:tk,WAJIB_JENIS:f.WAJIB_JENIS,WAKTU_TEMU:f.WAKTU_TEMU},b=K.batas(tmp);
+      if(f.WAKTU_LAPOR&&f.WAKTU_TEMU&&f.WAKTU_LAPOR<f.WAKTU_TEMU){SRIT.Notify('Waktu lapor tidak boleh sebelum waktu ditemukan','err');return;}
+      const row={WAKTU_TEMU:f.WAKTU_TEMU||'',TANGGAL:f.WAKTU_TEMU?String(f.WAKTU_TEMU).slice(0,10):(r.TANGGAL||SRIT.Util.todayISO()),ANAK:f.ANAK||'',NAMA_ANAK:f.ANAK?((SRIT.Repo.getById('ANAK',f.ANAK)||{}).NAMA||''):'',
+        KATEGORI:f.KATEGORI,PILAR:f.PILAR,KEJADIAN:String(f.KEJADIAN||'').trim(),TINDAKAN:String(f.TINDAKAN||'').trim(),WAJIB_JENIS:f.WAJIB_JENIS||'',
+        TINGKAT:tk,PRIORITAS:K.TINGKAT[tk].prio,BATAS_LAPOR:b?K.toLocal(b):'',DEADLINE:b?K.toLocal(b).slice(0,10):(r.DEADLINE||''),
+        DILAPORKAN_KE:f.DILAPORKAN_KE||'',WAKTU_LAPOR:f.WAKTU_LAPOR||'',KE_PUSAT:f.KE_PUSAT||'',TAHAP:th,STATUS:K.STATUS_OF[th],
+        PELAPOR:String(f.PELAPOR||'').trim(),PETUGAS:String(f.PETUGAS||'').trim()};
+      if(id){SRIT.Repo.update('INSIDEN',id,row);SRIT.Audit.log('UPDATE','insiden',id);}
+      else{row.ID=SRIT.Util.uid('IN');SRIT.Repo.insert('INSIDEN',row);SRIT.Audit.log('CREATE','insiden',row.ID);}
+      SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
+      m.close();SRIT.Notify('Kasus tersimpan','ok');
+      const msg=(row.WAJIB_JENIS&&!row.DILAPORKAN_KE)?'Kasus wajib diteruskan: segera laporkan ke Satgas SR / Kepala Sekolah.':'';if(msg)SRIT.Notify(msg,'warn');
+      self.render(self._host);
+    };
+  },
+  destroy(){}
+};
 </script>
 
 <script>__srit.n('View_Inspeksi')</script>
@@ -4846,10 +5410,266 @@ SRIT.Features.penghuni={
 <script>
 //# sourceURL=View_Penilaian.html
 // ---------- PENILAIAN + RAPOR ----------
+// Tab 1  Rapor Asrama  : 34 indikator, skala 1-4, sesuai Permensos 9/2026 (Pasal 15-21) → tabel RAPOR_ASRAMA
+// Tab 2  Penilaian Cepat: 8 aspek (versi lama) → tabel PENILAIAN
+SRIT.RaporAsrama=(function(){
+  const SKALA={1:'Kurang',2:'Cukup',3:'Baik',4:'Sangat Baik'};
+  // Empat kegiatan Program Asrama (Pasal 15 ayat 2). K4 hanya untuk jenjang SMA (Pasal 21 ayat 2).
+  const KEG=[
+    {k:'K1',nama:'Penguatan Karakter serta Pemahaman Nilai dan Praktik Keagamaan',pendek:'Karakter & Keagamaan',grup:[
+      {nama:'Pembinaan Keagamaan',items:[
+        {n:'Ibadah bersama'},{n:'Membaca kitab suci'},{n:'Menghafal kitab suci'},{n:'Kajian keilmuan keagamaan'},
+        {n:'Pembinaan ibadah harian'},{n:'Memimpin ibadah'},{n:'Ceramah atau pidato keagamaan'},{n:'Zikir dan doa'},
+        {n:'Pemahaman dan pengamalan nilai keagamaan'}]},
+      {nama:'Pembinaan Kehidupan Keasramaan',items:[
+        {n:'Akhlak mulia'},{n:'Belajar kelompok'},{n:'Literasi'},{n:'Olahraga'},{n:'Budaya bersih'},
+        {n:'Kedisiplinan'},{n:'Kepemimpinan dan organisasi'},{n:'Nasionalisme'}]}]},
+    {k:'K2',nama:'Pengasuhan',pendek:'Pengasuhan',grup:[{nama:'',items:[
+      {n:'Kemandirian dalam kegiatan harian',d:'activity daily living'},
+      {n:'Kelekatan dan relasi',d:'dengan wali asuh, wali asrama, dan teman sebaya'},
+      {n:'Pemahaman hak dan perlindungan diri',d:'serta keberanian menyampaikan keluhan'},
+      {n:'Kesejahteraan dan penyesuaian diri',d:'dalam kehidupan berasrama'},
+      {n:'Pemenuhan hak sipil',d:'identitas dan dokumen kependudukan'},
+      {n:'Penyaluran bakat, minat, dan kemampuan',d:'sesuai tumbuh kembang'}]}]},
+    {k:'K3',nama:'Pelatihan Kecakapan Hidup',pendek:'Kecakapan Hidup',grup:[{nama:'',items:[
+      {n:'Kecakapan personal',d:'pengelolaan diri, emosi, tanggung jawab'},
+      {n:'Kecakapan sosial',d:'kerja sama, komunikasi, penyelesaian konflik'},
+      {n:'Kecakapan fisik',d:'kebugaran, kesehatan diri, keterampilan praktis'},
+      {n:'Kebahasaan',d:'public speaking, kosakata, bahasa asing, pidato, literasi bahasa'},
+      {n:'Literasi digital yang sehat',d:'gawai secara aman dan bertanggung jawab'},
+      {n:'Literasi finansial',d:'uang saku, menabung, perencanaan sederhana'}]}]},
+    {k:'K4',nama:'Pelatihan Vokasional dan/atau Kewirausahaan',pendek:'Vokasional/Kewirausahaan',jenjang:['SRMA'],grup:[{nama:'',items:[
+      {n:'Kehadiran dalam kegiatan pelatihan'},
+      {n:'Keaktifan dan inisiatif'},
+      {n:'Kreativitas dan inovasi'},
+      {n:'Hasil karya atau produk'},
+      {n:'Sikap kerja, kedisiplinan, dan keselamatan kerja'}]}]}
+  ];
+  // beri ID berurutan i01..i34 (urutan tetap = urutan modul; jangan diubah agar data lama tetap terbaca)
+  let seq=0;
+  KEG.forEach(g=>{g.items=[];g.grup.forEach(gr=>gr.items.forEach(it=>{seq++;it.id='i'+String(seq).padStart(2,'0');it.keg=g.k;g.items.push(it);}));});
+  const ALL=[].concat.apply([],KEG.map(g=>g.items));
+  const aktif=jenjang=>KEG.filter(g=>!g.jenjang||g.jenjang.indexOf(jenjang)>=0);
+  const predikat=p=>p>=87.5?'Sangat Baik':p>=62.5?'Baik':p>=37.5?'Cukup':'Kurang';
+  const parse=v=>{try{const o=JSON.parse(v||'{}');return (o&&typeof o==='object')?o:{};}catch(e){return {};}};
+  const pct=(a,b)=>b?Math.round(a/b*1000)/10:0;
+  // hitung skor per kegiatan + total. Persentase terhadap skor MAKSIMAL jenjang (136 atau 116), bukan terhadap yang terisi.
+  function hitung(nilai,jenjang){
+    nilai=nilai||{};
+    const per=aktif(jenjang).map(g=>{
+      const vals=g.items.map(it=>+nilai[it.id]||0);
+      const terisi=vals.filter(v=>v>=1&&v<=4).length;
+      const skor=vals.reduce((s,v)=>s+(v>=1&&v<=4?v:0),0),maks=g.items.length*4;
+      return {k:g.k,nama:g.nama,pendek:g.pendek,skor,maks,terisi,n:g.items.length,persen:pct(skor,maks),pred:predikat(skor/maks*100),lengkap:terisi===g.items.length};
+    });
+    const skor=per.reduce((s,x)=>s+x.skor,0),maks=per.reduce((s,x)=>s+x.maks,0),terisi=per.reduce((s,x)=>s+x.terisi,0),n=per.reduce((s,x)=>s+x.n,0);
+    return {per,skor,maks,terisi,n,persen:pct(skor,maks),pred:predikat(skor/maks*100),lengkap:terisi===n};
+  }
+  const badge=p=>({'Sangat Baik':'st-HADIR','Baik':'st-IZIN','Cukup':'st-SAKIT','Kurang':'st-ALPA'}[p]||'st-BELUM');
+  // Tahun ajaran Juli–Juni: Juli–Des = Ganjil, Jan–Jun = Genap
+  function periodeDefault(){const d=new Date(),y=d.getFullYear(),m=d.getMonth()+1;return m>=7?(y+'/'+(y+1)+' Ganjil'):((y-1)+'/'+y+' Genap');}
+  // draf narasi deskriptif (objektif, mendidik; bukan pengganti penilaian wali asrama) — hanya berdasar skor yang diinput
+  function draf(nama,hit,nilai){
+    const depan=String(nama||'Ananda').trim().split(/\s+/)[0];
+    const kuat=ALL.filter(it=>+nilai[it.id]===4).slice(0,3).map(it=>it.n.toLowerCase());
+    const kurang=ALL.filter(it=>+nilai[it.id]>=1&&+nilai[it.id]<=2).slice(0,3);
+    const j=a=>a.length>1?a.slice(0,-1).join(', ')+' dan '+a[a.length-1]:a.join('');
+    let t='Ananda '+depan+' menunjukkan capaian '+hit.pred.toLowerCase()+' pada Program Asrama ('+String(hit.persen).replace('.',',')+'%).';
+    if(kuat.length)t+=' Capaian yang menonjol terlihat pada '+j(kuat)+'.';
+    if(kurang.length)t+=' Ananda masih memerlukan pendampingan pada '+j(kurang.map(it=>it.n.toLowerCase()))+'.';
+    t+=' Dengan pembiasaan dan pendampingan yang konsisten, Ananda diharapkan berkembang lebih baik pada periode berikutnya.';
+    const rek=kurang.map(it=>'Pendampingan dan pembiasaan rutin pada '+it.n.toLowerCase()+' bersama wali asuh.').join('\n');
+    return {catatan:t,rekomendasi:rek};
+  }
+  return {SKALA,KEG,ALL,aktif,predikat,parse,hitung,badge,periodeDefault,draf,pct};
+})();
+
 SRIT.Features.penilaian={
   aspects:['KARAKTER','DISIPLIN','KEMANDIRIAN','KEBERSIHAN','KEAGAMAAN','LEADERSHIP','SOSIAL','KEBAHASAAN'],
-  state:{page:1,size:25,search:''},
-  render(host){SRIT.UI.setPage('Penilaian Perkembangan','Penilaian');
+  state:{tab:'rapor',page:1,size:25,search:'',periode:''},
+  render(host){SRIT.UI.setPage('Penilaian & Rapor','Penilaian');
+    const t=this.state.tab;
+    host.innerHTML=`<ul class="nav nav-pills mb-3 gap-1" id="pnTabs">
+        <li class="nav-item"><button type="button" class="nav-link py-1 px-3 ${t==='rapor'?'active':''}" data-tab="rapor"><i class="bi bi-journal-check"></i> Rapor Asrama (Permensos 9/2026)</button></li>
+        <li class="nav-item"><button type="button" class="nav-link py-1 px-3 ${t==='cepat'?'active':''}" data-tab="cepat"><i class="bi bi-lightning-charge"></i> Penilaian Cepat 8 Aspek</button></li>
+      </ul><div id="pnBody"></div>`;
+    $$('#pnTabs [data-tab]').forEach(b=>b.onclick=()=>{this.state.tab=b.dataset.tab;this.state.page=1;this.render(host);});
+    const body=$('#pnBody');
+    if(t==='rapor')this.renderRapor(body);else this.renderCepat(body);
+  },
+
+  /* =================== TAB 1: RAPOR ASRAMA (34 indikator) =================== */
+  renderRapor(host){
+    const R=SRIT.RaporAsrama,s=this.state;
+    const periodes=Array.from(new Set(SRIT.Store.read('RAPOR_ASRAMA').map(r=>r.PERIODE).filter(Boolean))).sort().reverse();
+    host.innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
+      <div style="flex:1;min-width:180px"><label class="form-label-sm">Cari Anak</label>
+        <div style="position:relative"><input class="form-control form-control-sm" id="rpSearch" style="padding-right:26px" value="${SRIT.Util.esc(s.search||'')}">
+        <button type="button" id="rpSearchClear" class="sf-clear-x" style="display:${s.search?'flex':'none'}" title="Hapus pencarian"><i class="bi bi-x-circle-fill"></i></button></div></div>
+      <div><label class="form-label-sm">Periode</label><select class="form-select form-select-sm" id="rpPeriode"><option value="">Semua</option>${periodes.map(p=>`<option ${s.periode===p?'selected':''}>${SRIT.Util.esc(p)}</option>`).join('')}</select></div>
+      ${SRIT.Auth.can('penilaian:CREATE')?'<div><button class="btn btn-primary btn-sm" id="rpAdd"><i class="bi bi-plus-lg"></i> Buat Rapor</button></div>':''}
+    </div>
+    <div class="text-muted-2 mt-2" style="font-size:12px">4 kegiatan Program Asrama · 34 indikator (SD/SMP: 29) · skala 1–4 · skor maks 136 (SD/SMP 116) · predikat dari persentase skor.</div></div>
+    <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="rpTable"></table></div><div class="p-3 border-top" id="rpPag"></div></div>`;
+    $('#rpSearch').oninput=e=>{
+      $('#rpSearchClear').style.display=e.target.value?'flex':'none';
+      clearTimeout(this._rpT);this._rpT=setTimeout(()=>{s.search=e.target.value;s.page=1;this.loadRapor();},350);
+    };
+    $('#rpSearchClear').onclick=()=>{$('#rpSearch').value='';$('#rpSearchClear').style.display='none';s.search='';s.page=1;this.loadRapor();};
+    $('#rpPeriode').onchange=e=>{s.periode=e.target.value;s.page=1;this.loadRapor();};
+    const add=$('#rpAdd');if(add)add.onclick=()=>this.formRapor();
+    this.loadRapor();
+  },
+  loadRapor(){
+    const R=SRIT.RaporAsrama,s=this.state,esc=SRIT.Util.esc;
+    const r=SRIT.Api.list('RAPOR_ASRAMA',{page:s.page,size:s.size,search:s.search,searchFields:['NAMA_ANAK'],filters:{PERIODE:s.periode}});
+    const canU=SRIT.Auth.can('penilaian:UPDATE');
+    $('#rpTable').innerHTML=`<thead><tr><th>Anak</th><th>Periode</th><th title="Penguatan Karakter & Keagamaan">Karakter</th><th>Pengasuhan</th><th>Kec. Hidup</th><th>Vokasional</th><th>Total</th><th>Predikat</th><th></th></tr></thead><tbody>
+    ${r.rows.length?r.rows.map(p=>{
+      const nilai=R.parse(p.NILAI),h=R.hitung(nilai,p.JENJANG),fin=p.STATUS==='FINAL';
+      const cell=k=>{const x=h.per.find(q=>q.k===k);return x?`<span class="badge-soft ${R.badge(x.pred)}" title="${x.skor}/${x.maks}">${String(x.persen).replace('.',',')}%</span>`:'<span class="text-muted-2">–</span>';};
+      return `<tr>
+      <td class="fw-semibold">${esc(SRIT.nm('ANAK',p.ANAK)||p.NAMA_ANAK)}<div class="text-muted-2" style="font-size:11px">${esc(p.JENJANG||'')}</div></td>
+      <td><span class="badge-soft st-IZIN">${esc(p.PERIODE||'-')}</span></td>
+      <td>${cell('K1')}</td><td>${cell('K2')}</td><td>${cell('K3')}</td><td>${cell('K4')}</td>
+      <td class="fw-bold">${h.skor}/${h.maks}</td>
+      <td>${fin?`<span class="badge-soft ${R.badge(h.pred)}">${h.pred}</span>`:`<span class="badge-soft st-BELUM">Draf ${h.terisi}/${h.n}</span>`}</td>
+      <td class="text-end text-nowrap">
+        <button class="btn btn-sm btn-outline-primary py-0" onclick="SRIT.Features.penilaian.raporAsrama('${p.ID}')"><i class="bi bi-file-earmark-text"></i> Rapor</button>
+        ${canU?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" onclick="SRIT.Features.penilaian.formRapor('${p.ID}')"><i class="bi bi-pencil"></i></button>`:''}</td>
+    </tr>`;}).join(''):'<tr><td colspan="9"><div class="empty-state"><i class="bi bi-journal-check d-block"></i>Belum ada rapor asrama. Klik “Buat Rapor”.</div></td></tr>'}
+    </tbody>`;
+    $('#rpPag').innerHTML=SRIT.UI.pagination(r);
+    $$('#rpPag [data-pg]').forEach(a=>a.onclick=()=>{s.page=+a.dataset.pg;this.loadRapor();});
+  },
+  formRapor(id){
+    const R=SRIT.RaporAsrama,esc=SRIT.Util.esc,self=this;
+    const p=id?SRIT.Repo.getById('RAPOR_ASRAMA',id):{};
+    if(id&&!p){SRIT.Notify('Data rapor tidak ditemukan','err');return;}
+    const nilai=R.parse(p.NILAI);
+    const anakList=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF');
+    const anakOf=aid=>SRIT.Repo.getById('ANAK',aid)||{};
+    let jenjang=id?(p.JENJANG||anakOf(p.ANAK).JENJANG):(anakList[0]||{}).JENJANG;
+    const m=SRIT.Modal.open({title:(id?'Edit':'Buat')+' Rapor Asrama',size:'modal-lg',
+      body:`<form id="rpForm" onsubmit="return false"><div class="row g-2">
+        <div class="col-12 col-md-8"><label class="form-label-sm">Anak</label><select class="form-select form-select-sm" name="ANAK" id="rpAnak" ${id?'disabled':''}>${anakList.map(a=>`<option value="${a.ID}" ${(p.ANAK||'')===a.ID?'selected':''}>${esc(a.NAMA)} (${esc(a.NIS)}) · ${esc(a.JENJANG||'')}</option>`).join('')}</select></div>
+        <div class="col-12 col-md-4"><label class="form-label-sm">Periode</label><input class="form-control form-control-sm" name="PERIODE" value="${esc(p.PERIODE||R.periodeDefault())}"></div>
+        <div class="col-12"><div id="rpSum" class="p-2 rounded border" style="position:sticky;top:0;z-index:5;background:var(--bs-body-bg,#fff)"></div></div>
+        <div class="col-12"><div class="text-muted-2" style="font-size:12px">Skala: <b>1</b> Kurang · <b>2</b> Cukup · <b>3</b> Baik · <b>4</b> Sangat Baik. Beri skor berdasarkan pengamatan harian dan jurnal kegiatan, bukan kesan pribadi.</div></div>
+        <div class="col-12" id="rpItems"></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Hadir (hari)</label><input type="number" min="0" class="form-control form-control-sm" name="HADIR" value="${esc(p.HADIR===undefined?'':p.HADIR)}"></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Sakit</label><input type="number" min="0" class="form-control form-control-sm" name="SAKIT" value="${esc(p.SAKIT===undefined?'':p.SAKIT)}"></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Izin</label><input type="number" min="0" class="form-control form-control-sm" name="IZIN" value="${esc(p.IZIN===undefined?'':p.IZIN)}"></div>
+        <div class="col-6 col-md-3"><label class="form-label-sm">Alfa</label><input type="number" min="0" class="form-control form-control-sm" name="ALFA" value="${esc(p.ALFA===undefined?'':p.ALFA)}"></div>
+        <div class="col-12"><div class="d-flex justify-content-between align-items-end"><label class="form-label-sm mb-1">Catatan Pendamping Asrama</label><button type="button" class="btn btn-sm btn-outline-secondary py-0" id="rpDraf"><i class="bi bi-magic"></i> Buat draf dari skor</button></div>
+          <textarea class="form-control form-control-sm" name="CATATAN" rows="4" placeholder="Narasi deskriptif: kekuatan dan area yang perlu dikembangkan (bukan kalimat yang hanya menilai).">${esc(p.CATATAN||'')}</textarea></div>
+        <div class="col-12"><label class="form-label-sm">Rekomendasi / Tindak Lanjut</label><textarea class="form-control form-control-sm" name="REKOMENDASI" rows="3" placeholder="Satu rekomendasi per baris. Layanan konseling dilakukan wali asuh dan/atau pekerja sosial; wali asrama mengamati, mencatat, dan meneruskan.">${esc(p.REKOMENDASI||'')}</textarea></div>
+        <div class="col-12"><label class="form-label-sm">Penilai</label><input class="form-control form-control-sm" name="PENILAI" value="${esc(p.PENILAI||(SRIT.Auth.user||{}).NAME||'')}"></div>
+      </div></form>`,
+      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-outline-primary btn-sm" id="rpSaveDraf">Simpan Draf</button><button class="btn btn-primary btn-sm" id="rpSaveFinal"><i class="bi bi-check2-circle"></i> Simpan & Finalkan</button>`});
+    const el=m.el,cur={...nilai};
+    const readScores=()=>{const o={};R.ALL.forEach(it=>{const c=$('input[name="'+it.id+'"]:checked',el);if(c)o[it.id]=+c.value;});return o;};
+    const drawSum=()=>{
+      Object.assign(cur,readScores());
+      const h=R.hitung(cur,jenjang);
+      $('#rpSum',el).innerHTML=`<div class="d-flex flex-wrap gap-2 align-items-center" style="font-size:13px">
+        <b>Terisi ${h.terisi}/${h.n}</b><span class="text-muted-2">·</span><span>Skor <b>${h.skor}</b>/${h.maks}</span><span class="text-muted-2">·</span>
+        <span>${String(h.persen).replace('.',',')}%</span>${h.lengkap?`<span class="badge-soft ${R.badge(h.pred)}">${h.pred}</span>`:'<span class="badge-soft st-BELUM">belum lengkap</span>'}
+        <span class="ms-auto text-muted-2" style="font-size:11px">${h.per.map(x=>x.pendek+' '+x.skor+'/'+x.maks).join(' · ')}</span></div>`;
+      return h;
+    };
+    const drawItems=()=>{
+      let html='';
+      R.aktif(jenjang).forEach(g=>{
+        html+=`<div class="border rounded p-2 mb-2"><div class="fw-semibold mb-1" style="font-size:13px">${esc(g.nama)} <span class="text-muted-2 fw-normal">(${g.items.length} indikator, maks ${g.items.length*4})</span></div>`;
+        g.grup.forEach(gr=>{
+          if(gr.nama)html+=`<div class="text-muted-2 mt-2 mb-1" style="font-size:12px;text-transform:uppercase;letter-spacing:.03em">${esc(gr.nama)}</div>`;
+          gr.items.forEach(it=>{
+            html+=`<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 py-1 border-bottom" style="font-size:13px">
+              <div style="flex:1;min-width:170px">${esc(it.n)}${it.d?`<div class="text-muted-2" style="font-size:11px">${esc(it.d)}</div>`:''}</div>
+              <div class="btn-group btn-group-sm" role="group">${[1,2,3,4].map(n=>`<input type="radio" class="btn-check" name="${it.id}" id="${it.id}_${n}" value="${n}" ${+cur[it.id]===n?'checked':''}><label class="btn btn-outline-primary px-3" for="${it.id}_${n}" title="${R.SKALA[n]}">${n}</label>`).join('')}</div></div>`;
+          });
+        });
+        html+='</div>';
+      });
+      if(!R.aktif(jenjang).some(g=>g.k==='K4'))html+='<div class="text-muted-2" style="font-size:12px">Pelatihan vokasional/kewirausahaan hanya dinilai untuk jenjang SMA (Pasal 21 ayat 2), sehingga skor maksimal 116.</div>';
+      $('#rpItems',el).innerHTML=html;
+      $$('#rpItems input[type=radio]',el).forEach(i=>i.onchange=drawSum);
+      drawSum();
+    };
+    const sel=$('#rpAnak',el);
+    if(sel&&!id)sel.onchange=()=>{Object.assign(cur,readScores());jenjang=anakOf(sel.value).JENJANG;drawItems();};
+    drawItems();
+    $('#rpDraf',el).onclick=()=>{
+      const h=drawSum();
+      if(!h.terisi){SRIT.Notify('Isi skor indikator terlebih dahulu','err');return;}
+      const aid=id?p.ANAK:sel.value,d=R.draf(anakOf(aid).NAMA,h,cur);
+      const ta=$('textarea[name=CATATAN]',el),tr=$('textarea[name=REKOMENDASI]',el);
+      if(ta.value.trim()&&!confirm('Catatan yang sudah ada akan diganti draf baru. Lanjutkan?'))return;
+      ta.value=d.catatan;if(!tr.value.trim())tr.value=d.rekomendasi;
+      SRIT.Notify('Draf dibuat. Periksa dan sesuaikan sebelum disimpan.','ok');
+    };
+    const simpan=final=>{
+      const h=drawSum(),f=Object.fromEntries(new FormData($('#rpForm',el)));
+      const aid=id?p.ANAK:sel.value,periode=String(f.PERIODE||'').trim();
+      if(!aid){SRIT.Notify('Pilih anak','err');return;}
+      if(!periode){SRIT.Notify('Periode wajib diisi','err');return;}
+      if(!id&&SRIT.Store.read('RAPOR_ASRAMA').some(r=>r.ANAK===aid&&r.PERIODE===periode)){SRIT.Notify('Rapor anak ini untuk periode tersebut sudah ada. Buka dari daftar untuk mengubahnya.','err');return;}
+      if(final&&!h.lengkap){SRIT.Notify('Belum lengkap: '+(h.n-h.terisi)+' indikator belum diberi skor.','err');return;}
+      const num=v=>(v===''||v==null)?'':Math.max(0,parseInt(v,10)||0);
+      const row={ANAK:aid,NAMA_ANAK:anakOf(aid).NAMA||p.NAMA_ANAK||'',PERIODE:periode,TANGGAL:p.TANGGAL||SRIT.Util.todayISO(),JENJANG:jenjang||'',
+        NILAI:JSON.stringify(Object.fromEntries(R.aktif(jenjang).flatMap(g=>g.items).filter(it=>cur[it.id]).map(it=>[it.id,cur[it.id]]))),TOTAL:h.skor,MAKS:h.maks,PERSEN:h.persen,PREDIKAT:final?h.pred:'',
+        CATATAN:String(f.CATATAN||'').trim(),REKOMENDASI:String(f.REKOMENDASI||'').trim(),
+        HADIR:num(f.HADIR),SAKIT:num(f.SAKIT),IZIN:num(f.IZIN),ALFA:num(f.ALFA),PENILAI:String(f.PENILAI||'').trim(),STATUS:final?'FINAL':'DRAFT'};
+      if(id){SRIT.Repo.update('RAPOR_ASRAMA',id,row);SRIT.Audit.log('UPDATE','penilaian',id);}
+      else{row.ID=SRIT.Util.uid('RA');SRIT.Repo.insert('RAPOR_ASRAMA',row);SRIT.Audit.log('CREATE','penilaian',row.ID);}
+      m.close();SRIT.Notify(final?'Rapor difinalkan':'Draf rapor tersimpan','ok');self.renderRapor($('#pnBody'));
+    };
+    $('#rpSaveDraf',el).onclick=()=>simpan(false);
+    $('#rpSaveFinal',el).onclick=()=>simpan(true);
+  },
+  raporAsrama(id){
+    const R=SRIT.RaporAsrama,esc=SRIT.Util.esc,p=SRIT.Repo.getById('RAPOR_ASRAMA',id);
+    if(!p){SRIT.Notify('Data rapor tidak ditemukan','err');return;}
+    const anak=SRIT.Repo.getById('ANAK',p.ANAK)||{},set=SRIT.Store.readObj('SETTINGS')||{};
+    const nilai=R.parse(p.NILAI),h=R.hitung(nilai,p.JENJANG),fin=p.STATUS==='FINAL';
+    const asr=SRIT.Repo.getById('ASRAMA',anak.ASRAMA)||{};
+    const wa=(SRIT.Repo.getById('USERS',asr.PJ)||{}).NAME||asr.PJ||'-';
+    const kls=anak.KELAS||'-',pc=x=>String(x).replace('.',',')+'%';
+    const rekap=h.per.map(x=>`<tr><td>${esc(x.nama)} <small>(maks. ${x.maks})</small></td><td align="center">${x.skor}</td><td align="center">${pc(x.persen)}</td><td align="center">${x.lengkap?x.pred:'-'}</td></tr>`).join('');
+    const rincian=R.aktif(p.JENJANG).map(g=>`<tr style="background:#eef2f8"><td colspan="3"><b>${esc(g.nama)}</b></td></tr>`+g.grup.map(gr=>(gr.nama?`<tr><td colspan="3" style="font-style:italic">${esc(gr.nama)}</td></tr>`:'')+gr.items.map(it=>`<tr><td>${esc(it.n)}</td><td align="center">${nilai[it.id]||'-'}</td><td>${R.SKALA[nilai[it.id]]||'-'}</td></tr>`).join('')).join('')).join('');
+    const hadir=[p.HADIR,p.SAKIT,p.IZIN,p.ALFA].some(v=>v!==''&&v!=null&&v!==undefined);
+    const rek=String(p.REKOMENDASI||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
+    const html=`<div id="raporAsramaPrint" style="font-family:Segoe UI,Arial,sans-serif;color:#111;font-size:13px">
+      <div style="text-align:center;border-bottom:3px double #333;padding-bottom:10px;margin-bottom:14px">
+        <h4 style="margin:0">RAPOR ASRAMA</h4><div style="font-size:12px">Laporan Hasil Belajar Program Asrama · Permensos Nomor 9 Tahun 2026</div>
+        <div><b>${esc(set.SCHOOL_NAME||'')}</b></div><small>Periode: ${esc(p.PERIODE||'-')}</small></div>
+      ${fin?'':'<div style="background:#fff3cd;border:1px solid #ffe08a;padding:6px 10px;margin-bottom:10px">DRAF — penilaian belum lengkap/belum difinalkan ('+h.terisi+'/'+h.n+' indikator).</div>'}
+      <table style="width:100%;margin-bottom:12px"><tr><td width="18%">Nama Lengkap</td><td>: <b>${esc(anak.NAMA||p.NAMA_ANAK)}</b></td><td width="14%">Nomor Induk</td><td>: ${esc(anak.NIS||'-')}</td></tr>
+      <tr><td>Kelas</td><td>: ${esc(kls)} (${esc(p.JENJANG||'-')})</td><td>Asrama</td><td>: ${esc(asr.NAME||'-')}</td></tr>
+      <tr><td>Wali Asrama</td><td>: ${esc(wa)}</td><td>Penilai</td><td>: ${esc(p.PENILAI||'-')}</td></tr></table>
+      <div style="font-weight:bold;margin-bottom:4px">Rekapitulasi Penilaian</div>
+      <table border="1" cellspacing="0" cellpadding="6" style="width:100%;border-collapse:collapse"><thead style="background:#eef2f8"><tr><th align="left">Kegiatan Program Asrama</th><th>Total Skor</th><th>Persentase</th><th>Predikat</th></tr></thead><tbody>${rekap}
+        <tr style="font-weight:bold;background:#f7f9fc"><td>TOTAL (maks. ${h.maks})</td><td align="center">${h.skor}</td><td align="center">${pc(h.persen)}</td><td align="center">${fin?h.pred:'-'}</td></tr></tbody></table>
+      <div style="font-size:11px;margin:6px 0 12px">Skala predikat: Sangat Baik ≥ 87,5% · Baik 62,5–87,4% · Cukup 37,5–62,4% · Kurang &lt; 37,5%. Skala indikator: 1 Kurang, 2 Cukup, 3 Baik, 4 Sangat Baik.${h.maks===116?' Pelatihan vokasional/kewirausahaan tidak dinilai pada jenjang SD/SMP.':''}</div>
+      ${hadir?`<div style="margin-bottom:10px"><b>Kehadiran/partisipasi kegiatan asrama:</b> Hadir ${p.HADIR||0} · Sakit ${p.SAKIT||0} · Izin ${p.IZIN||0} · Alfa ${p.ALFA||0}</div>`:''}
+      <div style="font-weight:bold;margin-bottom:4px">Catatan Pendamping Asrama</div>
+      <div style="border:1px solid #999;padding:8px;min-height:50px;margin-bottom:10px">${esc(p.CATATAN||'').replace(/\n/g,'<br>')||'&nbsp;'}</div>
+      <div style="font-weight:bold;margin-bottom:4px">Rekomendasi / Tindak Lanjut</div>
+      ${rek.length?'<ul style="margin:0 0 10px 18px;padding:0">'+rek.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'<div style="border:1px solid #999;padding:8px;min-height:36px;margin-bottom:10px">&nbsp;</div>'}
+      <div style="font-size:11px;margin-bottom:10px">Aspek akademik dilaporkan melalui rapor akademik. Hasil layanan bimbingan konseling dan pekerjaan sosial disampaikan terpisah dengan menjaga kerahasiaan peserta didik.</div>
+      <div style="display:flex;justify-content:space-between;margin-top:26px;text-align:center">
+        <div>Mengetahui,<br>Kepala Sekolah<br><br><br><br>(________________)</div><div>.................., .......... 20....<br>Wali Asrama<br><br><br><br>(________________)</div></div>
+      <div style="page-break-before:always;margin-top:24px"><div style="font-weight:bold;margin-bottom:4px">Lampiran — Rincian Penilaian per Indikator</div>
+        <table border="1" cellspacing="0" cellpadding="5" style="width:100%;border-collapse:collapse"><thead style="background:#eef2f8"><tr><th align="left">Indikator</th><th>Skor</th><th align="left">Keterangan</th></tr></thead><tbody>${rincian}</tbody></table></div>
+    </div>`;
+    const m=SRIT.Modal.open({title:'Rapor Asrama',size:'modal-lg',body:html,
+      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button><button class="btn btn-primary btn-sm" id="raporAsramaPrintBtn"><i class="bi bi-printer"></i> Cetak / PDF</button>`});
+    $('#raporAsramaPrintBtn',m.el).onclick=()=>{const w=window.open('','_blank');w.document.write('<html><head><title>Rapor Asrama - '+esc(anak.NAMA||p.NAMA_ANAK)+'</title></head><body>'+$('#raporAsramaPrint',m.el).outerHTML+'</body></html>');w.document.close();w.focus();w.print();SRIT.Audit.log('PRINT','rapor-asrama',id);};
+  },
+
+  /* =================== TAB 2: PENILAIAN CEPAT 8 ASPEK (lama) =================== */
+  renderCepat(host){
     host.innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
       <div style="flex:1;min-width:200px"><label class="form-label-sm">Cari Anak</label>
         <div style="position:relative">
@@ -5486,6 +6306,10 @@ SRIT.computeAlerts=()=>{
   if(wait)al.push({title:wait+' izin menunggu persetujuan',desc:'Segera validasi pengajuan izin/kepulangan',level:'MEDIUM',color:'var(--srit-warning)',icon:'bi-hourglass-split'});
   // insiden critical/high aktif
   SRIT.Store.read('INSIDEN').filter(i=>(i.PRIORITAS==='HIGH'||i.PRIORITAS==='CRITICAL')&&i.STATUS!=='SELESAI'&&i.STATUS!=='PENYELESAIAN').forEach(i=>al.push({title:'Insiden '+i.PRIORITAS+': '+i.KATEGORI,desc:i.KEJADIAN,level:i.PRIORITAS,color:'var(--srit-danger)',icon:'bi-exclamation-octagon'}));
+  // kasus: batas lapor terlewat & wajib-teruskan belum dilaporkan (Modul Permasalahan di Asrama)
+  if(SRIT.Kasus)SRIT.Store.read('INSIDEN').filter(i=>SRIT.Kasus.aktif(i)).forEach(i=>{const st=SRIT.Kasus.lapor(i);
+    if(st.k==='LEWAT')al.push({title:'Batas lapor terlewat: '+(i.KATEGORI||'kasus'),desc:'Lewat '+SRIT.Kasus.fmtDur(st.jam)+' dari batas '+SRIT.Kasus.jamBatas(i)+' jam. Segera laporkan ke Satgas SR / Kepala Sekolah.',level:'CRITICAL',color:'var(--srit-danger)',icon:'bi-alarm'});
+    else if(i.WAJIB_JENIS&&!i.WAKTU_LAPOR)al.push({title:'Kasus wajib diteruskan belum dilaporkan: '+(i.KATEGORI||'kasus'),desc:'Laporkan ke Satgas SR / Kepala Sekolah sebelum batas waktu.',level:'HIGH',color:'var(--srit-danger)',icon:'bi-megaphone'});});
   // kamar penuh
   const anak=SRIT.Store.read('ANAK');
   SRIT.Store.read('KAMAR').forEach(k=>{const occ=anak.filter(a=>a.KAMAR===k.ID&&a.STATUS==='AKTIF').length;if(occ>=(k.KAPASITAS||8))al.push({title:'Kamar penuh: '+k.NAME,desc:'Okupansi '+occ+'/'+(k.KAPASITAS||8),level:'LOW',color:'var(--srit-info)',icon:'bi-door-closed'});});
@@ -5771,7 +6595,7 @@ SRIT.Features.settings={
    ROUTER + FEATURE LOADER (lazy, with lifecycle)
    ========================================================================= */
 SRIT.Router={
-  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','tamu','tatatertib','pelanggaran','pembinaan','insiden','inspeksi','sarpras','refleksi','penilaian','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
+  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','tamu','tatatertib','pelanggaran','pembinaan','insiden','inspeksi','sarpras','refleksi','penilaian','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
   go(){
     const _nav=(this._nav=(this._nav||0)+1);
     let hash=location.hash.replace('#/','')||'live';
