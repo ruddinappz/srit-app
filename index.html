@@ -16,7 +16,7 @@
 <script>
 /* SRIT — diagnostik pemuatan: bila halaman tampak putih/kosong, tampilkan PENYEBABNYA di layar (juga di HP tanpa konsol). */
 window.__srit=(function(){
-  var S={errs:[],booted:false,cur:'Index',parts:[],t0:Date.now(),server:null},EXPECT={"JS_Util": ["SRIT", "SRIT.Util"], "JS_Brand": ["SRIT.BrandAsset"], "JS_Data": ["SRIT.LS", "SRIT.Server", "SRIT.Store", "SRIT.Repo", "SRIT.Cache", "SRIT.Sync", "SRIT.Audit"], "JS_UI": ["SRIT.Notify", "SRIT.Loading", "SRIT.Modal", "SRIT.SS", "SRIT.Import"], "JS_Auth": ["SRIT.Auth"], "JS_Api": ["SRIT.Api"], "JS_Theme": ["SRIT.Theme", "SRIT.Brand"], "JS_Shell": ["SRIT.UI", "SRIT.MENU", "SRIT.Features"], "View_Shared": ["simpleFeature", "regFeature", "SRIT.anakKet", "SRIT.anakRefSearch"], "JS_Router": ["SRIT.Router"], "View_LiveTV": ["SRIT.LiveTV"], "View_Dashboard": ["SRIT.Features.dashboard"], "View_Anak": ["SRIT.Features.anak"], "View_Absensi": ["SRIT.Features.absensi"], "View_AbsensiKamera": ["SRIT.Features.absensi._showCamError"], "View_Jadwal": ["SRIT.Features.jadwal"], "View_Kegiatan": ["SRIT.Features.kegiatan"], "View_JadwalPiket": ["SRIT.Features.jadwal-piket"], "View_JurnalPiket": ["SRIT.Features.jurnal-piket"], "View_Jabatan": ["SRIT.Features.jabatan"], "View_User": ["SRIT.Features.user"], "View_Role": ["SRIT.Features.role"], "View_Analytics": ["SRIT.Features.analytics"], "View_Laporan": ["SRIT.Features.laporan"], "View_Keasramaan": ["SRIT.Features.keasramaan", "SRIT.Features.ops-module"], "View_StrukturMaster": ["SRIT.Features.keasramaan-master"], "View_Sarpras": ["SRIT.Features.sarpras"], "View_Program": ["SRIT.Features.program"], "View_Izin": ["SRIT.Features.izin"], "View_Tamu": ["SRIT.Features.tamu"], "View_TataTertib": ["SRIT.Features.tatatertib"], "View_Pelanggaran": ["SRIT.Features.pelanggaran"], "View_Pembinaan": ["SRIT.Features.pembinaan"], "View_Insiden": ["SRIT.Features.insiden"], "View_Inspeksi": ["SRIT.Features.inspeksi"], "View_Refleksi": ["SRIT.Features.refleksi"], "View_Penghuni": ["SRIT.Features.penghuni"], "View_Penilaian": ["SRIT.Features.penilaian"], "View_Profiling": ["SRIT.Features.profiling"], "View_Peta": ["SRIT.Features.peta"], "View_Alert": ["SRIT.Features.alert-center"], "View_Audit": ["SRIT.Features.audit"], "View_Settings": ["SRIT.Features.settings"]},CORE=["JS_Util", "JS_Data", "JS_UI", "JS_Auth", "JS_Api", "JS_Theme", "JS_Shell", "View_Shared", "JS_Router", "View_LiveTV"];
+  var S={errs:[],booted:false,cur:'Index',parts:[],t0:Date.now(),server:null},EXPECT={"JS_Util": ["SRIT", "SRIT.Util"], "JS_Brand": ["SRIT.BrandAsset"], "JS_Data": ["SRIT.LS", "SRIT.Server", "SRIT.Store", "SRIT.Repo", "SRIT.Cache", "SRIT.Sync", "SRIT.Audit"], "JS_UI": ["SRIT.Notify", "SRIT.Loading", "SRIT.Modal", "SRIT.SS", "SRIT.Import"], "JS_Auth": ["SRIT.Auth"], "JS_Api": ["SRIT.Api"], "JS_Theme": ["SRIT.Theme", "SRIT.Brand"], "JS_Shell": ["SRIT.UI", "SRIT.MENU", "SRIT.Features"], "View_Shared": ["simpleFeature", "regFeature", "SRIT.anakKet", "SRIT.anakRefSearch"], "JS_Router": ["SRIT.Router"], "View_LiveTV": ["SRIT.LiveTV"], "View_Dashboard": ["SRIT.Features.dashboard"], "View_Anak": ["SRIT.Features.anak"], "View_Absensi": ["SRIT.Features.absensi"], "View_AbsensiKamera": ["SRIT.Features.absensi._showCamError"], "View_Jadwal": ["SRIT.Features.jadwal"], "View_Kegiatan": ["SRIT.Features.kegiatan"], "View_JadwalPiket": ["SRIT.Features.jadwal-piket"], "View_JurnalPiket": ["SRIT.Features.jurnal-piket"], "View_Jabatan": ["SRIT.Features.jabatan"], "View_User": ["SRIT.Features.user"], "View_Role": ["SRIT.Features.role"], "View_Analytics": ["SRIT.Features.analytics"], "View_Laporan": ["SRIT.Features.laporan"], "View_Keasramaan": ["SRIT.Features.keasramaan", "SRIT.Features.ops-module"], "View_StrukturMaster": ["SRIT.Features.keasramaan-master"], "View_Sarpras": ["SRIT.Features.sarpras"], "View_Program": ["SRIT.Features.program"], "View_Izin": ["SRIT.Features.izin"], "View_Tamu": ["SRIT.Features.tamu"], "View_TataTertib": ["SRIT.Features.tatatertib"], "View_Pelanggaran": ["SRIT.Features.pelanggaran"], "View_Pembinaan": ["SRIT.Features.pembinaan"], "View_Insiden": ["SRIT.Features.insiden"], "View_Inspeksi": ["SRIT.Features.inspeksi"], "View_Refleksi": ["SRIT.Features.refleksi"], "View_Penghuni": ["SRIT.Features.penghuni"], "View_Penilaian": ["SRIT.Features.penilaian"], "View_Profiling": ["SRIT.Features.profiling"], "View_Gamifikasi": ["SRIT.Features.gamifikasi"], "View_Peta": ["SRIT.Features.peta"], "View_Alert": ["SRIT.Features.alert-center"], "View_Audit": ["SRIT.Features.audit"], "View_Settings": ["SRIT.Features.settings"]},CORE=["JS_Util", "JS_Data", "JS_UI", "JS_Auth", "JS_Api", "JS_Theme", "JS_Shell", "View_Shared", "JS_Router", "View_LiveTV"];
   S.n=function(name){S.cur=name;S.parts.push(name);};
   function get(p){try{return p.split('.').reduce(function(o,k){return o==null?undefined:o[k];},window);}catch(e){return undefined;}}
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -1149,6 +1149,7 @@ SRIT.MENU=[
   {r:'refleksi',t:'Refleksi',i:'bi-arrow-repeat'},
   {r:'profiling',t:'Profiling Siswa',i:'bi-person-lines-fill'},
   {r:'penilaian',t:'Penilaian & Rapor',i:'bi-award'},
+  {r:'gamifikasi',t:'Gamifikasi & Peringkat',i:'bi-trophy'},
   {r:'keasramaan',t:'Modul Operasional Lain',i:'bi-grid-3x3-gap'},
 
   {sec:'ANALITIK & LAPORAN'},
@@ -6346,6 +6347,142 @@ return F;
 </script>
 
 
+<script>__srit.n('View_Gamifikasi')</script>
+<script>
+//# sourceURL=View_Gamifikasi.html
+// ---------- GAMIFIKASI & PERINGKAT ----------
+// Poin, level, dan lencana anak dihitung otomatis tiap bulan oleh server (Api_Gamifikasi.gs) dari kehadiran, penilaian,
+// prestasi, pembinaan, dan pelanggaran (mengurangi poin). Peringkat kamar & kelompok asuh memakai rata-rata poin per anak.
+// Nama & poin individu hanya tampil di menu ini; Live TV publik hanya menampilkan agregat kamar/kelompok.
+SRIT.Features.gamifikasi={
+  tab:'anak',period:'',data:null,q:'',jj:'',
+  LV:{PERUNGGU:['Perunggu','#b8732f'],PERAK:['Perak','#64748b'],EMAS:['Emas','#c98a00'],PLATINUM:['Platinum','#0d9488']},
+  BD:{HADIR_PENUH:['Hadir Penuh','bi-calendar-check','#16a34a'],BINTANG_PRESTASI:['Bintang Prestasi','bi-star-fill','#c98a00'],
+      TELADAN_KARAKTER:['Teladan Karakter','bi-emoji-smile','#8b5cf6'],BEBAS_PELANGGARAN:['Bebas Pelanggaran','bi-shield-check','#0ea5e9']},
+  render(host){
+    SRIT.UI.setPage('Gamifikasi & Peringkat','Gamifikasi & Peringkat');
+    this._host=host;
+    if(!this.period)this.period=SRIT.Util.todayISO().slice(0,7);
+    this.load();
+  },
+  esc(s){return SRIT.Util.esc(s);},
+  bulan(p){const [y,m]=String(p).split('-');const n=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][(+m||1)-1];return n+' '+y;},
+  lvBadge(k){const l=this.LV[k]||['-','#64748b'];return `<span class="badge-soft" style="background:${l[1]}22;color:${l[1]};font-weight:700">${l[0]}</span>`;},
+  bdIcons(list){return (list||[]).map(b=>{const d=this.BD[b];return d?`<i class="bi ${d[1]}" title="${d[0]}" style="color:${d[2]};font-size:16px;margin-right:4px"></i>`:'';}).join('')||'<span class="text-muted-2">–</span>';},
+  async load(){
+    const host=this._host;
+    host.innerHTML=`<div class="card-srit p-3 mb-3 d-flex flex-wrap align-items-center gap-2">
+        <div class="fw-semibold me-2"><i class="bi bi-trophy me-1"></i>Gamifikasi & Peringkat</div>
+        <input type="month" class="form-control form-control-sm" id="gmPeriod" value="${this.esc(this.period)}" style="max-width:170px">
+        <button class="btn btn-outline-primary btn-sm" id="gmGo"><i class="bi bi-arrow-clockwise"></i> Muat</button>
+        <span class="text-muted-2 small ms-auto">Poin dihitung otomatis dari kehadiran, penilaian, prestasi, pembinaan, dan pelanggaran.</span>
+      </div><div id="gmBody"><div class="skeleton" style="height:320px"></div></div>`;
+    const go=()=>{const v=$('#gmPeriod').value;if(v){this.period=v;this.load();}};
+    $('#gmGo').onclick=go;$('#gmPeriod').onchange=go;
+    try{
+      const d=await SRIT.Server.call('apiGamifikasi',this.period);
+      if(SRIT.currentFeature!=='gamifikasi')return;
+      this.data=d;this.draw();
+    }catch(e){
+      const b=$('#gmBody');
+      if(b&&SRIT.currentFeature==='gamifikasi')b.innerHTML='<div class="empty-state"><i class="bi bi-exclamation-triangle d-block text-danger"></i>'+this.esc(e.message||'Gagal memuat data gamifikasi')+'</div>';
+    }
+  },
+  kpi(v,l,c){return `<div class="col-6 col-lg-3"><div class="kpi"><div class="kpi-lbl">${l}</div><div class="kpi-val" style="color:${c||'inherit'}">${v}</div></div></div>`;},
+  draw(){
+    const d=this.data,b=$('#gmBody');if(!b)return;
+    const nBd=Object.values(d.bd||{}).reduce((a,x)=>a+x,0);
+    const hi=(d.lv.EMAS||0)+(d.lv.PLATINUM||0);
+    b.innerHTML=`<div class="row g-2 mb-3">
+        ${this.kpi(d.n,'Anak aktif · '+this.bulan(d.period),'#2a78d6')}
+        ${this.kpi(String(d.avg).replace('.',','),'Rata-rata poin per anak','#0d9488')}
+        ${this.kpi(hi,'Level Emas & Platinum','#c98a00')}
+        ${this.kpi(nBd,'Lencana diraih bulan ini','#8b5cf6')}
+      </div>
+      <ul class="nav nav-pills mb-3" id="gmTabs">
+        ${[['anak','bi-people','Peringkat Anak'],['kamar','bi-door-closed','Peringkat Kamar'],['kelompok','bi-diagram-2','Peringkat Kelompok Asuh'],['aturan','bi-info-circle','Aturan Poin']].map(t=>`<li class="nav-item"><a class="nav-link ${this.tab===t[0]?'active':''} pointer" data-tab="${t[0]}"><i class="bi ${t[1]} me-1"></i>${t[2]}</a></li>`).join('')}
+      </ul><div id="gmTab"></div>`;
+    $$('#gmTabs a').forEach(a=>a.onclick=()=>{this.tab=a.dataset.tab;$$('#gmTabs a').forEach(x=>x.classList.toggle('active',x===a));this.drawTab();});
+    this.drawTab();
+  },
+  drawTab(){const t=$('#gmTab');if(!t)return;({anak:this.tabAnak,kamar:this.tabKamar,kelompok:this.tabKelompok,aturan:this.tabAturan})[this.tab].call(this,t);},
+  podium(items,label){
+    if(!items.length)return '';
+    const med=['#c98a00','#64748b','#b8732f'];
+    return `<div class="row g-2 mb-3">${items.slice(0,3).map((x,i)=>`<div class="col-12 col-md-4"><div class="card-srit p-3 h-100" style="border-top:4px solid ${med[i]}">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-trophy-fill" style="font-size:26px;color:${med[i]}"></i><div class="fw-bold" style="font-size:13px;color:${med[i]}">JUARA ${i+1}</div></div>
+        <div class="fw-bold mt-1 text-truncate" style="font-size:17px">${this.esc(x.nama)}</div>
+        <div class="text-muted-2 small">${this.esc(x.sub||'')}</div>
+        <div class="mt-1"><span class="fw-bold" style="font-size:24px">${String(x.val).replace('.',',')}</span> <span class="text-muted-2 small">${label}</span></div>
+      </div></div>`).join('')}</div>`;
+  },
+  tabAnak(el){
+    const d=this.data,kam={};d.kamar.forEach(k=>kam[k.id]=k.nama);
+    const jjs=[...new Set(d.anak.map(a=>a.jj).filter(Boolean))].sort();
+    el.innerHTML=this.podium(d.anak.map(a=>({nama:a.nama,sub:[a.jj,a.kelas&&('Kelas '+a.kelas),kam[a.kamar]].filter(Boolean).join(' · '),val:a.total})),'poin')+
+      `<div class="card-srit p-3">
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <input class="form-control form-control-sm" id="gmQ" placeholder="Cari nama anak…" value="${this.esc(this.q)}" style="max-width:240px">
+          <select class="form-select form-select-sm" id="gmJJ" style="max-width:150px"><option value="">Semua jenjang</option>${jjs.map(j=>`<option ${this.jj===j?'selected':''}>${this.esc(j)}</option>`).join('')}</select>
+        </div>
+        <div class="table-responsive" style="max-height:62vh;overflow:auto"><table class="table table-sm table-srit mb-0"><thead><tr><th>#</th><th>Nama</th><th>Kamar</th><th class="text-end">Poin</th><th>Level</th><th>Lencana</th><th>Rincian poin</th></tr></thead><tbody id="gmRows"></tbody></table></div>
+      </div>`;
+    const rows=()=>{
+      const q=this.q.trim().toLowerCase();
+      const L=d.anak.filter(a=>(!this.jj||a.jj===this.jj)&&(!q||String(a.nama).toLowerCase().indexOf(q)>=0));
+      $('#gmRows').innerHTML=L.length?L.map(a=>{const p=a.poin;
+        return `<tr><td>${a.rank}</td><td><div class="fw-semibold">${this.esc(a.nama)}</div><div class="text-muted-2" style="font-size:11px">${this.esc(a.jj)} ${a.kelas?'· Kelas '+this.esc(a.kelas):''}</div></td>
+          <td>${this.esc(kam[a.kamar]||'-')}</td><td class="text-end fw-bold">${a.total}</td><td>${this.lvBadge(a.level)}</td><td>${this.bdIcons(a.lencana)}</td>
+          <td class="text-muted-2" style="font-size:11.5px">Hadir ${p.hadir} · Nilai ${p.nilai} · Prestasi ${p.prestasi} · Pembinaan ${p.pembinaan} · Bonus ${p.bonus} · <span style="color:#dc2626">Pelanggaran ${p.pelanggaran}</span></td></tr>`;}).join('')
+        :'<tr><td colspan="7" class="text-center text-muted-2 py-4">Tidak ada anak yang cocok</td></tr>';
+    };
+    $('#gmQ').oninput=e=>{this.q=e.target.value;rows();};
+    $('#gmJJ').onchange=e=>{this.jj=e.target.value;rows();};
+    rows();
+  },
+  groupTable(list,withInsp){
+    if(!list.length)return '<div class="empty-state"><i class="bi bi-inbox d-block"></i>Belum ada data untuk bulan ini</div>';
+    const mx=Math.max(1,...list.map(x=>x.skor));
+    return `<div class="table-responsive"><table class="table table-sm table-srit mb-0"><thead><tr><th>#</th><th>${withInsp?'Kamar':'Kelompok'}</th><th class="text-end">Anak</th><th class="text-end">Rata-rata poin</th>${withInsp?'<th class="text-end">Skor inspeksi</th><th class="text-end">Bonus</th>':''}<th style="min-width:180px">Skor peringkat</th><th>Lencana</th></tr></thead><tbody>
+      ${list.map(x=>`<tr><td>${x.rank}</td><td><div class="fw-semibold">${this.esc(x.nama)}</div><div class="text-muted-2" style="font-size:11px">${this.esc(x.jj)} ${x.jk?'· '+(x.jk==='L'?'Putra':'Putri'):''}</div></td>
+        <td class="text-end">${x.n}</td><td class="text-end">${String(x.avg).replace('.',',')}</td>
+        ${withInsp?`<td class="text-end">${x.insp==null?'–':String(x.insp).replace('.',',')}</td><td class="text-end">${x.bonus?'+'+x.bonus:'–'}</td>`:''}
+        <td><div class="d-flex align-items-center gap-2"><div class="ltv-progress flex-grow-1" style="background:var(--srit-hover)"><span style="width:${x.skor/mx*100}%;background:linear-gradient(90deg,#2a78d6,#0d9488)"></span></div><b>${String(x.skor).replace('.',',')}</b></div></td>
+        <td>${Object.keys(this.BD).map(k=>x.bd[k]?`<span title="${this.BD[k][0]}" style="margin-right:6px"><i class="bi ${this.BD[k][1]}" style="color:${this.BD[k][2]}"></i> ${x.bd[k]}</span>`:'').join('')||'<span class="text-muted-2">–</span>'}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  },
+  tabKamar(el){
+    const k=this.data.kamar;
+    el.innerHTML=this.podium(k.map(x=>({nama:x.nama,sub:x.n+' anak'+(x.insp==null?'':' · inspeksi '+String(x.insp).replace('.',',')),val:x.skor})),'skor')+
+      `<div class="card-srit p-3"><div class="text-muted-2 small mb-2">Skor kamar = rata-rata poin per anak + bonus inspeksi kamar (maks. ${this.data.rules.poin.INSPEKSI_MAKS}). Kamar besar dan kecil dibandingkan secara adil.</div>${this.groupTable(k,true)}</div>`;
+  },
+  tabKelompok(el){
+    const k=this.data.kelompok;
+    el.innerHTML=this.podium(k.map(x=>({nama:x.nama,sub:x.n+' anak',val:x.skor})),'rata-rata poin')+
+      `<div class="card-srit p-3"><div class="text-muted-2 small mb-2">Skor kelompok = rata-rata poin per anak anggota.</div>${this.groupTable(k,false)}</div>`;
+  },
+  tabAturan(el){
+    const R=this.data.rules.poin,P=R.PELANGGARAN;
+    const row=(a,b,c,neg)=>`<tr><td>${a}</td><td class="text-end fw-bold" style="color:${neg?'#dc2626':'#16a34a'}">${b}</td><td class="text-muted-2">${c}</td></tr>`;
+    el.innerHTML=`<div class="row g-3"><div class="col-lg-7"><div class="card-srit p-3"><h6 class="section-title mb-2">Cara poin didapat (per bulan)</h6>
+      <table class="table table-sm table-srit mb-0"><thead><tr><th>Sumber</th><th class="text-end">Poin</th><th>Keterangan</th></tr></thead><tbody>
+      ${row('Hadir penuh (per hari)','+'+R.HARI_PENUH,'Semua kegiatan pada hari itu dihadiri')}
+      ${row('Hadir sebagian (per hari)','+'+R.HARI_SEBAGIAN,'Hadir sebagian kegiatan')}
+      ${row('Penilaian karakter','maks +20','Rata-rata aspek (skala 1–4) × '+R.NILAI_KALI+' per catatan penilaian')}
+      ${row('Catatan prestasi','+'+R.PRESTASI,'Tiap catatan perkembangan berkategori Prestasi')}
+      ${row('Pembinaan selesai','+'+R.PEMBINAAN,'Jenis Kegiatan Positif: +'+R.KEGIATAN_POSITIF)}
+      ${row('Pelanggaran ringan','−'+Math.abs(P.RINGAN),'Mengurangi poin',1)}
+      ${row('Pelanggaran sedang','−'+Math.abs(P.SEDANG),'Mengurangi poin',1)}
+      ${row('Pelanggaran berat','−'+Math.abs(P.BERAT),'Mengurangi poin',1)}
+      </tbody></table><div class="text-muted-2 small mt-2">Total poin tidak pernah di bawah 0.</div></div></div>
+      <div class="col-lg-5"><div class="card-srit p-3 mb-3"><h6 class="section-title mb-2">Lencana (bonus poin)</h6>
+        <div class="small">${[['HADIR_PENUH','≥ '+R.PERSEN_HADIR_PENUH+'% hari hadir penuh (min. '+R.MIN_HARI+' hari tercatat)','+'+R.BONUS_HADIR],['BINTANG_PRESTASI','Minimal 1 catatan prestasi','—'],['TELADAN_KARAKTER','Rata-rata penilaian ≥ '+String(R.NILAI_TELADAN).replace('.',','),'+'+R.BONUS_TELADAN],['BEBAS_PELANGGARAN','Tanpa pelanggaran sebulan penuh (min. '+R.MIN_HARI+' hari tercatat)','+'+R.BONUS_BERSIH]].map(x=>`<div class="d-flex gap-2 align-items-start mb-2"><i class="bi ${this.BD[x[0]][1]}" style="color:${this.BD[x[0]][2]};font-size:18px"></i><div><b>${this.BD[x[0]][0]}</b> <span class="text-muted-2">${x[2]}</span><br><span class="text-muted-2">${x[1]}</span></div></div>`).join('')}</div></div>
+        <div class="card-srit p-3"><h6 class="section-title mb-2">Level</h6><div class="d-flex flex-wrap gap-2">${R.LEVEL.map(l=>`<span>${this.lvBadge(l[1])} <span class="text-muted-2 small">≥ ${l[0]}</span></span>`).join('')}</div></div></div></div>`;
+  }
+};
+</script>
+
+
 <script>__srit.n('View_Peta')</script>
 <script>
 //# sourceURL=View_Peta.html
@@ -6812,7 +6949,7 @@ SRIT.Features.settings={
    ROUTER + FEATURE LOADER (lazy, with lifecycle)
    ========================================================================= */
 SRIT.Router={
-  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','tamu','tatatertib','pelanggaran','pembinaan','insiden','inspeksi','sarpras','refleksi','penilaian','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
+  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','tamu','tatatertib','pelanggaran','pembinaan','insiden','inspeksi','sarpras','refleksi','penilaian','gamifikasi','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
   go(){
     const _nav=(this._nav=(this._nav||0)+1);
     let hash=location.hash.replace('#/','')||'live';
@@ -6878,7 +7015,7 @@ SRIT.Router={
   background:radial-gradient(1400px 520px at 78% -8%,#12284d 0%,rgba(7,14,28,0) 70%)}
 .lv-head{height:78px;flex:none;display:flex;align-items:center;gap:20px;padding:0 28px;border-bottom:1px solid var(--ln)}
 .lv-logo{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#1c6ef2,#00b8a9);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;color:#fff;overflow:hidden;flex:none}
-.lv-logo img{width:100%;height:100%;object-fit:cover}
+.lv-logo img{width:100%;height:100%;object-fit:contain}
 .lv-school{min-width:0;flex:1}
 .lv-school b{display:block;font-size:26px;font-weight:700;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lv-school small{font-size:14px;color:var(--mu);letter-spacing:.4px}
@@ -6968,26 +7105,72 @@ SRIT.Router={
 .lv-btn.on{background:rgba(52,211,153,.3)}
 #ltvFilter{position:fixed;bottom:110px;right:12px;z-index:1601;display:none;background:#0e1830;border:1px solid var(--ln);border-radius:12px;padding:14px;width:min(300px,90vw);box-shadow:0 12px 40px rgba(0,0,0,.5)}
 #ltvFilter label{font-size:12px;color:var(--mu);display:block;margin:6px 0 3px}
-/* ---- HP (mobile-live): tanpa skala, halaman bertumpuk ---- */
-.lv-mob{overflow-y:auto!important}
-.lv-mob .lv-stage{position:relative;width:100%;height:auto;transform:none!important}
-.lv-mob .lv-head,.lv-mob .lv-bar{height:auto;flex-wrap:wrap;padding:10px 14px;gap:10px}
-.lv-mob .lv-ptitle,.lv-mob .lv-tabs,.lv-mob .lv-foot>b{display:none}
-.lv-mob .lv-clock{font-size:24px}.lv-mob .lv-school b{font-size:18px}
-.lv-mob .lv-body{flex:none}
-.lv-mob .lv-pg{position:relative;opacity:1;visibility:visible;display:block;padding:10px 12px}
-.lv-mob .lv-pg>*{margin-bottom:12px;min-height:200px}
-.lv-mob .lv-pg>.lv-k{min-height:100px}
-.lv-mob .lv-pg::before{content:attr(data-t);display:block;font-size:20px;font-weight:700;margin:10px 0 12px;color:var(--acc)}
-.lv-mob .sb{grid-template-columns:100px 1fr 80px;font-size:14px}
-.lv-mob .lv-k .v{font-size:36px}
-.lv-mob .lv-foot{height:40px}
-.lv-mob .lv-admin{opacity:1;pointer-events:auto;bottom:0;left:0;right:0;flex-wrap:wrap;justify-content:center;background:#0a1428;border-top:1px solid var(--ln);padding:8px;gap:6px}
-.lv-mob .lv-btn{white-space:nowrap;padding:7px 10px}
-.lv-mob .lv-stage{padding-bottom:96px}
-.lv-mob .lv-fg{flex-wrap:wrap}
+/* ---- HP / layar sempit: halaman bertumpuk, KPI 2 kolom, filter lengket, grafik terbaca ---- */
+.lv-mob{overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch}
+.lv-mob .lv-stage{position:relative;width:100%!important;height:auto!important;min-height:100%;transform:none!important;left:0!important;top:0!important;padding-bottom:68px}
+.lv-mob .lv-head{height:auto;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:6px 10px;padding:10px 14px}
+.lv-mob .lv-logo{width:40px;height:40px;font-size:17px;border-radius:10px}
+.lv-mob .lv-school b{font-size:15px;white-space:normal;overflow:visible;line-height:1.2}
+.lv-mob .lv-school small{display:block;font-size:11px;letter-spacing:.2px;margin-top:2px}
+.lv-mob .lv-ptitle,.lv-mob .lv-tabs{display:none}
+.lv-mob .lv-clockbox{min-width:0}
+.lv-mob .lv-clock{font-size:20px}
+.lv-mob .lv-date{font-size:11px}
+.lv-mob .lv-status{grid-column:1/-1;justify-self:start;padding:3px 10px;font-size:11px}
+.lv-mob .lv-bar{height:auto;flex-direction:column;align-items:stretch;gap:6px;padding:8px 12px;position:sticky;top:0;z-index:20;background:rgba(7,14,28,.96);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.lv-mob .lv-fg{flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none}
+.lv-mob .lv-fg::-webkit-scrollbar{display:none}
+.lv-mob .lv-fg>span:not(.lv-chip){font-size:12px;flex:none;min-width:80px;margin:0}
+.lv-mob .lv-chip{padding:5px 11px;font-size:13px;flex:none}
+.lv-mob .lv-body{flex:none;position:static}
+.lv-mob .lv-pg{position:relative;inset:auto;opacity:1;visibility:visible;transition:none;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none!important;grid-auto-rows:auto;gap:10px;padding:4px 12px 12px}
+.lv-mob .lv-pg::before{content:attr(data-t);grid-column:1/-1;display:block;font-size:18px;font-weight:700;margin:16px 0 2px;color:var(--acc)}
+.lv-mob .lv-pg>*{grid-column:1/-1!important;grid-row:auto!important;min-height:0;margin:0}
+.lv-mob .lv-pg>.lv-k{grid-column:auto!important;min-height:88px;padding:11px 14px}
+.lv-mob .lv-pg>.lv-k.lv-wide{grid-column:1/-1!important}
+.lv-mob .lv-k .l{font-size:12px}
+.lv-mob .lv-k .v{font-size:28px;margin-top:3px}
+.lv-mob .lv-k .v small{font-size:14px}
+.lv-mob .lv-k .s{font-size:11.5px;line-height:1.3}
+.lv-mob .lv-k .sp{display:none}
+.lv-mob .lv-k.lv-wide .sp{display:block;height:36px}
+.lv-mob .lv-p{min-height:0;padding:14px}
+.lv-mob .lv-empty{padding:24px 12px}
+.lv-mob .lv-p h4{font-size:16px}
+.lv-mob .lv-p .lv-sub{font-size:12px}
+.lv-mob .lv-pb{overflow-x:auto}
+.lv-mob .lv-scroll{overflow:visible}
+.lv-mob .lv-pb>svg{height:auto}
+.lv-mob .lv-leg{font-size:12px}
+.lv-mob .sb{grid-template-columns:minmax(72px,30%) 1fr auto!important;gap:8px;font-size:13.5px;padding:5px 0}
+.lv-mob .sb .rt{white-space:nowrap}
+.lv-mob .lv-t{font-size:13px}
+.lv-mob .lv-t th{font-size:11px;padding:5px;white-space:normal}
+.lv-mob .lv-t td{padding:7px 5px;white-space:normal}
+.lv-mob .lv-t td.tx{max-width:none}
+.lv-mob .sb>span[style*="font-size:20px"]{white-space:normal!important;font-size:16px!important;line-height:1.25}
+.lv-mob .lv-b{font-size:10.5px;padding:2px 7px;white-space:normal;text-align:center;line-height:1.25}
+.lv-mob .lv-t td{font-size:12.5px}
+.lv-mob .in{font-size:14px}
+.lv-mob .hm .c b{font-size:28px}
 .lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:column;align-items:stretch}
-.lv-mob .lv-pb>div[style*="gap:20px"]>svg{align-self:center;height:220px}
+.lv-mob .lv-pb>div[style*="gap:20px"]>svg{align-self:center;height:210px}
+.lv-mob .lv-foot{height:40px}
+.lv-mob .lv-foot>b{display:none}
+.lv-mob .lv-admin{opacity:1;pointer-events:auto;position:fixed;bottom:0;left:0;right:0;flex-wrap:nowrap;justify-content:center;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(10,20,40,.96);border-top:1px solid var(--ln)}
+.lv-mob .lv-admin .lv-btn{flex:1;max-width:170px;padding:9px 10px;font-size:13px;white-space:nowrap}
+.lv-mob .lv-admin #ltvBelBtn,.lv-mob .lv-admin #ltvAutoBtn,.lv-mob .lv-admin .lv-btn[onclick*="prev()"],.lv-mob .lv-admin .lv-btn[onclick*="next()"],.lv-mob .lv-admin .lv-btn[onclick*="fullscreen()"]{display:none}
+.lv-mob #ltvFilter{bottom:64px;left:12px;right:12px;width:auto}
+@media (min-width:600px){
+.lv-mob .lv-pg{grid-template-columns:repeat(4,minmax(0,1fr))}
+.lv-mob .lv-pg>.lv-k.lv-wide{grid-column:auto!important}
+.lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:row;align-items:center}
+}
+@media (max-height:480px){
+.lv-mob .lv-bar{position:static}
+.lv-mob .lv-admin{position:static;padding:6px 10px}
+.lv-mob .lv-stage{padding-bottom:0}
+}
 .lv-mob:not(.lv-act){cursor:auto}
 </style>
 <script>
@@ -6997,13 +7180,13 @@ SRIT.Router={
    lalu memfilter Jenjang × Jenis Kelamin di sisi klien tanpa panggilan server.
    ========================================================================= */
 SRIT.LiveTV={
-  timer:null,clockTimer:null,rotTimer:null,mobile:false,slide:0,slideCount:7,fDate:'',fSesi:'',fJJ:'',fJK:'',autoJJ:false,data:null,_rounds:0,
+  timer:null,clockTimer:null,rotTimer:null,mobile:false,slide:0,slideCount:8,fDate:'',fSesi:'',fJJ:'',fJK:'',autoJJ:false,data:null,_rounds:0,
   JJ:['SRD','SRMP','SRMA'],
   COL:{hadir:'#34d399',izin:'#818cf8',sakit:'#fbbf24',alpa:'#f87171',belum:'#64748b',L:'#38bdf8',P:'#f472b6',SRD:'#fb923c',SRMP:'#c084fc',SRMA:'#2dd4bf',baik:'#34d399',perbaikan:'#fbbf24',rusak:'#f87171'},
-  PAGES:[['Ringkasan Eksekutif','Ringkasan'],['Profil Peserta Didik','Profil'],['Absensi & Kehadiran','Kehadiran'],['Kesehatan','Kesehatan'],['Kedisiplinan & Pembinaan','Disiplin'],['Aset & Sarana Prasarana','Aset'],['Operasional Hari Ini','Operasional']],
+  PAGES:[['Ringkasan Eksekutif','Ringkasan'],['Profil Peserta Didik','Profil'],['Absensi & Kehadiran','Kehadiran'],['Kesehatan','Kesehatan'],['Kedisiplinan & Pembinaan','Disiplin'],['Aset & Sarana Prasarana','Aset'],['Operasional Hari Ini','Operasional'],['Gamifikasi & Peringkat','Gamifikasi']],
   /* ---------- siklus hidup ---------- */
   show(mobile){
-    this.mobile=!!mobile;this.slide=0;this.fDate='';this.fSesi='';this.fJJ='';this.fJK='';this._rounds=0;this.data=null;
+    this._forceMobile=!!mobile;this.mobile=this._forceMobile||this.isNarrow();this.slide=0;this.fDate='';this.fSesi='';this.fJJ='';this.fJK='';this._rounds=0;this.data=null;
     try{this.autoJJ=localStorage.getItem('ltvAutoJJ')==='1';}catch(e){this.autoJJ=false;}
     $('#appShell').style.display='none';$('#loginRoot').style.display='none';
     const root=$('#liveTvRoot');root.classList.add('show');root.classList.toggle('lv-mob',this.mobile);root.style.display='flex';
@@ -7017,8 +7200,8 @@ SRIT.LiveTV={
     if(!this._bound){
       this._bound=true;
       const act=()=>{const r=$('#liveTvRoot');if(!r)return;r.classList.add('lv-act');clearTimeout(this._at);this._at=setTimeout(()=>{const f=$('#ltvFilter');if(!f||f.style.display!=='block')r.classList.remove('lv-act');},4000);};
-      document.addEventListener('mousemove',act);document.addEventListener('touchstart',act,{passive:true});document.addEventListener('keydown',act);
-      window.addEventListener('resize',()=>{clearTimeout(this._rt);this._rt=setTimeout(()=>{this.fit();this.setupAutoScroll();},150);});
+      window.addEventListener('orientationchange',()=>setTimeout(()=>this.onResize(),300));document.addEventListener('mousemove',act);document.addEventListener('touchstart',act,{passive:true});document.addEventListener('keydown',act);
+      window.addEventListener('resize',()=>{clearTimeout(this._rt);this._rt=setTimeout(()=>this.onResize(),150);});
       document.addEventListener('keydown',e=>{
         const r=$('#liveTvRoot');if(!r||!r.classList.contains('show')||/INPUT|SELECT|TEXTAREA/.test((e.target||{}).tagName||''))return;
         if(e.key==='ArrowRight')this.next();else if(e.key==='ArrowLeft')this.prev();
@@ -7063,11 +7246,41 @@ SRIT.LiveTV={
   fullscreen(){const el=document.documentElement;if(!document.fullscreenElement)el.requestFullscreen&&el.requestFullscreen();else document.exitFullscreen();},
   armBell(){SRIT.Bell.unlock();SRIT.Bell.start();this._updateBelBtn();},
   _updateBelBtn(){const b=$('#ltvBelBtn');if(!b)return;if(SRIT.Bell._unlocked){b.innerHTML='Bel aktif';b.classList.add('on');}},
+  /* layar sempit (HP, tablet potret) -> layout bertumpuk; selain itu panggung 1920x1080 diskalakan */
+  isNarrow(){
+    /* HP/tablet potret -> layout bertumpuk. Tahan terhadap mode "Situs desktop" (innerWidth palsu besar): cek juga ukuran layar fisik & orientasi */
+    const w=Math.min(document.documentElement.clientWidth||innerWidth,innerWidth),h=document.documentElement.clientHeight||innerHeight;
+    let coarse=false;try{coarse=matchMedia('(pointer:coarse)').matches;}catch(e){}
+    const sm=Math.min(screen.width||9999,screen.height||9999);
+    return w<820||Math.min(w,h)<600||h>w*1.05||(coarse&&sm<700);
+  },
+  syncMode(){
+    const root=$('#liveTvRoot');if(!root||!root.classList.contains('show'))return;
+    const m=!!this._forceMobile||this.isNarrow();
+    if(m===this.mobile)return;
+    this.mobile=m;root.classList.toggle('lv-mob',m);
+    this.startRotation();this.fit();
+    if(this.data)this.render();
+    this.goto(this.slide);
+  },
+  onResize(){ /* ganti mode bila perlu; di mode HP gambar ulang grafik jika lebar layar berubah banyak */
+    const w0=this._rw;this._rw=innerWidth;this.syncMode();
+    if(this.mobile&&w0&&Math.abs(innerWidth-w0)>40&&this.data)this.render();
+    this.fit();this.setupAutoScroll();
+  },
+  mobFix(){ /* HP: jika jumlah KPI berurutan ganjil, KPI terakhir dilebarkan penuh agar tidak ada sel kosong */
+    if(!this.mobile)return;
+    $$('#ltvPages .lv-pg').forEach(pg=>{let run=[];const flush=()=>{if(run.length%2===1)run[run.length-1].classList.add('lv-wide');run=[];};
+      [...pg.children].forEach(el=>{if(el.classList.contains('lv-k'))run.push(el);else flush();});flush();});
+  },
   fit(){
     const st=$('#ltvStage');if(!st)return;
-    if(this.mobile){st.style.transform='';st.style.left='';st.style.top='';return;}
-    const s=Math.min(innerWidth/1920,innerHeight/1080);
-    st.style.transform='scale('+s+')';st.style.left=((innerWidth-1920*s)/2)+'px';st.style.top=((innerHeight-1080*s)/2)+'px';
+    if(this.mobile){st.style.transform='';st.style.left='';st.style.top='';st.style.width='';st.style.height='';return;}
+    /* panggung mengisi PENUH layar: skala dari sisi pembatas, sisi lain diperluas (tanpa bar hitam) */
+    const W=document.documentElement.clientWidth||innerWidth,H=document.documentElement.clientHeight||innerHeight;
+    const s=Math.min(W/1920,H/1080);
+    st.style.width=(W/s)+'px';st.style.height=(H/s)+'px';
+    st.style.transform='scale('+s+')';st.style.left='0px';st.style.top='0px';
   },
   /* ---------- rangka ---------- */
   buildShell(){
@@ -7162,7 +7375,7 @@ SRIT.LiveTV={
   },
   /** garis multi-seri. series:[{name,color,vals:[v|null],dim}] labels:[str]; fmt untuk sumbu-y */
   line(series,labels,o={}){
-    const W=760,H=o.h||330,pl=50,pr=96,pt=14,pb=32,all=series.flatMap(s=>s.vals).filter(v=>v!=null);
+    const mb=this.mobile,W=mb?(innerWidth<500?430:Math.min(760,innerWidth-48)):760,H=o.h||(mb?300:330),pl=mb?44:50,pr=mb?92:96,pt=14,pb=32,all=series.flatMap(s=>s.vals).filter(v=>v!=null);
     if(!all.length)return this.emp('Belum ada data tren');
     let lo=o.min!=null?o.min:Math.min(...all),hi=o.max!=null?o.max:Math.max(...all);
     if(!o.fmt){ // sumbu persen: 0–100, tiap garis kisi = kelipatan bulat
@@ -7188,7 +7401,7 @@ SRIT.LiveTV={
   },
   /** kolom sederhana. vals:[n], labels:[str] */
   cols(vals,labels,color,o={}){
-    const W=620,H=o.h||300,pl=34,pb=30,pt=24,n=vals.length,mx=Math.max(1,...vals),bw=Math.min(64,(W-pl)/n*.62),st=(W-pl)/n;
+    const W=this.mobile?(innerWidth<500?400:Math.min(620,innerWidth-48)):620,H=o.h||300,pl=34,pb=30,pt=24,n=vals.length,mx=Math.max(1,...vals),bw=Math.min(64,(W-pl)/n*.62),st=(W-pl)/n;
     let s=`<line x1="${pl}" x2="${W}" y1="${H-pb}" y2="${H-pb}" stroke="#21314f"/>`;
     vals.forEach((v,i)=>{const h=(H-pt-pb)*v/mx,x=pl+st*i+(st-bw)/2,y=H-pb-h;
       s+=`<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h,v?3:0)}" rx="5" fill="${color}"/><text x="${x+bw/2}" y="${y-7}" text-anchor="middle" style="fill:#e8eefc;font-size:16px;font-weight:700">${v}</text><text x="${x+bw/2}" y="${H-9}" text-anchor="middle" style="fill:#8fa3c7;font-size:13px">${labels[i]}</text>`;});
@@ -7259,8 +7472,8 @@ SRIT.LiveTV={
     const ab=$('#ltvAutoBtn');if(ab)ab.classList.toggle('on',this.autoJJ);
     $('#ltvTabs').innerHTML=this.PAGES.map((p,i)=>`<div class="lv-tab ${i===this.slide?'on':''}" onclick="SRIT.LiveTV.jump(${i})">${p[1]}</div>`).join('');
     // halaman
-    const B=[this.pg1,this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7];
-    const rows=['auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr'];
+    const B=[this.pg1,this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7,this.pg8];
+    const rows=['auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr'];
     let html;
     try{html=B.map((fn,i)=>`<div class="lv-pg ${i===this.slide?'on':''}" data-t="${this.PAGES[i][0]}" style="grid-template-rows:${rows[i]}">${fn.call(this,v)}</div>`).join('');}
     catch(e){console.error('LiveTV render',e);html=`<div class="lv-pg on"><div class="lv-p c12"><div class="lv-empty">Gagal menampilkan data: ${E(e.message)}</div></div></div>`;}
@@ -7273,7 +7486,7 @@ SRIT.LiveTV={
     root.style.setProperty('--lv-dur',this.rotateSec()+'s');
     this._ins=ins;
     $('#ltvPT').innerHTML=this.PAGES[this.slide][0]+'<em>'+(this.slide+1)+' / '+this.PAGES.length+'</em>';
-    this.fit();
+    this.fit();this.mobFix();
     requestAnimationFrame(()=>this.setupAutoScroll());
   },
   setupAutoScroll(){
@@ -7488,7 +7701,37 @@ SRIT.LiveTV={
       +this.pnl('Insiden aktif menurut prioritas','',insH,'c3')
       +this.pnl('Petugas piket hari ini','',pkH,'c4',true)
       +this.pnl('Program pembinaan aktif','',prog.length?prog.map(x=>`<div class="in" style="align-items:center"><span style="flex:1">${E(x.nama)}</span><span class="lv-b b-in">${E(x.kategori||'')}</span></div>`).join(''):this.emp('Belum ada program aktif'),'c3',true);
-  }
+  },
+  /* =====================  HALAMAN 8 — GAMIFIKASI & PERINGKAT (agregat kamar/kelompok, tanpa nama anak)  ===================== */
+  pg8(v){
+    const {d}=v,G=d.gamif,C=this.COL,E=SRIT.Util.esc;
+    if(!G||G.error||!(G.kamar||[]).length)return this.pnl('Gamifikasi & Peringkat','',this.emp(G&&G.error?'Data gamifikasi belum dapat dimuat':'Belum ada data peringkat bulan ini'),'c12');
+    const LVC={PERUNGGU:'#cd7f32',PERAK:'#cbd5e1',EMAS:'#fbbf24',PLATINUM:'#5eead4'},LVN={PERUNGGU:'Perunggu',PERAK:'Perak',EMAS:'Emas',PLATINUM:'Platinum'};
+    const BDN={HADIR_PENUH:'Hadir Penuh',BINTANG_PRESTASI:'Bintang Prestasi',TELADAN_KARAKTER:'Teladan Karakter',BEBAS_PELANGGARAN:'Bebas Pelanggaran'};
+    const BDC={HADIR_PENUH:C.hadir,BINTANG_PRESTASI:C.sakit,TELADAN_KARAKTER:C.izin,BEBAS_PELANGGARAN:'#38bdf8'};
+    const med=['#fbbf24','#cbd5e1','#cd7f32'];
+    const km=G.kamar.filter(k=>(!this.fJJ||k.jj===this.fJJ)&&(!this.fJK||k.jk===this.fJK));
+    const kl=G.kelompok.filter(k=>!this.fJJ||k.jj===this.fJJ);
+    const n=this.sum(km,k=>k.n),tot=this.sum(km,k=>k.total);
+    const lv={},bd={};Object.keys(LVN).forEach(k=>lv[k]=this.sum(km,x=>x.lv[k]));Object.keys(BDN).forEach(k=>bd[k]=this.sum(km,x=>x.bd[k]));
+    const nBd=Object.keys(bd).reduce((a,k)=>a+bd[k],0),hi=lv.EMAS+lv.PLATINUM;
+    const bln=new Date(G.period+'-01T00:00:00').toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+    const kMax=Math.max(1,...km.map(k=>k.skor)),gMax=Math.max(1,...kl.map(k=>k.skor));
+    const rank=(list,mx,colorOf)=>list.length?this.stack(list.map((k,i)=>({label:`<span style="color:${med[i]||'var(--mu2)'};font-weight:700;margin-right:8px">${i+1}</span>${E(k.nama)}`,parts:[{v:k.skor,c:colorOf(k)}],right:this.f1(k.skor),sub:k.n+' anak'})),mx):this.emp('Belum ada data');
+    const pod=km.length?`<div style="display:flex;gap:14px;flex:1;min-height:0;flex-wrap:wrap">${km.slice(0,3).map((k,i)=>`<div style="flex:1;min-width:150px;background:var(--pn2);border:1px solid var(--ln);border-top:4px solid ${med[i]};border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;min-width:0"><div style="font-size:14px;font-weight:700;color:${med[i]};letter-spacing:.6px">JUARA ${i+1}</div><div style="font-size:26px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${E(k.nama)}</div><div style="color:var(--mu);font-size:14px">${E(k.jj)}${k.jk?' · '+(k.jk==='L'?'Putra':'Putri'):''} · ${k.n} anak</div><div style="font-size:40px;font-weight:700;margin-top:4px;line-height:1.1">${this.f1(k.skor)}<small style="font-size:16px;color:var(--mu);margin-left:6px">skor</small></div></div>`).join('')}</div>`:this.emp('Belum ada data');
+    const don=this.donut(Object.keys(LVN).map(k=>({v:lv[k],c:LVC[k],l:LVN[k]})),this.fn(n),'anak dinilai');
+    const bdMax=Math.max(1,...Object.keys(bd).map(k=>bd[k]));
+    const bdH=Object.keys(BDN).map(k=>`<div class="sb" style="grid-template-columns:180px 1fr 60px;padding:11px 0"><span class="lb">${BDN[k]}</span><div class="tr" style="height:24px"><i style="width:${bd[k]/bdMax*100}%;background:${BDC[k]}"></i></div><span class="rt">${this.fn(bd[k])}</span></div>`).join('');
+    return this.kpi('Anak dinilai',this.fn(n),bln,'#e8eefc',null,'c3')
+      +this.kpi('Rata-rata poin',this.f1(n?tot/n:0),'per anak bulan ini','#5eead4',null,'c3')
+      +this.kpi('Level Emas & Platinum',this.fn(hi),`${this.f1(this.pc(hi,n))}% dari anak dinilai`,'#fbbf24',null,'c3')
+      +this.kpi('Lencana diraih',this.fn(nBd),'bulan ini',C.izin,null,'c3')
+      +this.pnl('Juara kamar',bln+' · skor = rata-rata poin per anak + bonus inspeksi',pod,'c5')
+      +this.pnl('Peringkat kamar','Semua kamar, urut skor',rank(km,kMax,k=>C[k.jk]||'#5eead4'),'c7',true)
+      +this.pnl('Peringkat kelompok asuh','Rata-rata poin per anak',rank(kl,gMax,()=>'#5eead4'),'c4',true)
+      +this.pnl('Sebaran level','Perunggu · Perak · Emas · Platinum',don,'c4')
+      +this.pnl('Lencana bulan ini','Jumlah anak per lencana',bdH,'c4');
+  },
 };
 </script>
 
