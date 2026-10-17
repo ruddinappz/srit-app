@@ -7273,7 +7273,15 @@ SRIT.LiveTV={
     $$('#ltvPages .lv-pg').forEach(pg=>{let run=[];const flush=()=>{if(run.length%2===1)run[run.length-1].classList.add('lv-wide');run=[];};
       [...pg.children].forEach(el=>{if(el.classList.contains('lv-k'))run.push(el);else flush();});flush();});
   },
+  dbg(){ /* tambahkan "debug" pada alamat (mis. ...index.html?debug#live) untuk menampilkan angka ukuran layar di pojok kiri bawah */
+    if(location.href.indexOf('debug')<0)return;
+    let el=document.getElementById('ltvDbg');if(!el){el=document.createElement('div');el.id='ltvDbg';el.style.cssText='position:fixed;left:4px;bottom:70px;z-index:99999;background:#000c;color:#0f0;font:11px/1.35 monospace;padding:4px 6px;border-radius:6px;pointer-events:none;max-width:92vw';document.body.appendChild(el);}
+    let co='?';try{co=matchMedia('(pointer:coarse)').matches;}catch(e){}
+    const st=$('#ltvStage'),b=st?st.getBoundingClientRect():null;
+    el.textContent='v1.3 inner='+innerWidth+'x'+innerHeight+' client='+document.documentElement.clientWidth+'x'+document.documentElement.clientHeight+' screen='+screen.width+'x'+screen.height+' dpr='+devicePixelRatio+' coarse='+co+' narrow='+this.isNarrow()+' mobile='+this.mobile+' stage='+(b?Math.round(b.width)+'x'+Math.round(b.height)+'@'+Math.round(b.top):'-')+' tf='+(st?st.style.transform||'-':'-');
+  },
   fit(){
+    this.dbg();
     const st=$('#ltvStage');if(!st)return;
     if(this.mobile){st.style.transform='';st.style.left='';st.style.top='';st.style.width='';st.style.height='';return;}
     /* panggung mengisi PENUH layar: skala dari sisi pembatas, sisi lain diperluas (tanpa bar hitam) */
