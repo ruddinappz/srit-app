@@ -4265,7 +4265,7 @@ SRIT.Features.analytics={
 // ---------- LAPORAN (Pusat Laporan: Wali Asrama & Wali Asuh) ----------
 SRIT.Features.laporan={
   active:null,from:'',to:'',
-  _range(){const to=this.to||SRIT.Util.todayISO();const from=this.from||(()=>{const d=new Date(to+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-29);return d.toISOString().slice(0,10);})();return {from,to};},
+  _range(){const to=this.to||SRIT.Util.todayISO();const def=(()=>{const d=new Date(to+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-29);return d.toISOString().slice(0,10);})();let from=this.from||def;if(from>to)from=def;return {from,to};},
   _inRange(tgl){if(!tgl)return true;const {from,to}=this._range();return tgl>=from&&tgl<=to;},
   // ===== data absensi berskala besar dihitung server; diambil sekali sebelum build()/cetak =====
   _agg(){return (this._pf&&this._pf.agg)||{total:0,hadir:0,byAnak:{},byKeg:{}};},
@@ -4471,46 +4471,413 @@ SRIT.Features.laporan={
      }}
     ];
   },
-  render(host){SRIT.UI.setPage('Laporan','Laporan');this._host=host;this.active=null;this.list();},
-  list(){
-    const host=this._host;const reps=this.reports();
-    const grup=(g)=>reps.filter(r=>r.grp===g);
-    const card=r=>`<div class="col-12 col-md-6 col-lg-4"><div class="card-srit p-3 h-100 pointer" onclick="SRIT.Features.laporan.open('${r.id}')">
-      <div class="d-flex align-items-start gap-2"><div class="kpi-icon bg-grad-primary" style="width:38px;height:38px;font-size:16px;flex-shrink:0"><i class="bi ${r.icon}"></i></div>
-      <div style="min-width:0"><div class="fw-semibold" style="font-size:13px">${r.name}</div><div class="text-muted-2" style="font-size:11px"><i class="bi bi-clock"></i> ${r.periode}</div></div></div>
-    </div></div>`;
-    host.innerHTML=`
-      <div class="mb-2"><h6 class="section-title"><i class="bi bi-person-badge me-1"></i>Laporan Wali Asrama <span class="text-muted-2" style="font-size:11px">(pengelolaan asrama)</span></h6></div>
-      <div class="row g-2 g-md-3 mb-4">${grup('WALI ASRAMA').map(card).join('')}</div>
-      <div class="mb-2"><h6 class="section-title"><i class="bi bi-person-heart me-1"></i>Laporan Wali Asuh <span class="text-muted-2" style="font-size:11px">(peserta didik asuh)</span></h6></div>
-      <div class="row g-2 g-md-3">${grup('WALI ASUH').map(card).join('')}</div>`;
+  /* =====================================================================================
+     TAMPILAN MENU LAPORAN (V1.6) — daftar laporan, pengaturan periode, ringkasan, tabel.
+     Isi laporan (reports()) dan format cetak resmi (_formal) TIDAK diubah.
+     ===================================================================================== */
+  // mode periode: range = Dari–Sampai | day = satu tanggal | month = satu bulan | year = satu tahun | none = tanpa periode
+  // agg = memakai agregat absensi server (maks. 93 hari) | formal = ada format surat resmi | pick = pilih anak/kejadian dulu saat cetak
+  META:{
+    'wr-harian':{mode:'day',formal:1,d:'Ringkasan satu hari: kehadiran, kegiatan, kejadian, dan pelanggaran.'},
+    'wr-rekap-absen':{mode:'month',formal:1,d:'Tabel nama × tanggal dalam sebulan: hadir ✓, sakit/izin/alpa, dan jumlah per anak.'},
+    'wr-refleksi':{mode:'range',d:'Capaian, masalah, dan tindak lanjut dari refleksi yang tercatat.'},
+    'wr-bulanan':{mode:'range',agg:1,formal:1,d:'Ringkasan sebulan: absensi, izin, tamu, pelanggaran, dan insiden.'},
+    'wr-perkembangan':{mode:'range',formal:1,pick:'anak',d:'Nilai 8 aspek perkembangan tiap anak. Saat cetak, pilih satu anak.'},
+    'wr-pembinaan':{mode:'none',d:'Daftar program pembinaan beserta kategori, target, dan statusnya.'},
+    'wr-disiplin':{mode:'range',d:'Pelanggaran tata tertib: aturan, tingkat, tindakan, dan status penanganan.'},
+    'wr-kesehatan':{mode:'range',d:'Insiden kesehatan, keamanan, kecelakaan, dan keadaan darurat.'},
+    'wr-kunjungan':{mode:'range',d:'Kunjungan orang tua/wali dan buku tamu lengkap dengan jam masuk–keluar.'},
+    'wr-mitigasi':{mode:'range',formal:1,pick:'kejadian',d:'Insiden dan kasus perlindungan beserta tindakannya. Cetak formulir per kejadian.'},
+    'wr-sarpras':{mode:'range',d:'Inventaris sarana prasarana dan hasil monitoring kondisinya.'},
+    'wr-evaluasi':{mode:'range',d:'Capaian indikator program asrama dibandingkan dengan target.'},
+    'wr-tahunan':{mode:'year',d:'Rekap satu tahun: hari terekap, kehadiran, izin, pelanggaran, dan insiden.'},
+    'wa-jurnal':{mode:'range',d:'Catatan kejadian harian dan pembiasaan yang dilakukan wali asuh.'},
+    'wa-refleksi':{mode:'range',agg:1,formal:1,d:'Refleksi mingguan wali asuh. Tersedia dalam format surat resmi.'},
+    'wa-perkembangan':{mode:'range',formal:1,pick:'anak',d:'Perkembangan anak asuh. Saat cetak, pilih satu anak.'},
+    'wa-kehadiran':{mode:'range',agg:1,d:'Persentase kehadiran tiap anak pada kegiatan, urut dari yang tertinggi.'},
+    'wa-disiplin':{mode:'range',d:'Pelanggaran per anak: tingkat, kejadian, dan status.'},
+    'wa-belajar':{mode:'range',d:'Mentoring, pendampingan, dan tugas belajar anak asuh.'},
+    'wa-kesehatan':{mode:'range',d:'Catatan kesehatan anak asuh beserta tindakan dan statusnya.'},
+    'wa-konseling':{mode:'range',d:'Konseling, nasihat, dan refleksi pendampingan per anak.'},
+    'wa-izin':{mode:'range',d:'Izin dan kepulangan: tujuan, penjemput, dan status.'},
+    'wa-prestasi':{mode:'range',d:'Nilai leadership, kebahasaan, dan sosial tiap anak.'},
+    'wa-karakter':{mode:'range',d:'Karakter, disiplin, kemandirian, dan kebersihan tiap anak.'},
+    'wa-rekap':{mode:'none',d:'Jumlah anak asuh aktif untuk setiap wali asuh.'}
   },
-  async open(id){
-    const rep=this.reports().find(r=>r.id===id);if(!rep)return;this.active=id;
-    if(!this.to)this.to=SRIT.Util.todayISO();
-    const host=this._host;const {from,to}=this._range();
-    await this._prefetch(id);
-    if(SRIT.currentFeature!=='laporan'||this.active!==id)return;
-    const res=rep.build();
-    const set=SRIT.Store.readObj('SETTINGS');
+  _meta(id){return this.META[id]||{mode:'range',d:''};},
+  // warna lencana otomatis untuk sel yang isinya persis salah satu status ini
+  _TONE:{SELESAI:'ok',TERCAPAI:'ok',BAIK:'ok',AKTIF:'ok',DISETUJUI:'ok',HADIR:'ok',TUNTAS:'ok',AMAN:'ok',
+    PROSES:'warn',DIPROSES:'warn',MONITORING:'warn',SEDANG:'warn',MENUNGGU:'warn',PENDING:'warn',DRAFT:'warn',CUKUP:'warn',SAKIT:'warn',BELUM:'warn',
+    BERAT:'bad',TINGGI:'bad',RUSAK:'bad',DITOLAK:'bad',ALPA:'bad',DARURAT:'bad',KRITIS:'bad',
+    RINGAN:'info',RENDAH:'info',IZIN:'info'},
+  // ----- tanggal -----
+  _add(iso,n){const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);},
+  _diff(a,b){return Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/864e5);},
+  _mStart(y,m){return y+'-'+String(m).padStart(2,'0')+'-01';},
+  _mEnd(y,m){return new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);},
+  _cap(iso){const t=SRIT.Util.todayISO();return iso>t?t:iso;},
+  _ym(iso){return {y:+iso.slice(0,4),m:+iso.slice(5,7)};},
+  _quick(){
+    const t=SRIT.Util.todayISO(),c=this._ym(t),pm=c.m===1?12:c.m-1,py=c.m===1?c.y-1:c.y;
+    return [{k:'7',l:'7 hari',from:this._add(t,-6),to:t},{k:'30',l:'30 hari',from:this._add(t,-29),to:t},
+      {k:'bln',l:'Bulan ini',from:this._mStart(c.y,c.m),to:t},{k:'bln-1',l:'Bulan lalu',from:this._mStart(py,pm),to:this._mEnd(py,pm)},
+      {k:'90',l:'90 hari',from:this._add(t,-89),to:t}];
+  },
+  _periodText(id){
+    const M=this._meta(id),{from,to}=this._range(),U=SRIT.Util;
+    if(M.mode==='day')return U.fmtDate(to);
+    if(M.mode==='month'){const c=this._ym(to);return this._BLN[c.m-1]+' '+c.y;}
+    if(M.mode==='year')return 'Tahun '+to.slice(0,4);
+    if(M.mode==='none')return 'Data terkini';
+    return U.fmtDateShort(from)+' – '+U.fmtDateShort(to);
+  },
+  // rapikan periode saat laporan dibuka (selaraskan dengan jenis periode laporan itu)
+  _normalize(id){
+    const M=this._meta(id),t=SRIT.Util.todayISO();
+    if(!this.to||this.to>t)this.to=t;
+    if(this.from&&this.from>this.to)this.from='';
+    if(M.mode==='month'){const c=this._ym(this.to);this.from=this._mStart(c.y,c.m);this.to=this._cap(this._mEnd(c.y,c.m));}
+    else if(M.mode==='year'){const y=this.to.slice(0,4);this.from=y+'-01-01';this.to=this._cap(y+'-12-31');}
+    else if(M.mode==='range'&&M.agg){const r=this._range();if(this._diff(r.from,r.to)>93){this.from=this._add(r.to,-92);SRIT.Notify('Rentang laporan ini dibatasi maksimal 93 hari','warn');}}
+  },
+  // ----- terakhir dibuka (disimpan di perangkat) -----
+  _recent(){try{const a=JSON.parse(SRIT.LS.get('SRIT_LAP_RECENT')||'[]');return Array.isArray(a)?a.filter(x=>typeof x==='string'):[];}catch(e){return [];}},
+  _pushRecent(id){try{SRIT.LS.set('SRIT_LAP_RECENT',JSON.stringify([id].concat(this._recent().filter(x=>x!==id)).slice(0,4)));}catch(e){}},
+  // ----- gaya (disisipkan sekali) -----
+  _css(){
+    if(document.getElementById('lpStyle'))return;
+    const st=document.createElement('style');st.id='lpStyle';
+    st.textContent=`
+.lp-hero{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;margin-bottom:14px;background:linear-gradient(135deg,rgba(var(--srit-primary-rgb),.12),rgba(var(--srit-primary-rgb),.02))}
+.lp-hero h5{margin:0 0 3px;font-weight:800;font-size:18px}
+.lp-hero p{margin:0;color:var(--srit-text-2);font-size:12.5px;max-width:560px}
+.lp-steps{display:flex;gap:8px;flex-wrap:wrap}
+.lp-steps span{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;background:var(--srit-card);border:1px solid var(--srit-border);border-radius:999px;padding:5px 12px 5px 6px}
+.lp-steps b{width:20px;height:20px;border-radius:50%;background:var(--srit-primary);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px}
+.lp-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.lp-search{position:relative;flex:1 1 260px;max-width:460px}
+.lp-search>i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--srit-text-2);pointer-events:none;font-size:13px}
+.lp-search .form-control{padding-left:34px;border-radius:999px;font-size:13px}
+.lp-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.lp-tab{border:1px solid var(--srit-border);background:var(--srit-card);color:var(--srit-text-2);border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.lp-tab:hover{border-color:var(--srit-primary);color:var(--srit-primary)}
+.lp-tab span{background:var(--srit-hover);border-radius:999px;padding:0 7px;font-size:11px}
+.lp-tab.on{background:var(--srit-primary);border-color:var(--srit-primary);color:#fff}
+.lp-tab.on span{background:rgba(255,255,255,.22)}
+.lp-gh{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;margin:4px 0 10px}
+.lp-gh small{font-weight:500;font-size:11.5px;color:var(--srit-text-2)}
+.lp-gh em{font-style:normal;font-size:11px;font-weight:700;background:var(--srit-hover);color:var(--srit-text-2);border-radius:999px;padding:1px 8px}
+.lp-recent{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.lp-rc{border:1px dashed var(--srit-border);background:var(--srit-card);color:var(--srit-text);border-radius:10px;padding:6px 12px;font-size:12.5px;cursor:pointer;transition:.15s}
+.lp-rc i{color:var(--srit-primary);margin-right:4px}
+.lp-rc:hover{border-color:var(--srit-primary);background:var(--srit-hover)}
+.lp-card{display:flex;align-items:flex-start;gap:12px;width:100%;height:100%;text-align:left;padding:14px;border:1px solid var(--srit-border);border-radius:var(--srit-radius);background:var(--srit-card);color:var(--srit-text);cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s}
+.lp-card:hover,.lp-card:focus-visible{transform:translateY(-2px);border-color:rgba(var(--srit-primary-rgb),.6);box-shadow:0 8px 22px rgba(var(--srit-primary-rgb),.13);outline:none}
+.lp-ic{width:42px;height:42px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-size:19px;color:#fff;flex-shrink:0}
+.lp-ic.lg{width:50px;height:50px;font-size:23px;border-radius:14px}
+.lp-ic.wr{background:var(--srit-primary);background:linear-gradient(135deg,var(--srit-primary),color-mix(in srgb,var(--srit-primary) 62%,#fff))}
+.lp-ic.wa{background:var(--srit-accent);background:linear-gradient(135deg,var(--srit-accent),color-mix(in srgb,var(--srit-accent) 62%,#fff))}
+.lp-cb{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.lp-cn{font-weight:700;font-size:13.5px;line-height:1.3}
+.lp-cd{font-size:12px;color:var(--srit-text-2);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lp-cp{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.lp-pill{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--srit-hover);color:var(--srit-text-2);border:1px solid var(--srit-border)}
+.lp-pill.ok{background:rgba(22,163,74,.12);border-color:transparent;color:#16a34a}
+.lp-go{color:var(--srit-text-2);font-size:13px;align-self:center;opacity:.5;transition:.15s}
+.lp-card:hover .lp-go{opacity:1;transform:translateX(2px);color:var(--srit-primary)}
+/* halaman laporan */
+.lp-head{padding:14px 16px;margin-bottom:12px}
+.lp-back{border:0;background:none;color:var(--srit-primary);font-size:12.5px;font-weight:600;padding:0 0 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.lp-back:hover{text-decoration:underline}
+.lp-hrow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.lp-hmain{display:flex;gap:12px;align-items:center;min-width:0;flex:1 1 320px}
+.lp-ht h5{margin:0;font-size:17px;font-weight:800;line-height:1.25}
+.lp-ht p{margin:2px 0 0;font-size:12.5px;color:var(--srit-text-2)}
+.lp-act{display:flex;gap:8px;flex-wrap:wrap}
+.lp-period{padding:12px 16px;margin-bottom:12px}
+.lp-pl{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.lp-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--srit-text-2);display:inline-flex;align-items:center;gap:6px}
+.lp-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;max-width:100%}
+.lp-chip{white-space:nowrap;border:1px solid var(--srit-border);background:var(--srit-surface);color:var(--srit-text);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.lp-chip:hover{border-color:var(--srit-primary);color:var(--srit-primary)}
+.lp-chip.on{background:rgba(var(--srit-primary-rgb),.14);border-color:var(--srit-primary);color:var(--srit-primary)}
+.lp-nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.lp-nav .form-control,.lp-nav .form-select{width:auto;font-size:13px}
+.lp-ptxt{font-size:12px;color:var(--srit-text-2);margin-top:8px}
+.lp-ptxt b{color:var(--srit-text)}
+.lp-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.lp-stat{background:var(--srit-card);border:1px solid var(--srit-border);border-radius:12px;padding:10px 14px;min-width:0}
+.lp-stat span{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--srit-text-2)}
+.lp-stat b{display:block;font-size:17px;font-weight:800;margin-top:2px;word-break:break-word}
+.lp-note{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:var(--srit-text);border-radius:12px;padding:9px 14px;font-size:12.5px;margin-bottom:12px}
+.lp-note i{color:#d97706}
+.lp-tcard{overflow:hidden}
+.lp-tb{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--srit-border)}
+.lp-tb .lp-search{max-width:340px;flex:1 1 200px}
+.lp-tb .form-control{border-radius:10px}
+.lp-count{font-size:12px;color:var(--srit-text-2)}
+.lp-tw{overflow:auto;max-height:70vh}
+.lp-t{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+.lp-t th{position:sticky;top:0;z-index:2;background:var(--srit-card);font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--srit-text-2);font-weight:700;padding:10px 12px;border-bottom:2px solid var(--srit-border);white-space:nowrap;text-align:left}
+.lp-t td{padding:9px 12px;border-bottom:1px solid var(--srit-border);vertical-align:top}
+.lp-t tbody tr:nth-child(even) td{background:rgba(var(--srit-primary-rgb),.035)}
+.lp-t tbody tr:hover td{background:var(--srit-hover)}
+.lp-t .c{text-align:center}
+.lp-t tr[hidden]{display:none}
+.lp-b{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+.lp-b.ok{background:rgba(22,163,74,.14);color:#16a34a}.lp-b.warn{background:rgba(245,158,11,.16);color:#d97706}
+.lp-b.bad{background:rgba(220,38,38,.14);color:#dc2626}.lp-b.info{background:rgba(14,165,233,.14);color:#0284c7}
+.lp-bar{display:flex;align-items:center;gap:8px;min-width:120px}
+.lp-bar>i{flex:1;height:6px;border-radius:4px;background:var(--srit-border);overflow:hidden;display:block}
+.lp-bar>i>b{display:block;height:100%;border-radius:4px}
+.lp-bar>i>b.ok{background:#16a34a}.lp-bar>i>b.warn{background:#f59e0b}.lp-bar>i>b.bad{background:#dc2626}
+.lp-bar>span{font-size:12px;font-weight:700;min-width:44px;text-align:right}
+.lp-kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.lp-kvi{background:var(--srit-card);border:1px solid var(--srit-border);border-radius:12px;padding:12px 14px}
+.lp-kvi span{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--srit-text-2)}
+.lp-kvi b{display:block;font-size:20px;font-weight:800;margin-top:3px;word-break:break-word}
+.lp-kvi.wide{grid-column:1/-1}.lp-kvi.wide b{font-size:13.5px;font-weight:600;line-height:1.5}
+/* matriks absensi */
+.lp-legend{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--srit-border);font-size:12px;color:var(--srit-text-2)}
+.lp-legend>span{display:inline-flex;align-items:center;gap:5px}
+.lp-nd{display:inline-block;width:18px;height:18px;border-radius:5px;background:rgba(120,130,150,.18)}
+.mk{display:inline-flex;width:20px;height:20px;border-radius:6px;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.mk.H{background:rgba(22,163,74,.16);color:#16a34a}.mk.S{background:rgba(245,158,11,.2);color:#d97706}
+.mk.I{background:rgba(14,165,233,.18);color:#0284c7}.mk.A{background:rgba(220,38,38,.16);color:#dc2626}.mk.x{color:var(--srit-text-2);opacity:.5}
+.lp-mx th,.lp-mx td{padding:0;text-align:center;min-width:25px;height:30px;font-size:11.5px}
+.lp-mx thead th{height:auto;padding:4px 0;line-height:1.15}
+.lp-mx th small{display:block;font-size:9px;font-weight:600;opacity:.7}
+.lp-mx th.sun{color:#dc2626}
+.lp-mx .c1,.lp-mx .c2{position:sticky;z-index:1;background:var(--srit-card)}
+.lp-mx thead .c1,.lp-mx thead .c2{z-index:3}
+.lp-mx .c1{left:0;min-width:36px;width:36px}
+.lp-mx .c2{left:36px;min-width:172px;text-align:left;padding:0 10px;white-space:nowrap;box-shadow:2px 0 0 var(--srit-border)}
+.lp-mx tbody tr:nth-child(even) td{background:transparent}
+.lp-mx tbody tr:nth-child(even) td.c1,.lp-mx tbody tr:nth-child(even) td.c2{background:var(--srit-card)}
+.lp-mx td.nd{background:rgba(120,130,150,.12)!important}
+.lp-mx td.t,.lp-mx th.t{min-width:30px;font-weight:700}
+.lp-mx td.t.h{color:#16a34a}.lp-mx td.t.s{color:#d97706}.lp-mx td.t.i{color:#0284c7}.lp-mx td.t.a{color:#dc2626}
+.lp-mx tr.g td{background:var(--srit-hover)!important;text-align:left;padding:6px 10px;font-weight:700;font-size:12px;position:sticky;left:0}
+@media(max-width:575px){
+  .lp-hero{padding:14px}.lp-ic.lg{width:42px;height:42px;font-size:19px}
+  .lp-act{width:100%}.lp-act .btn{flex:1}
+  .lp-mx .c2{min-width:132px}.lp-tw{max-height:62vh}
+}`;
+    document.head.appendChild(st);
+  },
+  // ====================================== DAFTAR LAPORAN ======================================
+  render(host){SRIT.UI.setPage('Laporan','Laporan');this._host=host;this.active=null;this._css();this.list();},
+  list(){
+    const host=this._host;this.active=null;this._css();
     host.innerHTML=`
-      <div class="card-srit p-3 mb-3">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <div class="d-flex align-items-center gap-2"><button class="btn btn-sm btn-outline-secondary" onclick="SRIT.Features.laporan.list()"><i class="bi bi-arrow-left"></i></button>
-            <div><h6 class="section-title mb-0">${rep.name}</h6><div class="text-muted-2" style="font-size:11px">${rep.grp} · Periode ${rep.periode}</div></div></div>
-          <div class="d-flex gap-2">${SRIT.Auth.can('laporan:EXPORT')||SRIT.Auth.isSuper()?`<button class="btn btn-outline-primary btn-sm" id="lpCsv"><i class="bi bi-download"></i> CSV</button>`:''}
-            <button class="btn btn-dark btn-sm" id="lpPrint"><i class="bi bi-printer"></i> Cetak Formal</button></div>
-        </div>
-        <div class="filter-bar">
-          <div><label class="form-label-sm">Dari Tanggal</label><input type="date" class="form-control form-control-sm" id="lpFrom" value="${from}" max="${SRIT.Util.todayISO()}"></div>
-          <div><label class="form-label-sm">Sampai Tanggal</label><input type="date" class="form-control form-control-sm" id="lpTo" value="${to}" max="${SRIT.Util.todayISO()}"></div>
-          <div><label class="form-label-sm d-block">&nbsp;</label><button class="btn btn-primary btn-sm" id="lpApply"><i class="bi bi-funnel"></i> Terapkan</button></div>
+      <div class="lp-hero card-srit">
+        <div><h5><i class="bi bi-file-earmark-bar-graph me-2"></i>Pusat Laporan</h5><p>Pilih laporan, atur periodenya, lalu lihat di layar atau cetak resmi dengan kop surat.</p></div>
+        <div class="lp-steps"><span><b>1</b> Pilih laporan</span><span><b>2</b> Atur periode</span><span><b>3</b> Lihat atau cetak</span></div>
+      </div>
+      <div class="lp-toolbar">
+        <div class="lp-search"><i class="bi bi-search"></i><input id="lpQ" type="search" class="form-control form-control-sm" placeholder="Cari laporan (mis. absensi, kesehatan, izin)" value="${SRIT.Util.esc(this._q||'')}" autocomplete="off"></div>
+        <div class="lp-tabs" id="lpTabs"></div>
+      </div>
+      <div id="lpRecent"></div><div id="lpGrid"></div>`;
+    const q=$('#lpQ');q.oninput=()=>{this._q=q.value;this._drawGrid();};
+    $('#lpTabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(!b)return;this._tab=b.dataset.tab;this._drawTabs();this._drawGrid();};
+    const go=e=>{const c=e.target.closest('[data-id]');if(c)this.open(c.dataset.id);};
+    $('#lpRecent').onclick=go;$('#lpGrid').onclick=go;
+    this._drawTabs();this._drawGrid();
+  },
+  _drawTabs(){
+    const reps=this.reports(),cur=this._tab||'ALL';
+    const T=[['ALL','Semua','bi-grid'],['WALI ASRAMA','Wali Asrama','bi-person-badge'],['WALI ASUH','Wali Asuh','bi-person-heart']];
+    $('#lpTabs').innerHTML=T.map(t=>{const n=t[0]==='ALL'?reps.length:reps.filter(r=>r.grp===t[0]).length;
+      return `<button type="button" class="lp-tab ${cur===t[0]?'on':''}" data-tab="${t[0]}"><i class="bi ${t[2]}"></i> ${t[1]} <span>${n}</span></button>`;}).join('');
+  },
+  _card(r){
+    const E=SRIT.Util.esc,M=this._meta(r.id),wr=r.grp==='WALI ASRAMA';
+    return `<button type="button" class="lp-card" data-id="${r.id}"><span class="lp-ic ${wr?'wr':'wa'}"><i class="bi ${r.icon}"></i></span>
+      <span class="lp-cb"><span class="lp-cn">${E(r.name)}</span><span class="lp-cd">${E(M.d||'')}</span>
+        <span class="lp-cp"><span class="lp-pill"><i class="bi bi-clock"></i> ${E(r.periode)}</span>${M.formal?'<span class="lp-pill ok"><i class="bi bi-file-earmark-text"></i> Surat resmi</span>':''}</span></span>
+      <i class="bi bi-chevron-right lp-go"></i></button>`;
+  },
+  _drawGrid(){
+    const reps=this.reports(),E=SRIT.Util.esc,q=(this._q||'').trim().toLowerCase(),tab=this._tab||'ALL';
+    const ok=r=>(tab==='ALL'||r.grp===tab)&&(!q||(r.name+' '+(this._meta(r.id).d||'')+' '+r.periode+' '+r.grp).toLowerCase().includes(q));
+    const list=reps.filter(ok);
+    const rec=(!q&&tab==='ALL')?this._recent().map(id=>reps.find(r=>r.id===id)).filter(Boolean):[];
+    $('#lpRecent').innerHTML=rec.length?`<div class="lp-gh"><i class="bi bi-clock-history"></i> Terakhir dibuka</div><div class="lp-recent">${rec.map(r=>`<button type="button" class="lp-rc" data-id="${r.id}"><i class="bi ${r.icon}"></i>${E(r.name)}</button>`).join('')}</div>`:'';
+    const G=[['WALI ASRAMA','bi-person-badge','Laporan Wali Asrama','pengelolaan asrama'],['WALI ASUH','bi-person-heart','Laporan Wali Asuh','peserta didik asuh']];
+    const html=G.map(g=>{const items=list.filter(r=>r.grp===g[0]);if(!items.length)return '';
+      return `<div class="lp-gh"><i class="bi ${g[1]}"></i> ${g[2]} <small>${g[3]}</small><em>${items.length}</em></div>
+        <div class="row g-2 g-md-3 mb-4">${items.map(r=>`<div class="col-12 col-md-6 col-xl-4">${this._card(r)}</div>`).join('')}</div>`;}).join('');
+    $('#lpGrid').innerHTML=html||`<div class="empty-state"><i class="bi bi-search d-block mb-2"></i>Tidak ada laporan yang cocok${q?' dengan “'+E(this._q)+'”':''}.<div><button type="button" class="btn btn-sm btn-outline-primary mt-3" id="lpClr">Tampilkan semua laporan</button></div></div>`;
+    const c=$('#lpClr');if(c)c.onclick=()=>{this._q='';this._tab='ALL';this.list();};
+  },
+  // ====================================== HALAMAN LAPORAN ======================================
+  _periodHTML(id){
+    const M=this._meta(id),{from,to}=this._range(),t=SRIT.Util.todayISO(),E=SRIT.Util.esc;
+    let h='';
+    if(M.mode==='range'){
+      const act=this._quick().find(q=>q.from===from&&q.to===to);
+      h=`<div class="lp-pl"><span class="lp-lbl"><i class="bi bi-calendar-range"></i> Periode</span>
+          <div class="lp-chips">${this._quick().map(q=>`<button type="button" class="lp-chip ${act&&act.k===q.k?'on':''}" data-q="${q.k}">${q.l}</button>`).join('')}</div></div>
+        <div class="filter-bar mt-2">
+          <div><label class="form-label-sm">Dari tanggal</label><input type="date" class="form-control form-control-sm" id="lpFrom" value="${from}" max="${t}"></div>
+          <div><label class="form-label-sm">Sampai tanggal</label><input type="date" class="form-control form-control-sm" id="lpTo" value="${to}" max="${t}"></div>
+          <div><button type="button" class="btn btn-primary btn-sm" id="lpApply"><i class="bi bi-funnel"></i> Tampilkan</button></div>
+        </div>`;
+    }else if(M.mode==='day'){
+      h=`<div class="lp-pl"><span class="lp-lbl"><i class="bi bi-calendar-day"></i> Tanggal</span>
+          <div class="lp-nav"><button type="button" class="btn btn-outline-secondary btn-sm" data-dn="-1" title="Hari sebelumnya"><i class="bi bi-chevron-left"></i></button>
+            <input type="date" class="form-control form-control-sm" id="lpDay" value="${to}" max="${t}">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-dn="1" title="Hari berikutnya" ${to>=t?'disabled':''}><i class="bi bi-chevron-right"></i></button></div>
+          <div class="lp-chips"><button type="button" class="lp-chip ${to===t?'on':''}" data-dq="0">Hari ini</button><button type="button" class="lp-chip ${to===this._add(t,-1)?'on':''}" data-dq="-1">Kemarin</button></div></div>`;
+    }else if(M.mode==='month'){
+      const c=this._ym(to),cy=+t.slice(0,4),cm=+t.slice(5,7),yrs=[];for(let y=cy-3;y<=cy;y++)yrs.push(y);
+      const nextOff=(c.y>cy)||(c.y===cy&&c.m>=cm);
+      h=`<div class="lp-pl"><span class="lp-lbl"><i class="bi bi-calendar-month"></i> Bulan</span>
+          <div class="lp-nav"><button type="button" class="btn btn-outline-secondary btn-sm" data-mn="-1" title="Bulan sebelumnya"><i class="bi bi-chevron-left"></i></button>
+            <select class="form-select form-select-sm" id="lpMon">${this._BLN.map((n,i)=>`<option value="${i+1}" ${c.m===i+1?'selected':''}>${n}</option>`).join('')}</select>
+            <select class="form-select form-select-sm" id="lpYr">${yrs.map(y=>`<option ${c.y===y?'selected':''}>${y}</option>`).join('')}</select>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-mn="1" title="Bulan berikutnya" ${nextOff?'disabled':''}><i class="bi bi-chevron-right"></i></button></div>
+          <div class="lp-chips"><button type="button" class="lp-chip ${c.y===cy&&c.m===cm?'on':''}" data-mq="0">Bulan ini</button><button type="button" class="lp-chip" data-mq="-1">Bulan lalu</button></div></div>`;
+    }else if(M.mode==='year'){
+      const y=+to.slice(0,4),cy=+t.slice(0,4),yrs=[];for(let i=cy-4;i<=cy;i++)yrs.push(i);
+      h=`<div class="lp-pl"><span class="lp-lbl"><i class="bi bi-calendar-range"></i> Tahun</span>
+          <div class="lp-nav"><button type="button" class="btn btn-outline-secondary btn-sm" data-yn="-1" title="Tahun sebelumnya"><i class="bi bi-chevron-left"></i></button>
+            <select class="form-select form-select-sm" id="lpYr">${yrs.map(v=>`<option ${y===v?'selected':''}>${v}</option>`).join('')}</select>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-yn="1" title="Tahun berikutnya" ${y>=cy?'disabled':''}><i class="bi bi-chevron-right"></i></button></div></div>`;
+    }else{
+      h=`<div class="lp-pl"><span class="lp-lbl"><i class="bi bi-info-circle"></i> Periode</span><span style="font-size:12.5px">Laporan ini menampilkan data terkini, jadi tidak perlu mengatur tanggal.</span></div>`;
+    }
+    return h+(M.mode==='none'?'':`<div class="lp-ptxt">Menampilkan: <b>${E(this._periodText(id))}</b></div>`);
+  },
+  _bindPeriod(id){
+    const P=$('#lpPeriod');if(!P)return;
+    const t=SRIT.Util.todayISO(),go=(f,to)=>{this.from=f;this.to=to;this.open(id);};
+    const goMonth=(y,m)=>{if(this._mStart(y,m)>t){const c=this._ym(t);y=c.y;m=c.m;}go(this._mStart(y,m),this._cap(this._mEnd(y,m)));};
+    const goYear=y=>{const cy=+t.slice(0,4);if(y>cy)y=cy;go(y+'-01-01',this._cap(y+'-12-31'));};
+    P.onclick=e=>{
+      const b=e.target.closest('button');if(!b||b.disabled)return;
+      if(b.dataset.q){const q=this._quick().find(x=>x.k===b.dataset.q);if(q)go(q.from,q.to);return;}
+      if(b.dataset.dq!=null){go(this.from,this._add(t,+b.dataset.dq));return;}
+      if(b.dataset.dn){const d=this._add(this.to,+b.dataset.dn);go(this.from,d>t?t:d);return;}
+      if(b.dataset.mq!=null){const c=this._ym(t),off=+b.dataset.mq;let y=c.y,m=c.m+off;if(m<1){m=12;y--;}goMonth(y,m);return;}
+      if(b.dataset.mn){const c=this._ym(this.to);let y=c.y,m=c.m+(+b.dataset.mn);if(m<1){m=12;y--;}if(m>12){m=1;y++;}goMonth(y,m);return;}
+      if(b.dataset.yn){goYear(+this.to.slice(0,4)+(+b.dataset.yn));return;}
+      if(b.id==='lpApply'){
+        const f=$('#lpFrom').value,to=$('#lpTo').value;
+        if(!f||!to){SRIT.Notify('Isi tanggal Dari dan Sampai','err');return;}
+        if(f>to){SRIT.Notify('Tanggal “Dari” tidak boleh setelah “Sampai”','err');return;}
+        if(this._meta(id).agg&&this._diff(f,to)>93){SRIT.Notify('Rentang laporan ini maksimal 93 hari','err');return;}
+        go(f,to>t?t:to);
+      }
+    };
+    const dy=$('#lpDay');if(dy)dy.onchange=()=>{if(dy.value)go(this.from,dy.value>t?t:dy.value);};
+    const mo=$('#lpMon'),yr=$('#lpYr');
+    if(mo&&yr){const ch=()=>goMonth(+yr.value,+mo.value);mo.onchange=ch;yr.onchange=ch;}
+    else if(yr)yr.onchange=()=>goYear(+yr.value);
+  },
+  _shellHTML(rep){
+    const M=this._meta(rep.id),E=SRIT.Util.esc,wr=rep.grp==='WALI ASRAMA';
+    const csv=(SRIT.Auth.can('laporan:EXPORT')||SRIT.Auth.isSuper())?`<button type="button" class="btn btn-outline-primary btn-sm" id="lpCsv" disabled><i class="bi bi-download"></i> Unduh CSV</button>`:'';
+    const plab=M.pick==='anak'?'Pilih Anak &amp; Cetak':M.pick==='kejadian'?'Pilih Kejadian &amp; Cetak':'Cetak Resmi';
+    return `<div class="lp-head card-srit">
+        <button type="button" class="lp-back" id="lpBack"><i class="bi bi-arrow-left"></i> Semua Laporan</button>
+        <div class="lp-hrow">
+          <div class="lp-hmain"><span class="lp-ic lg ${wr?'wr':'wa'}"><i class="bi ${rep.icon}"></i></span>
+            <div class="lp-ht"><h5>${E(rep.name)}</h5><p>${E(M.d||'')}</p>
+              <div class="lp-cp"><span class="lp-pill"><i class="bi ${wr?'bi-person-badge':'bi-person-heart'}"></i> ${E(rep.grp)}</span><span class="lp-pill"><i class="bi bi-clock"></i> ${E(rep.periode)}</span></div></div></div>
+          <div class="lp-act">${csv}<button type="button" class="btn btn-primary btn-sm" id="lpPrint" disabled><i class="bi bi-printer"></i> ${plab}</button></div>
         </div>
       </div>
-      <div class="card-srit p-0"><div id="lpReport">${this._renderTable(rep,res)}</div></div>`;
-    $('#lpApply').onclick=()=>{this.from=$('#lpFrom').value;this.to=$('#lpTo').value;this.open(id);};
-    const _csv=$('#lpCsv');if(_csv)_csv.onclick=()=>this.exportCSV(rep,res);
-    $('#lpPrint').onclick=()=>this.print(rep,res);
+      <div class="card-srit lp-period" id="lpPeriod">${this._periodHTML(rep.id)}</div>
+      <div id="lpBody"><div class="lp-stats">${[1,2,3].map(()=>'<div class="skeleton" style="height:62px;border-radius:12px"></div>').join('')}</div>
+        <div class="card-srit p-3">${[1,2,3,4,5,6].map(()=>'<div class="skeleton mb-2" style="height:30px"></div>').join('')}</div></div>`;
+  },
+  async open(id){
+    const rep=this.reports().find(r=>r.id===id);if(!rep)return;
+    this._css();this.active=id;this._tq='';
+    this._normalize(id);this._pushRecent(id);
+    this._host.innerHTML=this._shellHTML(rep);
+    $('#lpBack').onclick=()=>this.list();
+    this._bindPeriod(id);
+    await this._prefetch(id);
+    if(SRIT.currentFeature!=='laporan'||this.active!==id)return;
+    let res;
+    try{res=rep.build();}catch(e){
+      console.error(e);
+      $('#lpBody').innerHTML='<div class="card-srit"><div class="empty-state"><i class="bi bi-exclamation-triangle d-block mb-2 text-danger"></i>Laporan gagal disusun. Coba ubah periode atau muat ulang halaman.</div></div>';
+      return;
+    }
+    this._fill(rep,this._meta(id),res);
+  },
+  _cell(v,col){
+    const E=SRIT.Util.esc;
+    if(v==null||v==='')return '<span class="text-muted-2">-</span>';
+    const s=String(v),tone=this._TONE[s.trim().toUpperCase()];
+    if(tone){const t=s.trim();return `<span class="lp-b ${tone}">${E(t.charAt(0).toUpperCase()+t.slice(1).toLowerCase())}</span>`;}
+    if(/%/.test(col)&&/^\d+(\.\d+)?%$/.test(s)){const n=parseFloat(s),c=n>=90?'ok':n>=75?'warn':'bad';
+      return `<div class="lp-bar"><i><b class="${c}" style="width:${Math.min(100,n)}%"></b></i><span>${E(s)}</span></div>`;}
+    return E(s);
+  },
+  _tableHTML(res){
+    const E=SRIT.Util.esc,num=res.cols.map((c,i)=>{const vals=res.rows.map(r=>r[i]).filter(v=>v!=null&&v!=='');return vals.length>0&&vals.every(v=>/^-?[\d.,]+%?$|^\d+\/\d+$/.test(String(v)));});
+    return `<div class="lp-tw"><table class="lp-t"><thead><tr>${res.cols.map((c,i)=>`<th class="${num[i]?'c':''}">${E(c)}</th>`).join('')}</tr></thead>
+      <tbody>${res.rows.map(r=>`<tr data-s="${E(r.map(c=>c==null?'':c).join(' ').toLowerCase())}">${r.map((c,i)=>`<td class="${num[i]?'c':''}">${this._cell(c,res.cols[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  },
+  _matrixHTML(m){
+    const E=SRIT.Util.esc,rk=m.rk,ada=new Set(rk.hariData),WD=['M','S','S','R','K','J','S'];
+    const head='<thead><tr><th class="c1">No</th><th class="c2">Nama</th>'+rk.days.map(d=>{const w=new Date(d+'T00:00:00Z').getUTCDay();return `<th class="${w===0?'sun':''}">${+d.slice(8)}<small>${WD[w]}</small></th>`;}).join('')+'<th class="t">H</th><th class="t">S</th><th class="t">I</th><th class="t">A</th><th class="t">%</th></tr></thead>';
+    const groups=[];m.rows.forEach(r=>{const k=(r.a.JENJANG||'-')+' — Kelas '+(r.a.KELAS||'-');let g=groups[groups.length-1];if(!g||g.k!==k){g={k,rows:[]};groups.push(g);}g.rows.push(r);});
+    const body=groups.map((g,gi)=>`<tr class="g" data-g="${gi}"><td colspan="${rk.days.length+7}">${E(g.k)} <span class="text-muted-2" style="font-weight:500">(${g.rows.length} peserta)</span></td></tr>`+
+      g.rows.map((r,i)=>{
+        const tot=r.t.H+r.t.S+r.t.I+r.t.A,p=tot?Math.round(r.t.H/tot*100):0;
+        return `<tr data-g="${gi}" data-s="${E((r.a.NAMA||'').toLowerCase())}"><td class="c1">${i+1}</td><td class="c2">${E(r.a.NAMA||'-')}</td>`+
+          [...r.s].map((c,x)=>c==='.'?`<td class="${ada.has(rk.days[x])?'':'nd'}">${ada.has(rk.days[x])?'<span class="mk x">·</span>':''}</td>`:`<td><span class="mk ${c}">${c==='H'?'✓':c}</span></td>`).join('')+
+          `<td class="t h">${r.t.H}</td><td class="t s">${r.t.S}</td><td class="t i">${r.t.I}</td><td class="t a">${r.t.A}</td><td class="t" style="color:${p>=90?'#16a34a':p>=75?'#d97706':'#dc2626'}">${tot?p+'%':'-'}</td></tr>`;}).join('')).join('');
+    return `<div class="lp-legend"><span><i class="mk H">✓</i> Hadir</span><span><i class="mk S">S</i> Sakit</span><span><i class="mk I">I</i> Izin</span><span><i class="mk A">A</i> Alpa</span><span><i class="lp-nd"></i> Tanggal tanpa data</span><span class="ms-auto">Geser ke samping untuk melihat semua tanggal</span></div>
+      <div class="lp-tw"><table class="lp-t lp-mx">${head}<tbody>${body}</tbody></table></div>`;
+  },
+  _fill(rep,M,res){
+    const E=SRIT.Util.esc,U=SRIT.Util,body=$('#lpBody');
+    const isMx=rep.id==='wr-rekap-absen',mx=isMx?this._rekapModel():null;
+    const kv=!isMx&&res.cols.length===2&&/^(Aspek|Komponen)$/.test(res.cols[0]);
+    const n=isMx?(mx?mx.rows.length:0):res.rows.length;
+    let tiles=[],notes='';
+    if(isMx&&mx){
+      const T={H:0,S:0,I:0,A:0};mx.rows.forEach(r=>{for(const k in T)T[k]+=r.t[k];});
+      const tot=T.H+T.S+T.I+T.A;
+      tiles=[['Peserta aktif',n],['Hari berdata',mx.rk.hariData.length],['Kehadiran',tot?U.pct(T.H,tot)+'%':'-'],['H / S / I / A',[T.H,T.S,T.I,T.A].join(' / ')]];
+      if(mx.rk.partial)notes=`<div class="lp-note"><i class="bi bi-exclamation-triangle"></i><span>Data baru dimuat sampai <b>${E(mx.rk.sampai)}</b>.</span><button type="button" class="btn btn-sm btn-outline-secondary" id="lpReload"><i class="bi bi-arrow-clockwise"></i> Muat ulang</button></div>`;
+    }else{
+      (res.meta||[]).forEach(m=>{if(m[0]==='Catatan')notes+=`<div class="lp-note"><i class="bi bi-info-circle"></i><span>${E(String(m[1]))}</span></div>`;else if(!/^(Periode|Tanggal|Rentang|Tahun|Bulan)$/.test(m[0]))tiles.push([m[0],m[1]]);});
+      if(!kv)tiles.push(['Jumlah baris',n]);
+    }
+    const stats=!tiles.length?'':`<div class="lp-stats">${tiles.map(t=>`<div class="lp-stat"><span>${E(String(t[0]))}</span><b title="${E(String(t[1]))}">${E(String(t[1]))}</b></div>`).join('')}</div>`;
+    let main;
+    if(!n){
+      main=`<div class="card-srit"><div class="empty-state"><i class="bi bi-inbox d-block mb-2"></i><div class="fw-semibold">Belum ada data pada periode ini</div>
+        <div class="mt-1" style="font-size:12px">${M.mode==='none'?'Belum ada data yang tercatat.':'Coba pilih periode lain di atas.'}</div>
+        ${M.mode==='range'?'<button type="button" class="btn btn-sm btn-outline-primary mt-3" id="lpWiden"><i class="bi bi-calendar-range"></i> Lihat 90 hari terakhir</button>':''}</div></div>`;
+    }else if(kv){
+      main=`<div class="lp-kv">${res.rows.filter(r=>r[0]!=='Tanggal').map(r=>{const v=String(r[1]==null?'-':r[1]);return `<div class="lp-kvi ${v.length>38?'wide':''}"><span>${E(String(r[0]))}</span><b>${E(v)}</b></div>`;}).join('')}</div>`;
+    }else{
+      main=`<div class="card-srit lp-tcard"><div class="lp-tb"><div class="lp-search"><i class="bi bi-search"></i><input id="lpTq" type="search" class="form-control form-control-sm" placeholder="${isMx?'Cari nama anak':'Cari di tabel ini'}" autocomplete="off"></div><span class="lp-count" id="lpCnt">${n} baris</span></div>
+        ${isMx?this._matrixHTML(mx):this._tableHTML(res)}<div class="empty-state" id="lpNoMatch" hidden>Tidak ada baris yang cocok dengan pencarian.</div></div>`;
+    }
+    body.innerHTML=notes+stats+main;
+    // aksi
+    const pb=$('#lpPrint');pb.disabled=false;pb.onclick=()=>this.print(rep,res);
+    const cb=$('#lpCsv');if(cb){cb.disabled=false;cb.onclick=()=>this.exportCSV(rep,res);}
+    const rl=$('#lpReload');if(rl)rl.onclick=()=>{this._rk=null;this.open(rep.id);};
+    const wd=$('#lpWiden');if(wd)wd.onclick=()=>{const t=U.todayISO();this.from=this._add(t,-89);this.to=t;this.open(rep.id);};
+    const tq=$('#lpTq');
+    if(tq)tq.oninput=()=>{
+      const q=tq.value.trim().toLowerCase(),rows=body.querySelectorAll('tbody tr[data-s]');let vis=0;
+      rows.forEach(r=>{const show=!q||r.dataset.s.includes(q);r.hidden=!show;if(show)vis++;});
+      body.querySelectorAll('tr.g').forEach(g=>{g.hidden=!!q&&!body.querySelector('tr[data-g="'+g.dataset.g+'"][data-s]:not([hidden])');});
+      $('#lpCnt').textContent=q?vis+' dari '+n+' baris':n+' baris';
+      $('#lpNoMatch').hidden=vis>0;
+    };
   },
   _kop(set,judul,subtitle){ // kop resmi (KOP_SURAT_BARU) + judul laporan
     return SRIT.Kop.html()+(judul?`<div class="head" style="margin-top:6px"><h3>${SRIT.Util.esc(judul)}</h3>${subtitle?`<div style="font-size:12px;color:#555">${SRIT.Util.esc(subtitle)}</div>`:''}</div>`:'');
@@ -4543,16 +4910,10 @@ SRIT.Features.laporan={
     w.document.write(html);w.document.close();w.focus();
     SRIT.Audit.log('PRINT','laporan',this.active);
   },
-  _renderTable(rep,res){
-    const meta=(res.meta||[[ 'Rentang',SRIT.Util.fmtDateShort(this._range().from)+' s/d '+SRIT.Util.fmtDateShort(this._range().to)]]);
-    return `<div class="p-3 border-bottom d-flex flex-wrap gap-3" style="font-size:12px">${meta.map(m=>`<span><span class="text-muted-2">${m[0]}:</span> <b>${SRIT.Util.esc(String(m[1]))}</b></span>`).join('')}<span class="text-muted-2 ms-auto">${res.rows.length} baris</span></div>
-      <div class="table-responsive"><table class="table table-srit mb-0"><thead><tr>${res.cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
-      <tbody>${res.rows.length?res.rows.map(row=>`<tr>${row.map(c=>`<td>${SRIT.Util.esc(String(c==null?'-':c))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${res.cols.length}"><div class="empty-state"><i class="bi bi-inbox d-block"></i>Belum ada data pada periode ini</div></td></tr>`}</tbody></table></div>`;
-  },
   exportCSV(rep,res){
     let csv=res.cols.join(',')+'\n';
     res.rows.forEach(r=>csv+=r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')+'\n');
-    const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=rep.id+'_'+this._range().from+'_'+this._range().to+'.csv';a.click();
+    const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent('\uFEFF'+csv);a.download=rep.id+'_'+this._range().from+'_'+this._range().to+'.csv';a.click();
     SRIT.Audit.log('EXPORT','laporan',rep.id);SRIT.Notify('Laporan diekspor','ok');
   },
   async print(rep,res){
