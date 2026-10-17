@@ -16,7 +16,7 @@
 <script>
 /* SRIT — diagnostik pemuatan: bila halaman tampak putih/kosong, tampilkan PENYEBABNYA di layar (juga di HP tanpa konsol). */
 window.__srit=(function(){
-  var S={errs:[],booted:false,cur:'Index',parts:[],t0:Date.now(),server:null},EXPECT={"JS_Util": ["SRIT", "SRIT.Util"], "JS_Brand": ["SRIT.BrandAsset"], "JS_Data": ["SRIT.LS", "SRIT.Server", "SRIT.Store", "SRIT.Repo", "SRIT.Cache", "SRIT.Sync", "SRIT.Audit"], "JS_UI": ["SRIT.Notify", "SRIT.Loading", "SRIT.Modal", "SRIT.SS", "SRIT.Import"], "JS_Auth": ["SRIT.Auth"], "JS_Api": ["SRIT.Api"], "JS_Theme": ["SRIT.Theme", "SRIT.Brand"], "JS_Shell": ["SRIT.UI", "SRIT.MENU", "SRIT.Features"], "View_Shared": ["simpleFeature", "regFeature", "SRIT.anakKet", "SRIT.anakRefSearch"], "JS_Router": ["SRIT.Router"], "View_LiveTV": ["SRIT.LiveTV"], "View_Dashboard": ["SRIT.Features.dashboard"], "View_Anak": ["SRIT.Features.anak"], "View_Absensi": ["SRIT.Features.absensi"], "View_AbsensiKamera": ["SRIT.Features.absensi._showCamError"], "View_Jadwal": ["SRIT.Features.jadwal"], "View_Kegiatan": ["SRIT.Features.kegiatan"], "View_JadwalPiket": ["SRIT.Features.jadwal-piket"], "View_JurnalPiket": ["SRIT.Features.jurnal-piket"], "View_Jabatan": ["SRIT.Features.jabatan"], "View_User": ["SRIT.Features.user"], "View_Role": ["SRIT.Features.role"], "View_Analytics": ["SRIT.Features.analytics"], "View_Laporan": ["SRIT.Features.laporan"], "View_Keasramaan": ["SRIT.Features.keasramaan", "SRIT.Features.ops-module"], "View_StrukturMaster": ["SRIT.Features.keasramaan-master"], "View_Sarpras": ["SRIT.Features.sarpras"], "View_Program": ["SRIT.Features.program"], "View_Izin": ["SRIT.Features.izin"], "View_Tamu": ["SRIT.Features.tamu"], "View_TataTertib": ["SRIT.Features.tatatertib"], "View_Pelanggaran": ["SRIT.Features.pelanggaran"], "View_Pembinaan": ["SRIT.Features.pembinaan"], "View_Insiden": ["SRIT.Features.insiden"], "View_Inspeksi": ["SRIT.Features.inspeksi"], "View_Refleksi": ["SRIT.Features.refleksi"], "View_Penghuni": ["SRIT.Features.penghuni"], "View_Penilaian": ["SRIT.Features.penilaian"], "View_Profiling": ["SRIT.Features.profiling"], "View_Gamifikasi": ["SRIT.Features.gamifikasi"], "View_Peta": ["SRIT.Features.peta"], "View_Alert": ["SRIT.Features.alert-center"], "View_Audit": ["SRIT.Features.audit"], "View_Settings": ["SRIT.Features.settings"]},CORE=["JS_Util", "JS_Data", "JS_UI", "JS_Auth", "JS_Api", "JS_Theme", "JS_Shell", "View_Shared", "JS_Router", "View_LiveTV"];
+  var S={errs:[],booted:false,cur:'Index',parts:[],t0:Date.now(),server:null},EXPECT={"JS_Util": ["SRIT", "SRIT.Util"], "JS_Brand": ["SRIT.BrandAsset"], "JS_Data": ["SRIT.LS", "SRIT.Server", "SRIT.Store", "SRIT.Repo", "SRIT.Cache", "SRIT.Sync", "SRIT.Audit"], "JS_UI": ["SRIT.Notify", "SRIT.Loading", "SRIT.Modal", "SRIT.SS", "SRIT.Import"], "JS_Auth": ["SRIT.Auth"], "JS_Api": ["SRIT.Api"], "JS_Theme": ["SRIT.Theme", "SRIT.Brand"], "JS_Shell": ["SRIT.UI", "SRIT.MENU", "SRIT.Features"], "View_Shared": ["simpleFeature", "regFeature", "SRIT.anakKet", "SRIT.anakRefSearch"], "JS_Router": ["SRIT.Router"], "View_LiveTV": ["SRIT.LiveTV"], "View_Dashboard": ["SRIT.Features.dashboard"], "View_Anak": ["SRIT.Features.anak"], "View_Absensi": ["SRIT.Features.absensi"], "View_AbsensiKamera": ["SRIT.Features.absensi._showCamError"], "View_Jadwal": ["SRIT.Features.jadwal"], "View_Kegiatan": ["SRIT.Features.kegiatan"], "View_JadwalPiket": ["SRIT.Features.jadwal-piket"], "View_JurnalPiket": ["SRIT.Features.jurnal-piket"], "View_Dokumentasi": ["SRIT.Features.dokumentasi"], "View_Jabatan": ["SRIT.Features.jabatan"], "View_User": ["SRIT.Features.user"], "View_Role": ["SRIT.Features.role"], "View_Analytics": ["SRIT.Features.analytics"], "View_Laporan": ["SRIT.Features.laporan"], "View_Keasramaan": ["SRIT.Features.keasramaan", "SRIT.Features.ops-module"], "View_StrukturMaster": ["SRIT.Features.keasramaan-master"], "View_Sarpras": ["SRIT.Features.sarpras"], "View_Program": ["SRIT.Features.program"], "View_Izin": ["SRIT.Features.izin"], "View_Tamu": ["SRIT.Features.tamu"], "View_TataTertib": ["SRIT.Features.tatatertib"], "View_Pelanggaran": ["SRIT.Features.pelanggaran"], "View_Pembinaan": ["SRIT.Features.pembinaan"], "View_Insiden": ["SRIT.Features.insiden"], "View_Inspeksi": ["SRIT.Features.inspeksi"], "View_Refleksi": ["SRIT.Features.refleksi"], "View_Penghuni": ["SRIT.Features.penghuni"], "View_Penilaian": ["SRIT.Features.penilaian"], "View_Profiling": ["SRIT.Features.profiling"], "View_Gamifikasi": ["SRIT.Features.gamifikasi"], "View_Peta": ["SRIT.Features.peta"], "View_Alert": ["SRIT.Features.alert-center"], "View_Audit": ["SRIT.Features.audit"], "View_Settings": ["SRIT.Features.settings"]},CORE=["JS_Util", "JS_Data", "JS_UI", "JS_Auth", "JS_Api", "JS_Theme", "JS_Shell", "View_Shared", "JS_Router", "View_LiveTV"];
   S.n=function(name){S.cur=name;S.parts.push(name);};
   function get(p){try{return p.split('.').reduce(function(o,k){return o==null?undefined:o[k];},window);}catch(e){return undefined;}}
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -437,6 +437,15 @@ const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
 /* ============ UTILITY ============ */
 SRIT.Util = {
+  // ---- jam shift (satu sumber untuk Foto Dokumentasi & Jurnal Piket; nilai dari server lewat bootstrap/apiDokInit) ----
+  // Awal tiap shift; berakhir saat shift berikutnya mulai. MALAM melewati tengah malam (00:00 s.d. awal PAGI = MALAM yang dimulai kemarin).
+  SHIFT_DEF:{PAGI:'07:00',SIANG:'15:00',MALAM:'23:00'},SHIFT:null,
+  _hm:s=>{const m=/^(\d{1,2}):(\d{2})/.exec(String(s||''));return m&&+m[1]<24&&+m[2]<60?+m[1]*60+ +m[2]:null;},
+  setShift(c){const U=SRIT.Util,a=U._hm(c&&c.PAGI),b=U._hm(c&&c.SIANG),d=U._hm(c&&c.MALAM);if(a!=null&&b!=null&&d!=null&&a<b&&b<d)U.SHIFT={PAGI:c.PAGI,SIANG:c.SIANG,MALAM:c.MALAM};},
+  shiftCfg:()=>SRIT.Util.SHIFT||SRIT.Util.SHIFT_DEF,
+  shiftOf(hm){const U=SRIT.Util,c=U.shiftCfg(),m=U._hm(hm);if(m==null)return 'MALAM';return m>=U._hm(c.MALAM)?'MALAM':m>=U._hm(c.SIANG)?'SIANG':m>=U._hm(c.PAGI)?'PAGI':'MALAM';},
+  // tanggal "milik" shift: foto/aktivitas sebelum awal PAGI masuk malam yang dimulai hari sebelumnya
+  shiftDate(iso,hm){const U=SRIT.Util,m=U._hm(hm);if(m!=null&&m<U._hm(U.shiftCfg().PAGI)){const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10);}return iso;},
   uid:(p='ID')=>p+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
   todayISO:()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}catch(e){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}}, // tanggal WIB = zona server (asli: UTC → salah sebelum 07.00 WIB)
   fmtDate:iso=>{ if(!iso)return'-'; const d=new Date(iso+'T00:00:00'); return d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});},
@@ -582,7 +591,7 @@ SRIT.Sync={
     Object.keys(r.objs||{}).forEach(t=>SRIT.Store._set(t,r.objs[t]));
     this.vers=r.vers||{};this.lastPoll=Date.now();
   },
-  async bootstrap(){const r=await SRIT.Server.call('apiBootstrap');this._hydrate(r);SRIT.Auth.user=r.user;return r;},
+  async bootstrap(){const r=await SRIT.Server.call('apiBootstrap');this._hydrate(r);SRIT.Auth.user=r.user;if(r.shift)SRIT.Util.setShift(r.shift);return r;},
   async poll(){
     if(!SRIT.Server.token||this.busy||this.q.length||this.audits.length)return;
     try{
@@ -997,7 +1006,7 @@ SRIT.Api = {
   // ---- Laporan: agregat absensi rentang tanggal / per hari ----
   getReportAttAgg(from,to){return SRIT.Server.call('apiReportAtt',from,to);},
   getReportAttDay(iso){return SRIT.Server.call('apiReportAttDay',iso);},
-  getRekapBulanan(ym){return SRIT.Server.call('apiRekapBulanan',ym);}
+  getRekapBulanan(ym,keg){return SRIT.Server.call('apiRekapBulanan',ym,keg||'');}
 };
 </script>
 
@@ -1150,6 +1159,7 @@ SRIT.MENU=[
   {r:'kegiatan',t:'Kegiatan Khusus',i:'bi-list-check'},
   {r:'jadwal-piket',t:'Jadwal Piket',i:'bi-shield-check'},
   {r:'jurnal-piket',t:'Jurnal & Serah Terima Piket',i:'bi-journal-bookmark'},
+  {r:'dokumentasi',t:'Foto Dokumentasi',i:'bi-camera'},
   {r:'bel',t:'Bel Otomatis',i:'bi-bell-fill'},
   {r:'program',t:'Program Pembinaan',i:'bi-stars'},
 
@@ -1882,7 +1892,7 @@ SRIT.Features.anak={
 //# sourceURL=View_Absensi.html
 // ---------- ABSENSI (tab: Manual / RFID / QR Camera) ----------
 SRIT.Features.absensi={
-  state:{date:SRIT.Util.todayISO(),keg:'',page:1,size:25,search:'',jenjang:'',jk:'',asrama:'',kelas:'',dirty:{},tab:'manual',log:[]},
+  state:{date:SRIT.Util.todayISO(),keg:'',kgQ:'',kgSrc:'',page:1,size:25,search:'',jenjang:'',jk:'',asrama:'',kelas:'',dirty:{},tab:'manual',log:[]},
   _qr:{stream:null,raf:null,last:'',lastTime:0},
   render(host){SRIT.UI.setPage('Absensi','Absensi');
     const asrama=SRIT.Store.read('ASRAMA');
@@ -1891,7 +1901,12 @@ SRIT.Features.absensi={
       <div class="card-srit p-3 mb-3">
         <div class="filter-bar">
           <div><label class="form-label-sm">Tanggal</label><input type="date" class="form-control form-control-sm" id="abDate" value="${this.state.date}"></div>
-          <div style="min-width:260px"><label class="form-label-sm">Sesi Kegiatan <span id="abHari" class="text-muted-2"></span></label><select class="form-select form-select-sm" id="abKeg"></select></div>
+          <div style="min-width:200px"><label class="form-label-sm">Cari Kegiatan</label>
+            <div style="position:relative"><input type="text" class="form-control form-control-sm" id="abKegQ" placeholder="Nama kegiatan\u2026" autocomplete="off" value="${SRIT.Util.esc(this.state.kgQ||'')}" style="padding-right:28px">
+            <button type="button" id="abKegQClear" class="sf-clear-x" style="display:${this.state.kgQ?'flex':'none'}" title="Hapus pencarian kegiatan"><i class="bi bi-x-circle-fill"></i></button></div></div>
+          <div><label class="form-label-sm">Jenis Kegiatan</label><select class="form-select form-select-sm" id="abKegSrc">
+            <option value="">Semua jenis</option><option value="JADWAL">Jadwal Rutin</option><option value="KEGIATAN">Kegiatan Khusus</option></select></div>
+          <div style="min-width:260px"><label class="form-label-sm">Sesi Kegiatan <span id="abHari" class="text-muted-2"></span> <span id="abKegN" class="text-muted-2"></span></label><select class="form-select form-select-sm" id="abKeg"></select></div>
         </div>
         <div id="abSesInfo" class="mt-2"></div>
         <hr class="my-2">
@@ -1929,6 +1944,14 @@ SRIT.Features.absensi={
       <div id="abTabBody"></div>`;
     $('#abDate').onchange=e=>{this.state.date=e.target.value;this.state.dirty={};this.buildSessions();};
     $('#abKeg').onchange=e=>{this.state.keg=e.target.value;this.state.dirty={};this.load();};
+    $('#abKegSrc').value=this.state.kgSrc;
+    $('#abKegSrc').onchange=e=>{this.state.kgSrc=e.target.value;this.state.dirty={};this.buildSessions();};
+    $('#abKegQ').oninput=e=>{
+      $('#abKegQClear').style.display=e.target.value?'flex':'none';
+      clearTimeout(this._kgT);
+      this._kgT=setTimeout(()=>{this.state.kgQ=e.target.value;this.state.dirty={};this.buildSessions();},250);
+    };
+    $('#abKegQClear').onclick=()=>{$('#abKegQ').value='';$('#abKegQClear').style.display='none';this.state.kgQ='';this.state.dirty={};this.buildSessions();};
     this.state.jk='';
     $('#abSearch').oninput=e=>{
       $('#abSearchClear').style.display=e.target.value?'flex':'none';
@@ -2013,11 +2036,16 @@ SRIT.Features.absensi={
     this.renderTab();
   },
   buildSessions(){
-    const sessions=SRIT.Api.getSessionsForDate(this.state.date);
+    const allSes=SRIT.Api.getSessionsForDate(this.state.date);
+    const kq=String(this.state.kgQ||'').trim().toLowerCase(),ks=this.state.kgSrc;
+    const sessions=allSes.filter(s=>(!ks||s.source===ks)&&(!kq||String(s.nama||'').toLowerCase().indexOf(kq)>=0));
+    const nEl=$('#abKegN');if(nEl)nEl.textContent=(kq||ks)?'\u00b7 '+sessions.length+' dari '+allSes.length+' sesi':'';
     $('#abHari').textContent='('+SRIT.Util.hariOf(this.state.date)+')';
     const sel=$('#abKeg');
     if(!sessions.length){sel.innerHTML='<option value="">\u2014 Tidak ada sesi \u2014</option>';this.state.keg='';
-      $('#abSesInfo').innerHTML='<div class="alert alert-warning py-2 mb-0" style="font-size:12px"><i class="bi bi-info-circle"></i> Tidak ada kegiatan ber-absensi (jadwal rutin atau kegiatan khusus) pada hari ini.</div>';
+      $('#abSesInfo').innerHTML=allSes.length
+        ?'<div class="alert alert-warning py-2 mb-0" style="font-size:12px"><i class="bi bi-funnel"></i> Tidak ada kegiatan yang cocok dengan filter kegiatan. Ubah atau hapus filter di atas.</div>'
+        :'<div class="alert alert-warning py-2 mb-0" style="font-size:12px"><i class="bi bi-info-circle"></i> Tidak ada kegiatan ber-absensi (jadwal rutin atau kegiatan khusus) pada hari ini.</div>';
       this.load();return;}
     if(!sessions.find(s=>s.id===this.state.keg))this.state.keg=sessions[0].id;
     sel.innerHTML=sessions.map(s=>{
@@ -3016,7 +3044,7 @@ SRIT.Features['jurnal-piket']=(function(){
   const nowT=()=>{const d=new Date();return p2(d.getHours())+':'+p2(d.getMinutes());};
   const nowLocal=()=>{const d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'T'+nowT();};
   const parse=(v,def)=>{try{const o=JSON.parse(v);return Array.isArray(o)?o:def;}catch(e){return def;}};
-  const shiftNow=()=>{const h=new Date().getHours();return h<14?'PAGI':h<20?'SIANG':'MALAM';};
+  const shiftNow=()=>{const n=new Date();return SRIT.Util.shiftOf(String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'));};   // jam shift dari pengaturan Foto Dokumentasi (bawaan 07:00 / 15:00 / 23:00)
   const dstr=iso=>SRIT.Util.fmtDateShort(iso);
   const sel=(o,cur)=>Object.keys(o).map(k=>`<option value="${k}" ${String(cur||'')===k?'selected':''}>${typeof o[k]==='string'?o[k]:o[k].t}</option>`).join('');
   const kamarName=id=>(SRIT.Repo.getById('KAMAR',id)||{}).NAME||'';
@@ -3334,6 +3362,324 @@ SRIT.Features['jurnal-piket']=(function(){
   };
   return F;
 })();
+</script>
+
+
+<script>__srit.n('View_Dokumentasi')</script>
+<script>
+//# sourceURL=View_Dokumentasi.html
+// v1.9.3 (URL pustaka EXIF disandikan agar aman dari pemrosesan Apps Script)
+// ---------- FOTO DOKUMENTASI (tab: Unggah / Galeri / Pengaturan Shift) ----------
+// Foto \u2192 Drive: <TAHUN>/<BULAN>/<TANGGAL SHIFT>/<SHIFT>. Shift dihitung dari jam foto; server menghitung ulang (otoritatif).
+SRIT.Features.dokumentasi={
+  state:{tab:'upload',queue:[],busy:false,geo:null,gal:{from:'',to:'',shift:'',keg:'',page:1}},
+  _init:null,
+  _BLN:['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'],
+  _ICO:{PAGI:'\ud83c\udf05',SIANG:'\u2600\ufe0f',MALAM:'\ud83c\udf19'},
+  async render(host){
+    SRIT.UI.setPage('Foto Dokumentasi','Foto Dokumentasi');this._host=host;
+    this._css();
+    const can=a=>SRIT.Auth.can('dokumentasi:'+a);
+    this._can={C:can('CREATE'),D:can('DELETE'),M:can('MANAGE')};
+    if(!this._can.C&&this.state.tab==='upload')this.state.tab='galeri';
+    host.innerHTML=`<ul class="nav nav-pills mb-3" id="dkTabs">
+        ${this._can.C?'<li class="nav-item"><a class="nav-link pointer" data-tab="upload"><i class="bi bi-camera me-1"></i>Unggah Foto</a></li>':''}
+        <li class="nav-item"><a class="nav-link pointer" data-tab="galeri"><i class="bi bi-images me-1"></i>Galeri</a></li>
+        ${this._can.M?'<li class="nav-item"><a class="nav-link pointer" data-tab="shift"><i class="bi bi-clock-history me-1"></i>Pengaturan Shift</a></li>':''}
+      </ul><div id="dkBody"></div>`;
+    $('#dkTabs').onclick=e=>{const a=e.target.closest('[data-tab]');if(!a)return;this.state.tab=a.dataset.tab;this._tab();};
+    this._tab();
+    try{ // jam shift & tautan dari server (satu sumber untuk semua pengguna)
+      this._init=await SRIT.Server.call('apiDokInit');
+      SRIT.Util.setShift(this._init.shift);
+      if(SRIT.currentFeature!=='dokumentasi')return;
+      this._requeue();this._tab(true);
+    }catch(e){SRIT.Notify(e.message||'Gagal memuat pengaturan dokumentasi','err');}
+  },
+  destroy(){this.state.queue.forEach(q=>{try{URL.revokeObjectURL(q.url);}catch(e){}});this.state.queue=[];},
+  _tab(soft){
+    $$('#dkTabs a').forEach(a=>a.classList.toggle('active',a.dataset.tab===this.state.tab));
+    const t=this.state.tab;
+    if(soft&&t==='galeri')return;
+    if(t==='upload')this._renderUpload();else if(t==='galeri')this._renderGaleri();else this._renderShift();
+  },
+  _css(){
+    if(document.getElementById('dkStyle'))return;
+    const s=document.createElement('style');s.id='dkStyle';
+    s.textContent=`.dk-q{display:flex;gap:10px;align-items:flex-start;padding:10px;border-bottom:1px solid var(--srit-border)}
+.dk-q img{width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;background:var(--srit-hover)}
+.dk-q .m{flex:1;min-width:0;font-size:12px}.dk-q .p{color:var(--srit-text-2);font-size:11px;word-break:break-all}
+.dk-sh{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 9px;font-size:11px;font-weight:800}
+.dk-sh.PAGI{background:#FFF7ED;color:#C2410C}.dk-sh.SIANG{background:#DBEAFE;color:#1D4ED8}.dk-sh.MALAM{background:#EDE9FE;color:#6D28D9}
+.dk-st{font-size:11px;font-weight:700}.dk-st.ok{color:#16a34a}.dk-st.err{color:#dc2626}.dk-st.run{color:#d97706}
+.dk-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.dk-c{border:1px solid var(--srit-border);border-radius:12px;overflow:hidden;background:var(--srit-card);cursor:pointer;transition:.15s}
+.dk-c:hover{border-color:var(--srit-primary);transform:translateY(-2px)}
+.dk-c .im{aspect-ratio:4/3;background:var(--srit-hover);display:flex;align-items:center;justify-content:center;color:var(--srit-text-2)}
+.dk-c .im img{width:100%;height:100%;object-fit:cover}.dk-c .b{padding:8px 10px;font-size:12px}
+.dk-c .k{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`;
+    document.head.appendChild(s);
+  },
+  // ---------- util ----------
+  _pad:n=>String(n).padStart(2,'0'),
+  _folder(m){const p=this._BLN[+m.tglShift.slice(5,7)-1];return m.tglShift.slice(0,4)+' / '+p+' / '+m.tglShift+' / '+m.shift;},
+  _calc(m){ // shift & tanggal-shift dari tanggal+jam (sama persis dengan server)
+    m.shift=SRIT.Util.shiftOf(m.jam);m.tglShift=SRIT.Util.shiftDate(m.tanggal,m.jam);return m;
+  },
+  _requeue(){this.state.queue.forEach(q=>this._calc(q.meta));if(this.state.tab==='upload')this._renderQueue();},
+  _badge(s){return `<span class="dk-sh ${s}">${this._ICO[s]||''} ${s}</span>`;},
+  _loadExif(){
+    if(window.EXIF)return Promise.resolve(true);
+    if(this._exifP)return this._exifP;
+    return this._exifP=new Promise(res=>{const s=document.createElement('script');s.src=atob('aHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L25wbS9leGlmLWpzQDIuMy4wL2V4aWYuanM=');
+      s.onload=()=>res(!!window.EXIF);s.onerror=()=>res(false);document.head.appendChild(s);});
+  },
+  _exifTags(file){return new Promise(res=>{try{EXIF.getData(file,function(){res(EXIF.getAllTags(this)||{});});}catch(e){res({});}});},
+  _gps(arr,ref){
+    if(!arr||arr.length<3)return null;
+    const f=x=>x&&x.denominator?x.numerator/x.denominator:Number(x);
+    let d=f(arr[0])+f(arr[1])/60+f(arr[2])/3600;if(ref==='S'||ref==='W')d=-d;return isFinite(d)?+d.toFixed(6):null;
+  },
+  _getGeo(){
+    if(this.state.geo)return Promise.resolve(this.state.geo);
+    return new Promise(res=>{
+      const no={lat:'',lng:''};
+      if(!navigator.geolocation){res(no);return;}
+      navigator.geolocation.getCurrentPosition(p=>{this.state.geo={lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6)};res(this.state.geo);},()=>res(no),{timeout:6000});
+    });
+  },
+  async _meta(file){
+    const P=this._pad,m={tanggal:'',jam:'',src:'',lat:'',lng:''};
+    if(await this._loadExif()){
+      const t=await this._exifTags(file),str=t.DateTimeOriginal||t.CreateDate||t.DateCreated;
+      const x=typeof str==='string'&&str.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})/);
+      if(x){m.tanggal=x[1]+'-'+x[2]+'-'+x[3];m.jam=x[4]+':'+x[5];m.src='EXIF';}
+      const la=this._gps(t.GPSLatitude,t.GPSLatitudeRef),lo=this._gps(t.GPSLongitude,t.GPSLongitudeRef);
+      if(la!=null&&lo!=null){m.lat=la;m.lng=lo;}
+    }
+    if(!m.tanggal&&file.lastModified){const d=new Date(file.lastModified);m.tanggal=d.getFullYear()+'-'+P(d.getMonth()+1)+'-'+P(d.getDate());m.jam=P(d.getHours())+':'+P(d.getMinutes());m.src='Berkas';}
+    if(!m.tanggal){const d=new Date();m.tanggal=d.getFullYear()+'-'+P(d.getMonth()+1)+'-'+P(d.getDate());m.jam=P(d.getHours())+':'+P(d.getMinutes());m.src='Sistem';}
+    if(m.lat===''){const g=await this._getGeo();m.lat=g.lat;m.lng=g.lng;}
+    return this._calc(m);
+  },
+  // ---------- UNGGAH ----------
+  _renderUpload(){
+    const sesi=(()=>{try{return SRIT.Api.getSessionsForDate(SRIT.Util.todayISO(),true);}catch(e){return[];}})();
+    const names=[...new Set(sesi.map(s=>s.nama).filter(Boolean))];
+    const cfg=SRIT.Util.shiftCfg();
+    $('#dkBody').innerHTML=`<div class="row g-3"><div class="col-lg-5"><div class="card-srit p-3">
+        <label class="form-label-sm">Nama kegiatan <span class="text-danger">*</span></label>
+        <input class="form-control" id="dkKeg" list="dkKegList" maxlength="120" placeholder="Ketik atau pilih kegiatan hari ini" autocomplete="off" value="${SRIT.Util.esc(this._keg||'')}">
+        <datalist id="dkKegList">${names.map(n=>`<option value="${SRIT.Util.esc(n)}">`).join('')}</datalist>
+        <div class="form-check form-switch mt-3"><input class="form-check-input" type="checkbox" id="dkWm" ${this._wm===false?'':'checked'}><label class="form-check-label" for="dkWm" style="font-size:13px">Tambahkan watermark (kegiatan, waktu, shift, koordinat)</label></div>
+        <div class="d-flex gap-2 flex-wrap mt-3">
+          <button class="btn btn-primary btn-sm" id="dkCam"><i class="bi bi-camera"></i> Kamera</button>
+          <button class="btn btn-outline-primary btn-sm" id="dkGal"><i class="bi bi-images"></i> Pilih dari galeri</button>
+        </div>
+        <input type="file" id="dkFcam" accept="image/*" capture="environment" hidden><input type="file" id="dkFgal" accept="image/*" multiple hidden>
+        <div class="text-muted-2 mt-3" style="font-size:11px"><b>Jam shift:</b> ${this._badge('PAGI')} ${cfg.PAGI} \u00b7 ${this._badge('SIANG')} ${cfg.SIANG} \u00b7 ${this._badge('MALAM')} ${cfg.MALAM}\u2013${cfg.PAGI} (lewat tengah malam).<br>Foto malam pukul 00:00\u2013${cfg.PAGI} disimpan di folder <b>tanggal sebelumnya</b> / MALAM karena shift-nya dimulai kemarin. Tanggal & jam asli tetap tercatat.</div>
+      </div></div>
+      <div class="col-lg-7"><div class="card-srit p-0">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2"><h6 class="section-title mb-0"><i class="bi bi-card-image me-1"></i>Antrean unggah <span class="badge-soft st-HADIR" id="dkN">0</span></h6>
+          <button class="btn btn-success btn-sm" id="dkGo" disabled><i class="bi bi-cloud-arrow-up"></i> Unggah semua</button></div>
+        <div id="dkQ"></div><div class="p-2 text-muted-2" id="dkSum" style="font-size:12px"></div>
+      </div></div></div>`;
+    $('#dkKeg').oninput=e=>{this._keg=e.target.value;};
+    $('#dkWm').onchange=e=>{this._wm=e.target.checked;};
+    $('#dkCam').onclick=()=>$('#dkFcam').click();$('#dkGal').onclick=()=>$('#dkFgal').click();
+    $('#dkFcam').onchange=e=>this._add(e.target.files);$('#dkFgal').onchange=e=>this._add(e.target.files);
+    $('#dkGo').onclick=()=>this._uploadAll();
+    $('#dkQ').onclick=e=>{
+      const rm=e.target.closest('[data-rm]');
+      if(rm&&!this.state.busy){const i=+rm.dataset.rm,q=this.state.queue[i];if(q){try{URL.revokeObjectURL(q.url);}catch(x){}this.state.queue.splice(i,1);this._renderQueue();}}
+    };
+    $('#dkQ').onchange=e=>{ // koreksi tanggal/jam manual \u2192 hitung ulang shift & folder
+      const el=e.target.closest('[data-dt]');if(!el||!el.value)return;
+      const q=this.state.queue[+el.dataset.dt];if(!q)return;
+      q.meta.tanggal=el.value.slice(0,10);q.meta.jam=el.value.slice(11,16);q.meta.src='Manual';this._calc(q.meta);this._renderQueue();
+    };
+    this._renderQueue();
+  },
+  async _add(files){
+    if(!files||!files.length)return;
+    SRIT.Loading.show();
+    try{for(const f of Array.from(files)){
+      if(!/^image\//.test(f.type||'')&&!/\.(jpe?g|png|heic|webp)$/i.test(f.name))continue;
+      const meta=await this._meta(f);
+      this.state.queue.push({file:f,meta,url:URL.createObjectURL(f),st:'',id:Math.random().toString(36).slice(2,8)});
+    }}finally{SRIT.Loading.hide();}
+    ['dkFcam','dkFgal'].forEach(i=>{const el=$('#'+i);if(el)el.value='';});
+    this._renderQueue();
+  },
+  _renderQueue(){
+    const q=this.state.queue,box=$('#dkQ');if(!box)return;
+    const E=SRIT.Util.esc;
+    $('#dkN').textContent=q.length;$('#dkGo').disabled=!q.length||this.state.busy;
+    box.innerHTML=q.length?q.map((x,i)=>{const m=x.meta;
+      const stt=x.st==='ok'?'<span class="dk-st ok">\u2713 Tersimpan</span>':x.st==='run'?'<span class="dk-st run">Mengunggah\u2026</span>':x.st?`<span class="dk-st err">\u2715 ${E(x.st)}</span>`:'';
+      return `<div class="dk-q"><img src="${x.url}" alt="">
+        <div class="m"><div class="d-flex align-items-center gap-2 flex-wrap">${this._badge(m.shift)}<span class="badge-soft st-BELUM">${E(m.src)}</span>${stt}</div>
+          <div class="mt-1"><input type="datetime-local" class="form-control form-control-sm" style="max-width:220px" data-dt="${i}" value="${m.tanggal}T${m.jam}" ${this.state.busy?'disabled':''}></div>
+          <div class="p mt-1">\ud83d\udcc1 ${E(this._folder(m))}</div>
+          <div class="p">${m.lat!==''?'\ud83d\udccd '+m.lat+', '+m.lng:'\ud83d\udccd koordinat tidak tersedia'} \u00b7 ${(x.file.size/1024).toFixed(0)} KB</div></div>
+        <button class="btn btn-sm btn-outline-danger py-0" data-rm="${i}" ${this.state.busy?'disabled':''} title="Hapus dari antrean"><i class="bi bi-x-lg"></i></button></div>`;}).join('')
+      :'<div class="empty-state py-4"><i class="bi bi-camera d-block"></i>Belum ada foto. Ambil dari kamera atau pilih dari galeri.</div>';
+    const per={PAGI:0,SIANG:0,MALAM:0};q.forEach(x=>per[x.meta.shift]++);
+    $('#dkSum').textContent=q.length?'Ringkasan antrean: Pagi '+per.PAGI+' \u00b7 Siang '+per.SIANG+' \u00b7 Malam '+per.MALAM:'';
+  },
+  _compress(file){
+    return new Promise(res=>{
+      const img=new Image(),url=URL.createObjectURL(file);
+      img.onload=()=>{let w=img.naturalWidth,h=img.naturalHeight;const mx=1600;
+        if(w>mx||h>mx){if(w>=h){h=Math.round(h*mx/w);w=mx;}else{w=Math.round(w*mx/h);h=mx;}}
+        const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
+        res(c);};
+      img.onerror=()=>{URL.revokeObjectURL(url);res(null);};img.src=url;
+    });
+  },
+  _mark(c,m,keg){
+    const ctx=c.getContext('2d'),w=c.width,h=c.height,fs=Math.max(13,Math.floor(w/32)),lh=fs*1.45;
+    const d=m.tanggal.split('-').reverse().join('/');
+    const lines=[keg,d+'  '+m.jam,'Shift : '+m.shift,m.lat!==''?'Lat : '+m.lat:'Lat : -',m.lng!==''?'Lng : '+m.lng:'Lng : -'];
+    const bh=lh*lines.length+fs*0.7,by=h-bh-fs*0.3;
+    ctx.fillStyle='rgba(0,0,0,0.52)';ctx.fillRect(0,by,w,h-by);
+    ctx.fillStyle='#fff';ctx.font='bold '+fs+'px Arial,sans-serif';ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=3;
+    lines.forEach((l,i)=>ctx.fillText(l,fs*0.4,by+lh*(i+1)-fs*0.1));
+  },
+  async _uploadAll(){
+    const keg=($('#dkKeg').value||'').trim();
+    if(!keg){SRIT.Notify('Nama kegiatan wajib diisi','err');$('#dkKeg').focus();return;}
+    const wm=$('#dkWm').checked,sesi=(()=>{try{return SRIT.Api.getSessionsForDate(SRIT.Util.todayISO(),true).find(s=>s.nama===keg);}catch(e){return null;}})();
+    this.state.busy=true;let ok=0,gagal=0;
+    for(const x of this.state.queue.slice()){
+      if(x.st==='ok')continue;
+      x.st='run';this._renderQueue();
+      try{
+        const c=await this._compress(x.file);if(!c)throw new Error('Foto tidak terbaca');
+        if(wm)this._mark(c,x.meta,keg);
+        const b64=c.toDataURL('image/jpeg',wm?0.88:0.7).split(',')[1];
+        const r=await SRIT.Server.call('apiDokUpload',{base64:b64,kegiatan:keg,sesiId:sesi?sesi.id:'',tanggal:x.meta.tanggal,jam:x.meta.jam,
+          lat:String(x.meta.lat),lng:String(x.meta.lng),ukuranKb:Math.round(b64.length*0.75/1024),clientId:x.id});
+        x.st='ok';x.meta.shift=r.shift;x.meta.tglShift=r.tglShift;ok++;
+      }catch(e){x.st=(e.message||'Gagal').slice(0,80);gagal++;}
+      this._renderQueue();
+    }
+    this.state.busy=false;
+    this.state.queue=this.state.queue.filter(x=>{if(x.st==='ok'){try{URL.revokeObjectURL(x.url);}catch(e){}return false;}return true;});
+    this._renderQueue();
+    if(ok)SRIT.Notify(ok+' foto tersimpan di Drive'+(gagal?' \u00b7 '+gagal+' gagal (tekan Unggah lagi)':''),gagal?'warn':'ok');
+    else if(gagal)SRIT.Notify(gagal+' foto gagal diunggah','err');
+  },
+  // ---------- GALERI ----------
+  _renderGaleri(){
+    const g=this.state.gal,E=SRIT.Util.esc;
+    $('#dkBody').innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
+        <div><label class="form-label-sm">Dari tanggal</label><input type="date" class="form-control form-control-sm" id="dgFrom" value="${g.from}"></div>
+        <div><label class="form-label-sm">Sampai tanggal</label><input type="date" class="form-control form-control-sm" id="dgTo" value="${g.to}"></div>
+        <div><label class="form-label-sm">Shift</label><select class="form-select form-select-sm" id="dgShift"><option value="">Semua shift</option>${['PAGI','SIANG','MALAM'].map(s=>`<option ${g.shift===s?'selected':''}>${s}</option>`).join('')}</select></div>
+        <div style="min-width:200px"><label class="form-label-sm">Kegiatan</label><input class="form-control form-control-sm" id="dgKeg" placeholder="Cari nama kegiatan\u2026" value="${E(g.keg)}"></div>
+      </div><div class="d-flex flex-wrap gap-2 align-items-center mt-2" id="dgSum" style="font-size:12px"></div></div>
+      <div id="dgGrid"><div class="p-3 text-muted-2">Memuat\u2026</div></div><div class="d-flex justify-content-between align-items-center mt-3" id="dgPag"></div>`;
+    const reload=()=>{g.page=1;this._loadGal();};
+    $('#dgFrom').onchange=e=>{g.from=e.target.value;reload();};$('#dgTo').onchange=e=>{g.to=e.target.value;reload();};
+    $('#dgShift').onchange=e=>{g.shift=e.target.value;reload();};
+    let t;$('#dgKeg').oninput=e=>{clearTimeout(t);t=setTimeout(()=>{g.keg=e.target.value.trim();reload();},350);};
+    this._loadGal();
+  },
+  async _loadGal(){
+    const g=this.state.gal,E=SRIT.Util.esc,seq=(this._gs=(this._gs||0)+1);let r;
+    try{r=await SRIT.Server.call('apiDokList',{from:g.from,to:g.to,shift:g.shift,keg:g.keg,page:g.page,size:24});}
+    catch(e){const el=$('#dgGrid');if(el)el.innerHTML='<div class="p-3 text-danger">'+E(e.message||'Gagal memuat')+'</div>';return;}
+    if(seq!==this._gs||SRIT.currentFeature!=='dokumentasi'||!$('#dgGrid'))return;
+    this._rows={};r.rows.forEach(x=>this._rows[x.id]=x);
+    const s=r.summary;
+    $('#dgSum').innerHTML=`<span class="badge-soft st-HADIR">${s.total} foto</span>${['PAGI','SIANG','MALAM'].map(k=>`<span class="dk-sh ${k}">${this._ICO[k]} ${k} ${s[k]}</span>`).join('')}
+      ${r.folderUrl?`<a class="ms-auto" href="${E(r.folderUrl)}" target="_blank" rel="noopener"><i class="bi bi-folder2-open"></i> Folder Drive</a>`:''}${r.sheetUrl?`<a href="${E(r.sheetUrl)}" target="_blank" rel="noopener"><i class="bi bi-table"></i> Spreadsheet</a>`:''}`;
+    $('#dgGrid').innerHTML=r.rows.length?`<div class="dk-g">${r.rows.map(x=>`<div class="dk-c" data-id="${E(x.id)}"><div class="im" data-im="${E(x.id)}"><i class="bi bi-image"></i></div>
+      <div class="b"><div class="k" title="${E(x.kegiatan)}">${E(x.kegiatan)}</div><div class="text-muted-2">${SRIT.Util.fmtDateShort(x.tanggal)} \u00b7 ${E(x.jam)}</div><div class="mt-1">${this._badge(x.shift)}</div></div></div>`).join('')}</div>`
+      :'<div class="empty-state"><i class="bi bi-images d-block"></i>Belum ada foto sesuai filter.</div>';
+    $('#dgPag').innerHTML=r.pages>1?`<span class="text-muted-2" style="font-size:12px">Hal ${r.page}/${r.pages} \u00b7 ${r.total} foto</span>
+      <span><button class="btn btn-sm btn-outline-secondary py-0" id="dgP" ${r.page<=1?'disabled':''}>\u2039</button> <button class="btn btn-sm btn-outline-secondary py-0" id="dgN" ${r.page>=r.pages?'disabled':''}>\u203a</button></span>`:'';
+    const pv=$('#dgP'),nx=$('#dgN');if(pv)pv.onclick=()=>{g.page--;this._loadGal();};if(nx)nx.onclick=()=>{g.page++;this._loadGal();};
+    $('#dgGrid').onclick=e=>{const c=e.target.closest('[data-id]');if(c)this._detail(c.dataset.id);};
+    // gambar mini diminta bertahap (server membaca Drive)
+    this._thumbs={};const ids=r.rows.map(x=>x.id);
+    for(let i=0;i<ids.length;i+=8){
+      if(seq!==this._gs)return;
+      try{const t=await SRIT.Server.call('apiDokThumbs',ids.slice(i,i+8));
+        if(seq!==this._gs||SRIT.currentFeature!=='dokumentasi')return;
+        Object.keys(t).forEach(id=>{this._thumbs[id]=t[id];const el=document.querySelector('[data-im="'+id+'"]');if(el&&t[id])el.innerHTML='<img alt="" src="'+t[id]+'">';});
+      }catch(e){}
+    }
+  },
+  _detail(id){
+    const x=(this._rows||{})[id];if(!x)return;const E=SRIT.Util.esc;
+    const m=SRIT.Modal.open({title:E(x.kegiatan),size:'modal-lg',body:`
+      ${this._thumbs&&this._thumbs[id]?`<img alt="" src="${this._thumbs[id]}" style="width:100%;max-height:60vh;object-fit:contain;border-radius:10px;background:var(--srit-hover)">`:''}
+      <div class="mt-3" style="font-size:13px">${this._badge(x.shift)} <b>${SRIT.Util.fmtDateShort(x.tanggal)} ${E(x.jam)}</b>
+        <div class="text-muted-2 mt-1">\ud83d\udcc1 ${E(this._folder({tglShift:x.tglShift,shift:x.shift}))}</div>
+        <div class="text-muted-2">${x.lat?'\ud83d\udccd '+E(x.lat)+', '+E(x.lng):'\ud83d\udccd koordinat tidak tersedia'} \u00b7 ${E(String(x.kb||'-'))} KB</div>
+        <div class="text-muted-2">Diunggah oleh ${E(x.oleh)} \u00b7 ${E(x.pada)}</div></div>`,
+      footer:`${x.link?`<a class="btn btn-outline-primary btn-sm" href="${E(x.link)}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Buka di Drive</a>`:''}
+        ${this._can.D?'<button class="btn btn-outline-danger btn-sm" id="dkDel"><i class="bi bi-trash"></i> Hapus</button>':''}`});
+    const d=m.el.querySelector('#dkDel');
+    if(d)d.onclick=async()=>{
+      if(!window.confirm('Hapus foto ini dari Drive dan log? Tindakan ini tidak dapat dibatalkan.'))return;
+      SRIT.Loading.show();
+      try{await SRIT.Server.call('apiDokDelete',id);SRIT.Loading.hide();m.close();SRIT.Notify('Foto dihapus','ok');this._loadGal();}
+      catch(e){SRIT.Loading.hide();SRIT.Notify(e.message||'Gagal menghapus','err');}
+    };
+  },
+  // ---------- PENGATURAN SHIFT ----------
+  _renderShift(){
+    const c=SRIT.Util.shiftCfg();
+    $('#dkBody').innerHTML=`<div class="row g-3"><div class="col-lg-6"><div class="card-srit p-3">
+        <h6 class="section-title mb-2"><i class="bi bi-clock-history me-1"></i>Jam shift</h6>
+        <div class="text-muted-2 mb-3" style="font-size:12px">Isi jam <b>mulai</b> tiap shift. Shift berakhir saat shift berikutnya mulai; Malam berakhir saat Pagi mulai (lewat tengah malam). Dipakai oleh Foto Dokumentasi dan penentuan shift di Jurnal Piket.</div>
+        <div class="row g-2">
+          <div class="col-4"><label class="form-label-sm">${this._ICO.PAGI} Pagi mulai</label><input type="time" class="form-control form-control-sm" id="shP" value="${c.PAGI}"></div>
+          <div class="col-4"><label class="form-label-sm">${this._ICO.SIANG} Siang mulai</label><input type="time" class="form-control form-control-sm" id="shS" value="${c.SIANG}"></div>
+          <div class="col-4"><label class="form-label-sm">${this._ICO.MALAM} Malam mulai</label><input type="time" class="form-control form-control-sm" id="shM" value="${c.MALAM}"></div>
+        </div>
+        <div class="mt-3" id="shPrev" style="font-size:12px"></div>
+        <button class="btn btn-primary btn-sm mt-3" id="shSave"><i class="bi bi-save"></i> Simpan jam shift</button>
+      </div></div>
+      <div class="col-lg-6"><div class="card-srit p-3">
+        <h6 class="section-title mb-2"><i class="bi bi-folder-check me-1"></i>Periksa ulang foto terunggah</h6>
+        <div class="text-muted-2 mb-3" style="font-size:12px">Membandingkan shift &amp; folder setiap foto yang sudah diunggah dengan jam shift di atas. Gunakan setelah mengubah jam shift. \u201cRapikan\u201d memindahkan berkas ke folder yang benar.</div>
+        <div class="d-flex gap-2"><button class="btn btn-outline-primary btn-sm" id="shChk"><i class="bi bi-search"></i> Periksa</button>
+          <button class="btn btn-warning btn-sm" id="shFix" disabled><i class="bi bi-arrow-left-right"></i> Rapikan folder</button></div>
+        <div class="mt-3" id="shRes" style="font-size:12px"></div>
+      </div></div></div>`;
+    const E=SRIT.Util.esc,min=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(v||'');return m?+m[1]*60+ +m[2]:null;};
+    const cur=()=>({PAGI:$('#shP').value,SIANG:$('#shS').value,MALAM:$('#shM').value});
+    const prev=()=>{
+      const v=cur(),a=min(v.PAGI),b=min(v.SIANG),d=min(v.MALAM),box=$('#shPrev');
+      if(a==null||b==null||d==null||!(a<b&&b<d)){box.innerHTML='<span class="text-danger">Urutan harus Pagi &lt; Siang &lt; Malam dalam satu hari.</span>';$('#shSave').disabled=true;return;}
+      const end=m=>{m=(m-1+1440)%1440;return this._pad(Math.floor(m/60))+':'+this._pad(m%60);};
+      box.innerHTML=`${this._badge('PAGI')} ${v.PAGI}\u2013${end(b)} \u00b7 ${this._badge('SIANG')} ${v.SIANG}\u2013${end(d)} \u00b7 ${this._badge('MALAM')} ${v.MALAM}\u2013${end(a)} <span class="text-muted-2">(hari berikutnya)</span>`;
+      $('#shSave').disabled=false;
+    };
+    ['shP','shS','shM'].forEach(i=>$('#'+i).oninput=prev);prev();
+    $('#shSave').onclick=async()=>{
+      SRIT.Loading.show();
+      try{const r=await SRIT.Server.call('apiDokShiftSave',cur());SRIT.Util.setShift(r.shift);SRIT.Loading.hide();SRIT.Notify('Jam shift disimpan. Jalankan \u201cPeriksa\u201d untuk foto lama.','ok');}
+      catch(e){SRIT.Loading.hide();SRIT.Notify(e.message||'Gagal menyimpan','err');}
+    };
+    const run=async apply=>{
+      if(apply&&!window.confirm('Pindahkan berkas yang salah folder ke folder shift yang benar?'))return;
+      SRIT.Loading.show();
+      try{
+        const r=await SRIT.Server.call('apiDokCekShift',apply);SRIT.Loading.hide();
+        $('#shFix').disabled=!(r.salah-r.fixed>0);
+        $('#shRes').innerHTML=!r.salah?'<span class="dk-st ok">\u2713 Semua foto sudah sesuai jam shift saat ini.</span>'
+          :`<div class="${apply&&r.fixed===r.salah?'dk-st ok':'dk-st run'}">${apply?r.fixed+' dari '+r.salah+' foto dipindahkan'+(r.partial?' \u2014 belum selesai, tekan Rapikan lagi':''):r.salah+' foto tidak sesuai jam shift saat ini'}</div>
+          <table class="table table-sm mt-2 mb-0"><thead><tr><th>Foto</th><th>Tersimpan</th><th>Seharusnya</th></tr></thead><tbody>${r.contoh.map(c=>`<tr><td>${E(c.tanggal)} ${E(c.jam)}</td><td>${E(c.dari)}</td><td>${E(c.ke)}</td></tr>`).join('')}</tbody></table>${r.salah>r.contoh.length?'<div class="text-muted-2 mt-1">\u2026dan lainnya</div>':''}`;
+      }catch(e){SRIT.Loading.hide();SRIT.Notify(e.message||'Gagal memeriksa','err');}
+    };
+    $('#shChk').onclick=()=>run(false);$('#shFix').onclick=()=>run(true);
+  }
+};
 </script>
 
 
@@ -4273,19 +4619,72 @@ SRIT.Features.laporan={
     const bs=((this._pf&&this._pf.day)||{}).bySession||{};const out=[];
     Object.keys(bs).forEach(sid=>['HADIR','IZIN','SAKIT','ALPA'].forEach(st=>{for(let i=0;i<(bs[sid][st]||0);i++)out.push({KEGIATAN_ID:sid,STATUS:st});}));
     return out;},
+  /* ===== Filter bertingkat laporan rekap absensi: Kegiatan · Jenjang → Kelas · JK · Asrama → Gedung → Kamar =====
+     Filter anak (jenjang…kamar) dihitung di browser; filter kegiatan diminta ke server (data per sesi). Anak-filter muncul setelah induknya dipilih. */
+  _fl:{},
+  _kegOpts(){
+    const ok=r=>SRIT.Api.absensiYa(r.ABSENSI)&&(r.STATUS||'AKTIF')!=='NONAKTIF';
+    return [...new Set(SRIT.Store.read('JADWAL').filter(ok).concat(SRIT.Store.read('KEGIATAN').filter(r=>ok(r)&&['DIBATALKAN','USULAN','DITOLAK'].indexOf(r.STATUS||'TERJADWAL')<0)).map(r=>r.NAMA).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id',{numeric:true}));
+  },
+  _flOpts(k){
+    const f=this._fl,A=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF'),srt=(a,b)=>String(a[1]).localeCompare(String(b[1]),'id',{numeric:true});
+    if(k==='jenjang')return ['SRD','SRMP','SRMA'].filter(j=>A.some(a=>a.JENJANG===j)).map(j=>[j,j]);
+    if(k==='kelas')return [...new Set(A.filter(a=>a.JENJANG===f.jenjang).map(a=>a.KELAS).filter(Boolean))].map(v=>[v,v]).sort(srt);
+    if(k==='jk')return [['L','Putra'],['P','Putri']];
+    if(k==='asrama'){const ids=new Set(A.map(a=>a.ASRAMA));return SRIT.Store.read('ASRAMA').filter(x=>ids.has(x.ID)).map(x=>[x.ID,x.NAME]).sort(srt);}
+    if(k==='gedung'){const ids=new Set(A.filter(a=>a.ASRAMA===f.asrama).map(a=>a.GEDUNG));return SRIT.Store.read('GEDUNG').filter(x=>ids.has(x.ID)).map(x=>[x.ID,x.NAME]).sort(srt);}
+    if(k==='kamar'){const ids=new Set(A.filter(a=>a.GEDUNG===f.gedung).map(a=>a.KAMAR));return SRIT.Store.read('KAMAR').filter(x=>ids.has(x.ID)).map(x=>[x.ID,x.NAME]).sort(srt);}
+    return [];
+  },
+  // induk → anak; mengganti induk mengosongkan seluruh turunannya
+  _FLKIDS:{jenjang:['kelas'],asrama:['gedung','kamar'],gedung:['kamar']},
+  _flLabel(){
+    const f=this._fl,nm=(k,v)=>((this._flOpts(k).find(o=>o[0]===v))||[v,v])[1],out=[];
+    if(f.keg)out.push('Kegiatan: '+f.keg);
+    if(f.jenjang)out.push('Jenjang '+f.jenjang);if(f.kelas)out.push('Kelas '+f.kelas);
+    if(f.jk)out.push(f.jk==='L'?'Putra':'Putri');
+    if(f.asrama)out.push(nm('asrama',f.asrama));if(f.gedung)out.push(nm('gedung',f.gedung));if(f.kamar)out.push('Kamar '+nm('kamar',f.kamar));
+    return out.join(' · ');
+  },
+  _filterHTML(){
+    const f=this._fl,E=SRIT.Util.esc;
+    const sel=(k,lbl,opts,all)=>`<div class="lp-fi"><label class="form-label-sm">${lbl}</label><select class="form-select form-select-sm" data-fl="${k}"><option value="">${all}</option>${opts.map(o=>`<option value="${E(o[0])}" ${f[k]===o[0]?'selected':''}>${E(o[1])}</option>`).join('')}</select></div>`;
+    const kegs=this._kegOpts().map(n=>[n,n]);
+    const cells=[sel('keg','Kegiatan',kegs,'Semua kegiatan'),sel('jenjang','Jenjang',this._flOpts('jenjang'),'Semua jenjang')];
+    if(f.jenjang)cells.push(sel('kelas','Kelas',this._flOpts('kelas'),'Semua kelas'));
+    cells.push(sel('jk','Putra / Putri',this._flOpts('jk'),'Semua'),sel('asrama','Asrama',this._flOpts('asrama'),'Semua asrama'));
+    if(f.asrama)cells.push(sel('gedung','Gedung',this._flOpts('gedung'),'Semua gedung'));
+    if(f.gedung)cells.push(sel('kamar','Kamar',this._flOpts('kamar'),'Semua kamar'));
+    const n=Object.keys(f).filter(k=>f[k]).length;
+    return `<div class="lp-pl"><span class="lp-lbl"><i class="bi bi-funnel"></i> Filter</span>${n?`<button type="button" class="lp-chip on" id="lpFlReset"><i class="bi bi-x-lg"></i> Hapus ${n} filter</button>`:''}</div>
+      <div class="lp-fg">${cells.join('')}</div>
+      <div class="lp-ptxt">Filter lanjutan (kelas, gedung, kamar) muncul setelah jenjang / asrama / gedung dipilih.</div>`;
+  },
+  _bindFilter(id){
+    const P=$('#lpFilter');if(!P)return;
+    P.onchange=e=>{
+      const k=e.target.dataset.fl;if(!k)return;
+      this._fl[k]=e.target.value;
+      (this._FLKIDS[k]||[]).forEach(c=>{this._fl[c]='';});
+      this.open(id);
+    };
+    const r=$('#lpFlReset');if(r)r.onclick=()=>{this._fl={};this.open(id);};
+  },
   /* ===== Rekap absensi bulanan (tabel nama × tanggal): data harian per peserta untuk satu bulan, dari server ===== */
   async _prefetchRekap(){
     const ym=(this.to||SRIT.Util.todayISO()).slice(0,7);
-    if(this._rk&&this._rk.ym===ym&&this._rk.d&&Date.now()-this._rk.t<300000)return;
+    const keg=(this._fl&&this._fl.keg)||'';
+    if(this._rk&&this._rk.ym===ym&&this._rk.keg===keg&&this._rk.d&&Date.now()-this._rk.t<300000)return;
     SRIT.Loading.show();let d=null;
-    try{d=await SRIT.Api.getRekapBulanan(ym);}catch(e){SRIT.Notify(e.message||'Gagal memuat rekap absensi','err');}
-    SRIT.Loading.hide();this._rk={ym,t:Date.now(),d};
+    try{d=await SRIT.Api.getRekapBulanan(ym,keg);}catch(e){SRIT.Notify(e.message||'Gagal memuat rekap absensi','err');}
+    SRIT.Loading.hide();this._rk={ym,keg,t:Date.now(),d};
   },
   _BLN:['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],
   _rekapModel(){
     const rk=this._rk&&this._rk.d;if(!rk)return null;
     const ord={SRD:1,SRMP:2,SRMA:3},cmp=(a,b)=>String(a||'').localeCompare(String(b||''),'id',{numeric:true});
-    const anak=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF').sort((x,y)=>(ord[x.JENJANG]||9)-(ord[y.JENJANG]||9)||cmp(x.KELAS,y.KELAS)||cmp(x.NAMA,y.NAMA));
+    const f=this._fl||{};
+    const anak=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF'&&(!f.jenjang||a.JENJANG===f.jenjang)&&(!f.kelas||a.KELAS===f.kelas)&&(!f.jk||a.JK===f.jk)&&(!f.asrama||a.ASRAMA===f.asrama)&&(!f.gedung||a.GEDUNG===f.gedung)&&(!f.kamar||a.KAMAR===f.kamar)).sort((x,y)=>(ord[x.JENJANG]||9)-(ord[y.JENJANG]||9)||cmp(x.KELAS,y.KELAS)||cmp(x.NAMA,y.NAMA));
     const rows=anak.map(a=>{const s=rk.data[String(a.ID)]||'.'.repeat(rk.days.length);const t={H:0,S:0,I:0,A:0};for(const ch of s)if(t[ch]!=null)t[ch]++;return {a,s,t};});
     const ym=rk.ym,label=this._BLN[+ym.slice(5,7)-1]+' '+ym.slice(0,4);
     return {rk,rows,label};
@@ -4338,7 +4737,7 @@ SRIT.Features.laporan={
         const days=m.rk.days.map(d=>String(+d.slice(8)));
         const sym={H:'✓',S:'S',I:'I',A:'A','.':''};
         const rows=m.rows.map((r,i)=>[i+1,r.a.NAMA,...[...r.s].map(c=>sym[c]),r.t.H,r.t.S,r.t.I,r.t.A]);
-        return {cols:['No','Nama',...days,'H','S','I','A'],rows,meta:[['Bulan',m.label],['Hari berdata',m.rk.hariData.length],['Peserta aktif',m.rows.length]].concat(m.rk.partial?[['Catatan','Data dimuat sebagian sampai '+m.rk.sampai+' — tekan Terapkan lagi']]:[])};
+        return {cols:['No','Nama',...days,'H','S','I','A'],rows,meta:[['Bulan',m.label],['Hari berdata',m.rk.hariData.length],['Peserta aktif',m.rows.length]].concat(T._flLabel()?[['Filter',T._flLabel()]]:[]).concat(m.rk.partial?[['Catatan','Data dimuat sebagian sampai '+m.rk.sampai+' — tekan Terapkan lagi']]:[])};
      }},
      {id:'wr-refleksi',grp:'WALI ASRAMA',name:'Laporan Refleksi Mingguan',periode:'Mingguan',icon:'bi-arrow-repeat',build(){
         const rows=SRIT.Store.read('REFLEKSI').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.PERIODE,r.PJ,r.CAPAIAN,r.MASALAH,r.TINDAK_LANJUT]);
@@ -4603,6 +5002,8 @@ SRIT.Features.laporan={
 .lp-chip.on{background:rgba(var(--srit-primary-rgb),.14);border-color:var(--srit-primary);color:var(--srit-primary)}
 .lp-nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .lp-nav .form-control,.lp-nav .form-select{width:auto;font-size:13px}
+.lp-fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
+@media(max-width:575px){.lp-fg{grid-template-columns:1fr 1fr}}
 .lp-ptxt{font-size:12px;color:var(--srit-text-2);margin-top:8px}
 .lp-ptxt b{color:var(--srit-text)}
 .lp-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:12px}
@@ -4668,7 +5069,7 @@ SRIT.Features.laporan={
   // ====================================== DAFTAR LAPORAN ======================================
   render(host){SRIT.UI.setPage('Laporan','Laporan');this._host=host;this.active=null;this._css();this.list();},
   list(){
-    const host=this._host;this.active=null;this._css();
+    const host=this._host;this.active=null;this._fl={};this._css();
     host.innerHTML=`
       <div class="lp-hero card-srit">
         <div><h5><i class="bi bi-file-earmark-bar-graph me-2"></i>Pusat Laporan</h5><p>Pilih laporan, atur periodenya, lalu lihat di layar atau cetak resmi dengan kop surat.</p></div>
@@ -4790,6 +5191,7 @@ SRIT.Features.laporan={
         </div>
       </div>
       <div class="card-srit lp-period" id="lpPeriod">${this._periodHTML(rep.id)}</div>
+      ${rep.id==='wr-rekap-absen'?`<div class="card-srit lp-period" id="lpFilter">${this._filterHTML()}</div>`:''}
       <div id="lpBody"><div class="lp-stats">${[1,2,3].map(()=>'<div class="skeleton" style="height:62px;border-radius:12px"></div>').join('')}</div>
         <div class="card-srit p-3">${[1,2,3,4,5,6].map(()=>'<div class="skeleton mb-2" style="height:30px"></div>').join('')}</div></div>`;
   },
@@ -4799,7 +5201,7 @@ SRIT.Features.laporan={
     this._normalize(id);this._pushRecent(id);
     this._host.innerHTML=this._shellHTML(rep);
     $('#lpBack').onclick=()=>this.list();
-    this._bindPeriod(id);
+    this._bindPeriod(id);this._bindFilter(id);
     await this._prefetch(id);
     if(SRIT.currentFeature!=='laporan'||this.active!==id)return;
     let res;
@@ -4955,7 +5357,7 @@ SRIT.Features.laporan={
         .rk .nd{background:#e4e4e4}.rk .al{font-weight:bold}
         .rk tr.g td{background:#dfe6f1;font-weight:bold;text-align:left;padding:1px 5px;font-family:'Times New Roman',serif;font-size:10.5px}
         .leg{margin-top:5px;font-size:10px}.sign{margin-top:16px;page-break-inside:avoid}`;
-      const inner=this._kop(set,'REKAP ABSENSI PESERTA DIDIK BULAN '+m.label.toUpperCase(),'')+
+      const inner=this._kop(set,'REKAP ABSENSI PESERTA DIDIK BULAN '+m.label.toUpperCase(),this._flLabel())+
         '<table class="rk">'+colg+head+'<tbody>'+body+'</tbody></table>'+
         '<div class="leg"><b>Keterangan:</b> ✓ = Hadir &nbsp; S = Sakit &nbsp; I = Izin &nbsp; A = Alpa &nbsp; Kotak abu-abu = tidak ada data absensi pada tanggal itu. '+
         'Status harian ditentukan dari mayoritas sesi kegiatan pada hari tersebut (hadir bila sesi hadir ≥ sesi tidak hadir).'+(rk.partial?' <b>Data dimuat sebagian sampai '+E(rk.sampai)+'.</b>':'')+'</div>'+
@@ -6566,7 +6968,7 @@ const F={
     if(!tabs.some(t=>t[0]===this.st.tab))this.st.tab='timeline';
     const detail={
       timeline:tl.length?`<div class="pf-tl">${tl.slice(0,300).map(e=>`<div class="pf-ti" style="--c:${e.c}"><div style="font-size:11px" class="text-muted-2">${U.fmtDateShort(String(e.d).slice(0,10))}</div><div style="font-size:13px"><i class="bi ${e.i} me-1" style="color:${e.c}"></i><b>${esc(e.t)}</b> <span class="text-muted-2">${esc(e.x)}</span></div></div>`).join('')}</div>${tl.length>300?'<div class="text-muted-2 mt-2" style="font-size:12px">Menampilkan 300 catatan terbaru dari '+tl.length+'.</div>':''}`:'<div class="text-center text-muted-2 py-3">Tidak ada catatan pada periode ini</div>',
-      absen:tbl(['Tanggal','Hadir','Izin','Sakit','Alpa'],Object.keys(D.hari).filter(d=>inR(P,d)&&(D.hari[d][1]+D.hari[d][2]+D.hari[d][3])>0).sort().reverse().map(d=>{const x=D.hari[d];return [U.fmtDateShort(d),x[0],x[1]||'-',x[2]||'-',x[3]?`<b style="color:#ef4444">${x[3]}</b>`:'-'];}),'Tidak ada ketidakhadiran pada periode ini 🎉'),
+      absen:tbl(['Tanggal','Hadir','Izin','Sakit','Alpa'],Object.keys(D.hari).filter(d=>inR(P,d)&&(D.hari[d][1]+D.hari[d][2]+D.hari[d][3])>0).sort().reverse().map(d=>{const x=D.hari[d];return [U.fmtDateShort(d),x[0],x[1]||'-',x[2]||'-',x[3]?`<b style="color:#ef4444">${x[3]}</b>`:'-'];}),'Tidak ada ketidakhadiran pada periode ini \ud83c\udf89'),
       pel:tbl(['Tanggal','Aturan','Tingkat','Kejadian','Tindakan','Status'],S.pel.slice().sort((x,y)=>String(y.TANGGAL).localeCompare(String(x.TANGGAL))).map(r=>[U.fmtDateShort(r.TANGGAL),esc((tt(r).KODE?tt(r).KODE+' — ':'')+(tt(r).JUDUL||'-')),badge(r.TINGKAT||'-',tkCls[r.TINGKAT]),esc(r.KEJADIAN||'-'),esc(r.TINDAKAN||'-'),badge(r.STATUS||'-',r.STATUS==='SELESAI'?'HADIR':'SAKIT')])),
       pbn:tbl(['Tanggal','Jenis','Materi','Hasil','Pembina','Status'],S.pbn.slice().sort((x,y)=>String(y.TANGGAL).localeCompare(String(x.TANGGAL))).map(r=>[U.fmtDateShort(r.TANGGAL),esc(r.JENIS||'-'),esc(r.MATERI||'-'),esc(r.HASIL||'-'),esc(r.PEMBINA||'-'),badge(r.STATUS||'-',r.STATUS==='SELESAI'?'HADIR':'SAKIT')])),
       pen:tbl(['Periode','Tanggal'].concat(ASPEK.map(k=>ASPEK_L[k].slice(0,6)+'.'),['Rata²','Penilai']),S.pen.slice().sort((x,y)=>String(y.TANGGAL).localeCompare(String(x.TANGGAL))).map(r=>{const v=ASPEK.map(k=>+r[k]).filter(z=>z>0);return [esc(r.PERIODE||'-'),U.fmtDateShort(r.TANGGAL)].concat(ASPEK.map(k=>r[k]||'-'),['<b>'+(v.length?r2(avg(v)):'-')+'</b>',esc(r.PENILAI||'-')]);})),
@@ -7386,7 +7788,7 @@ SRIT.Features.settings={
    ROUTER + FEATURE LOADER (lazy, with lifecycle)
    ========================================================================= */
 SRIT.Router={
-  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','tamu','tatatertib','pelanggaran','pembinaan','insiden','inspeksi','sarpras','refleksi','penilaian','gamifikasi','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
+  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','dokumentasi','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','tamu','tatatertib','pelanggaran','pembinaan','insiden','inspeksi','sarpras','refleksi','penilaian','gamifikasi','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
   go(){
     const _nav=(this._nav=(this._nav||0)+1);
     let hash=location.hash.replace('#/','')||'live';
@@ -8440,7 +8842,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   if(D){if(routed)D.ready();else{D.fail(miss);return;}}   // router gagal → tampilkan penyebab, jangan biarkan layar kosong
   // peringatan non-fatal: menu yang berkasnya cacat & pustaka CDN yang gagal dimuat
   step('peringatan',()=>{
-    if(miss.length)SRIT.Notify('Berkas belum termuat lengkap: '+miss.map(m=>m.file).join(', ')+'. Menu terkait tidak akan berfungsi.','warn',15000);
+    if(miss.length)SRIT.Notify('Berkas belum termuat lengkap: '+miss.map(m=>m.file+(m.missing&&m.missing.length?' ['+m.missing.join(', ')+']':'')).join(', ')+'. Menu terkait tidak akan berfungsi. Tempel ulang berkas tsb. secara utuh, lalu Deploy versi baru.','warn',15000);
     const lib=['bootstrap','Chart'].filter(k=>!window[k]);
     if(lib.length)SRIT.Notify('Pustaka '+lib.join(' & ')+' dari CDN belum termuat — tampilan/grafik mungkin tidak lengkap. Periksa koneksi internet.','warn',12000);
   });
