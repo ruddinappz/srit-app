@@ -8019,10 +8019,10 @@ SRIT.Router={
    lalu memfilter Jenjang × Jenis Kelamin di sisi klien tanpa panggilan server.
    ========================================================================= */
 SRIT.LiveTV={
-  timer:null,clockTimer:null,rotTimer:null,mobile:false,slide:0,slideCount:8,fDate:'',fSesi:'',fJJ:'',fJK:'',autoJJ:false,data:null,_rounds:0,
+  timer:null,clockTimer:null,rotTimer:null,mobile:false,slide:0,slideCount:9,fDate:'',fSesi:'',fJJ:'',fJK:'',autoJJ:false,data:null,_rounds:0,
   JJ:['SRD','SRMP','SRMA'],
   COL:{hadir:'#34d399',izin:'#818cf8',sakit:'#fbbf24',alpa:'#f87171',belum:'#64748b',L:'#38bdf8',P:'#f472b6',SRD:'#fb923c',SRMP:'#c084fc',SRMA:'#2dd4bf',baik:'#34d399',perbaikan:'#fbbf24',rusak:'#f87171'},
-  PAGES:[['Ringkasan Eksekutif','Ringkasan'],['Profil Peserta Didik','Profil'],['Absensi & Kehadiran','Kehadiran'],['Kesehatan','Kesehatan'],['Kedisiplinan & Pembinaan','Disiplin'],['Aset & Sarana Prasarana','Aset'],['Operasional Hari Ini','Operasional'],['Gamifikasi & Peringkat','Gamifikasi']],
+  PAGES:[['Ringkasan Eksekutif','Ringkasan'],['Profil Peserta Didik','Profil'],['Absensi & Kehadiran','Kehadiran'],['Kesehatan','Kesehatan'],['Kedisiplinan & Pembinaan','Disiplin'],['Aset & Sarana Prasarana','Aset'],['Operasional Hari Ini','Operasional'],['Izin & Kepulangan','Izin'],['Gamifikasi & Peringkat','Gamifikasi']],
   /* ---------- siklus hidup ---------- */
   show(mobile){
     this._forceMobile=!!mobile;this.mobile=this._forceMobile||this.isNarrow();this.slide=0;this.fDate='';this.fSesi='';this.fJJ='';this.fJK='';this._rounds=0;this.data=null;
@@ -8319,8 +8319,8 @@ SRIT.LiveTV={
     const ab=$('#ltvAutoBtn');if(ab)ab.classList.toggle('on',this.autoJJ);
     $('#ltvTabs').innerHTML=this.PAGES.map((p,i)=>`<div class="lv-tab ${i===this.slide?'on':''}" onclick="SRIT.LiveTV.jump(${i})">${p[1]}</div>`).join('');
     // halaman
-    const B=[this.pg1,this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7,this.pg8];
-    const rows=['auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr'];
+    const B=[this.pg1,this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7,this.pg9,this.pg8];
+    const rows=['auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr'];
     let html;
     try{html=B.map((fn,i)=>`<div class="lv-pg ${i===this.slide?'on':''}" data-t="${this.PAGES[i][0]}" style="grid-template-rows:${rows[i]}">${fn.call(this,v)}</div>`).join('');}
     catch(e){console.error('LiveTV render',e);html=`<div class="lv-pg on"><div class="lv-p c12"><div class="lv-empty">Gagal menampilkan data: ${E(e.message)}</div></div></div>`;}
@@ -8548,6 +8548,50 @@ SRIT.LiveTV={
       +this.pnl('Insiden aktif menurut prioritas','',insH,'c3')
       +this.pnl('Petugas piket hari ini','',pkH,'c4',true)
       +this.pnl('Program pembinaan aktif','',prog.length?prog.map(x=>`<div class="in" style="align-items:center"><span style="flex:1">${E(x.nama)}</span><span class="lv-b b-in">${E(x.kategori||'')}</span></div>`).join(''):this.emp('Belum ada program aktif'),'c3',true);
+  },
+  /* =====================  HALAMAN 9 - IZIN & KEPULANGAN (nama + rekap jenjang x jenis kelamin)  ===================== */
+  pg9(v){
+    const {d,all}=v,C=this.COL,E=SRIT.Util.esc,Z=d.izin;
+    if(!Z||Z.error)return this.pnl('Izin & Kepulangan','',this.emp(Z&&Z.error?'Data izin belum dapat dimuat':'Belum ada data izin'),'c12');
+    const hist=this.isHist();
+    const catOf=x=>x.telat?'telat':x.status==='BERANGKAT'?'luar':x.status==='DISETUJUI'?'setuju':x.status==='MENUNGGU'?'tunggu':'kembali';
+    const CAT={tunggu:['Menunggu',C.sakit],setuju:['Disetujui',C.izin],luar:['Di luar asrama','#5eead4'],telat:['Terlambat',C.alpa],kembali:['Sudah kembali',C.hadir]};
+    const inSegSel=x=>(!this.fJJ||x.jj===this.fJJ)&&(!this.fJK||x.jk===this.fJK);
+    const rows=(Z.list||[]).filter(x=>(!this.fJJ&&!this.fJK)||inSegSel(x));
+    const cnt=l=>{const o={tunggu:0,setuju:0,luar:0,telat:0,kembali:0};l.forEach(x=>o[catOf(x)]++);return o;};
+    const T=cnt(rows),nPeserta=this.sum(v.cs,c=>c.n),diLuar=T.luar+T.telat;
+    const badge=x=>{const c=catOf(x);return c==='telat'?`<span class="lv-b b-bd">Terlambat ${x.telat} hari</span>`:c==='luar'?'<span class="lv-b b-in">Di luar asrama</span>':c==='setuju'?'<span class="lv-b b-in">Disetujui</span>':c==='tunggu'?'<span class="lv-b b-wr">Menunggu</span>':'<span class="lv-b b-ok">Sudah kembali</span>';};
+    const seg=x=>x.jj&&x.jk?x.jj+' '+(x.jk==='L'?'Putra':'Putri'):'-';
+    const tgl=(t,j)=>t?SRIT.Util.fmtDateShort(t)+(j?' '+E(j):''):'-';
+    // rekap per jenjang x JK
+    const segRows=all.filter(c=>c.n>0).map(c=>{const o=cnt((Z.list||[]).filter(x=>x.jj===c.jj&&x.jk===c.jk));return {c,o,tot:o.tunggu+o.setuju+o.luar+o.telat+o.kembali};});
+    const sel=segRows.filter(r=>this.inSel(r.c));
+    const sumO=k=>sel.reduce((a,r)=>a+r.o[k],0);
+    const segT=`<table class="lv-t"><thead><tr><th>Segmen</th><th>Peserta</th><th>Menunggu</th><th>Disetujui</th><th>Di luar</th><th>Terlambat</th><th>Kembali</th><th>% di luar</th></tr></thead><tbody>${segRows.map(r=>`<tr class="${this.inSel(r.c)?'':'dim'}"><td><i class="lv-dot" style="background:${C[r.c.jk]}"></i>${this.segName(r.c)}</td><td><b>${r.c.n}</b></td><td>${r.o.tunggu||'-'}</td><td>${r.o.setuju||'-'}</td><td>${r.o.luar||'-'}</td><td style="color:${r.o.telat?C.alpa:'inherit'}">${r.o.telat||'-'}</td><td>${r.o.kembali||'-'}</td><td><b>${this.f1(this.pc(r.o.luar+r.o.telat,r.c.n))}%</b></td></tr>`).join('')}</tbody><tfoot><tr><td>Total (${this.filterLabel()})</td><td>${this.fn(nPeserta)}</td><td>${sumO('tunggu')}</td><td>${sumO('setuju')}</td><td>${sumO('luar')}</td><td>${sumO('telat')}</td><td>${sumO('kembali')}</td><td>${this.f1(this.pc(sumO('luar')+sumO('telat'),nPeserta))}%</td></tr></tfoot></table>`;
+    // rekap per jenis izin
+    const jn=['REGULER','KHUSUS','DARURAT'];Object.keys(rows.reduce((a,x)=>(a[x.jenis]=1,a),{})).forEach(k=>{if(jn.indexOf(k)<0)jn.push(k);});
+    const jRows=jn.map(k=>{const o=cnt(rows.filter(x=>x.jenis===k));const tot=o.tunggu+o.setuju+o.luar+o.telat+o.kembali;return {label:E(k.charAt(0)+k.slice(1).toLowerCase()),parts:Object.keys(CAT).map(c=>({v:o[c],c:CAT[c][1]})),right:tot,sub:'orang',tot};});
+    const jMax=Math.max(1,...jRows.map(r=>r.tot));
+    const jH=rows.length?this.stack(jRows,jMax)+this.legend(Object.keys(CAT).map(c=>[CAT[c][1],CAT[c][0]])):this.emp('Tidak ada izin pada filter ini');
+    // rekap per kelas
+    const kls={};rows.forEach(x=>{const k=x.kelas||'-';kls[k]=(kls[k]||0)+1;});
+    const klsH=Object.keys(kls).sort((a,b)=>kls[b]-kls[a]||a.localeCompare(b,'id',{numeric:true})).slice(0,6).map(k=>`<span class="lv-b" style="margin:3px 6px 3px 0">Kelas ${E(k)}: <b>${kls[k]}</b></span>`).join('');
+    // daftar terlambat
+    const lt=rows.filter(x=>x.telat).sort((a,b)=>b.telat-a.telat);
+    const ltH=lt.length?lt.map(x=>`<div class="in" style="align-items:center"><span style="flex:1"><b>${E(x.nama)}</b><br><span style="color:var(--mu);font-size:14px">${seg(x)}${x.kelas?' &middot; Kelas '+E(x.kelas):''} &middot; seharusnya kembali ${x.kb?SRIT.Util.fmtDateShort(x.kb):'-'}</span></span><span class="lv-b b-bd">${x.telat} hari</span></div>`).join(''):this.emp('Tidak ada yang terlambat kembali');
+    // daftar nama
+    const dT=rows.length?`<table class="lv-t"><thead><tr><th>Nama</th><th>Segmen</th><th>Kelas</th><th>Jenis</th><th>Berangkat</th><th>Kembali</th><th>Status</th></tr></thead><tbody>${rows.map(x=>`<tr><td class="tx"><b>${E(x.nama)}</b></td><td>${seg(x)}</td><td>${E(x.kelas||'-')}</td><td>${E(x.jenis.charAt(0)+x.jenis.slice(1).toLowerCase())}</td><td>${tgl(x.tg,x.jamB)}</td><td>${tgl(x.kb,x.jamK)}</td><td>${badge(x)}</td></tr>`).join('')}</tbody></table>`:this.emp('Tidak ada izin atau kepulangan');
+    const note=(Z.showNama===false?'Nama disamarkan (inisial)':'Urut: terlambat, di luar asrama, disetujui, menunggu')+(hist?' &middot; status saat ini, bukan arsip tanggal tsb':'');
+    return this.kpi('Izin & kepulangan',this.fn(rows.length),this.filterLabel(),'#e8eefc',null,'c2')
+      +this.kpi('Menunggu persetujuan',this.fn(T.tunggu),'belum diputuskan',C.sakit,null,'c2')
+      +this.kpi('Disetujui',this.fn(T.setuju),'belum berangkat',C.izin,null,'c2')
+      +this.kpi('Di luar asrama',this.fn(diLuar),`${this.f1(this.pc(diLuar,nPeserta))}% dari peserta`,'#5eead4',null,'c2')
+      +this.kpi('Terlambat kembali',this.fn(T.telat),'melewati tanggal kembali',T.telat?C.alpa:C.hadir,null,'c2')
+      +this.kpi('Sudah kembali',this.fn(T.kembali),'berangkat/kembali hari ini',C.hadir,null,'c2')
+      +this.pnl('Rekap per jenjang dan jenis kelamin','Redup = di luar filter',segT,'c7',true)
+      +this.pnl('Rekap menurut jenis izin',this.filterLabel(),jH+(klsH?`<div style="margin-top:10px"><span style="color:var(--mu);font-size:13px">Kelas terbanyak</span><div>${klsH}</div></div>`:''),'c5',true)
+      +this.pnl('Daftar nama izin & kepulangan',note,dT,'c8',true)
+      +this.pnl('Belum kembali (terlambat)','Terlama di atas',ltH,'c4',true);
   },
   /* =====================  HALAMAN 8 — GAMIFIKASI & PERINGKAT (agregat kamar/kelompok, tanpa nama anak)  ===================== */
   pg8(v){
