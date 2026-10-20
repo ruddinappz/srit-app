@@ -5488,7 +5488,8 @@ SRIT.Features.laporan={
     </style></head><body>${inner}
       <script>window.onload=function(){setTimeout(function(){window.print();},350);}<\/script>
     </body></html>`;
-    const w=window.open('','_blank');if(!w){SRIT.Notify('Popup diblokir, izinkan popup untuk mencetak','err');return;}
+    const w=(opt&&opt.win)||window.open('','_blank');if(!w){SRIT.Notify('Popup diblokir, izinkan popup untuk mencetak','err');return;}
+    if(opt&&opt.win)w.document.open();
     w.document.write(html);w.document.close();w.focus();
     SRIT.Audit.log('PRINT','laporan',this.active);
   },
@@ -5691,8 +5692,18 @@ SRIT.Features.laporan={
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="lpInsGo"><i class="bi bi-printer"></i> Cetak</button>`});
     $('#lpInsGo',m.el).onclick=()=>{const id=$('#lpIns',m.el).value;m.close();this._doKejadian(id);};
   },
-  _doKejadian(id){
+  async _doKejadian(id){
     const set=SRIT.Store.readObj('SETTINGS');const r=SRIT.Repo.getById('INSIDEN',id)||{};
+    // dokumentasi foto (opsional): jendela cetak dibuka dulu (agar tidak diblokir), foto dimuat dari Drive lalu formulir dicetak
+    const w=window.open('','_blank');if(w)w.document.write('<p style="font-family:sans-serif;padding:20px">Menyiapkan formulir...</p>');
+    const fl=id?SRIT.Store.read('INSIDEN_FOTO').filter(x=>x.INSIDEN_ID===id):[];let fotoHtml='';
+    if(fl.length){
+      try{
+        const g=await SRIT.Server.call('apiInsFotoGet',fl.map(x=>x.ID),true),E=SRIT.Util.esc;
+        const figs=fl.map((x,i)=>g[x.ID]?`<figure style="margin:0;width:calc(50% - 4px);border:1px solid #888;padding:4px;break-inside:avoid;page-break-inside:avoid"><img src="${g[x.ID]}" style="width:100%;max-height:250px;object-fit:contain;display:block"><figcaption style="font-size:11px;margin-top:3px">Foto ${i+1}${x.KETERANGAN?': '+E(x.KETERANGAN):''}</figcaption></figure>`:'').join('');
+        if(figs)fotoHtml=`<h4>Dokumentasi Foto</h4><div style="display:flex;flex-wrap:wrap;gap:8px">${figs}</div>`;
+      }catch(e){SRIT.Notify('Foto tidak dapat dimuat ('+e.message+'). Formulir dicetak tanpa foto.','warn');}
+    }
     const cats=['Kesehatan','Pelanggaran tata tertib','Konflik antar peserta didik','Perundungan','Keamanan','Kerusakan fasilitas','Kepulangan/perizinan','Lainnya'];
     const map={'KESEHATAN':'Kesehatan','KONFLIK':'Konflik antar peserta didik','PERUNDUNGAN':'Perundungan','KEAMANAN':'Keamanan','KERUSAKAN':'Kerusakan fasilitas','KETIDAKHADIRAN':'Kepulangan/perizinan'};
     const chosen=map[r.KATEGORI]||'Lainnya';
@@ -5710,9 +5721,9 @@ SRIT.Features.laporan={
       <h4>Koordinasi dengan</h4><div style="line-height:2">${['Wali Asuh','Wali Asrama','Kepala Sekolah','Guru','Orang Tua/Wali','Pihak lain'].map(coord).join('')}</div>
       <h4>Hasil Penanganan</h4><div style="min-height:26px">.......................................................................................................</div>
       <h4>Tindak Lanjut</h4><div style="min-height:26px">.......................................................................................................</div>
-      <h4>Status</h4><div style="line-height:2">${['Selesai','Dalam pemantauan','Perlu tindak lanjut'].map(stat).join('')}</div>`+
+      <h4>Status</h4><div style="line-height:2">${['Selesai','Dalam pemantauan','Perlu tindak lanjut'].map(stat).join('')}</div>`+fotoHtml+
       this._signBlock('Wali Asrama','Mengetahui,<br>Kepala Sekolah');
-    this._printDoc('Formulir Kejadian',inner);
+    this._printDoc('Formulir Kejadian',inner,w?{win:w}:undefined);
   },
   destroy(){}
 };
@@ -6175,6 +6186,80 @@ regFeature('pembinaan',{title:'Pembinaan',table:'PEMBINAAN',perm:'pembinaan',mod
 // 3 pilar (Kesehatan/Keselamatan/Perlindungan) · klasifikasi Ringan/Sedang/Berat · batas lapor mengikat
 // (berat 1×24 jam, sedang 2×24 jam) · 6 tahap manajemen kasus · eskalasi Satgas SR → Kepala Sekolah → Satgas Pusat.
 // PRIORITAS dan STATUS lama tetap diisi otomatis (dari Tingkat dan Tahap) agar Beranda, Pusat Peringatan, Live TV, dan laporan lama tetap berjalan.
+// ---------- FOTO DOKUMENTASI KEJADIAN (opsional, maks 6) — tampil pada cetak formulir laporan kejadian ----------
+SRIT.InsFoto={
+  MAKS:6,
+  list(id){return id?SRIT.Store.read('INSIDEN_FOTO').filter(r=>r.INSIDEN_ID===id):[];},
+  n(id){return this.list(id).length;},
+  // kompres ke JPEG maks 1400 px agar ringan diunggah; hasil {base64,kb,preview}
+  async kompres(file){
+    if(!/^image\//.test(file.type||''))throw new Error('bukan gambar');
+    const im=await new Promise((ok,no)=>{const u=URL.createObjectURL(file),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);ok(i);};i.onerror=()=>{URL.revokeObjectURL(u);no(new Error('gambar tidak dapat dibaca'));};i.src=u;});
+    const sc=Math.min(1,1400/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(im.width*sc));c.height=Math.max(1,Math.round(im.height*sc));
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    const d=c.toDataURL('image/jpeg',0.8);
+    return {base64:d.split(',')[1],kb:Math.round(d.length*0.75/1024),preview:d};
+  },
+  // bagian form: kembalikan kendali {baru:[],hapus:[]} yang dipakai saat Simpan
+  panel(host,id){
+    const E=SRIT.Util.esc,self=this,ctl={baru:[],hapus:[]},thumbs={};
+    const ada=()=>self.list(id||'').filter(x=>ctl.hapus.indexOf(x.ID)<0);
+    host.innerHTML=`<label class="form-label-sm"><i class="bi bi-camera"></i> Dokumentasi foto <span class="text-muted-2">(opsional, maks ${self.MAKS})</span></label>
+      <div id="ifGrid" class="d-flex flex-wrap gap-2 mb-2"></div>
+      <input type="file" id="ifFile" accept="image/*" multiple class="d-none">
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="ifAdd"><i class="bi bi-camera"></i> Tambah foto</button>
+      <span class="text-muted-2" style="font-size:11px">Dikompres otomatis, disimpan di Drive sekolah, dan dicetak pada formulir laporan kejadian.</span>`;
+    const grid=$('#ifGrid',host);
+    const x=a=>`<button type="button" class="btn btn-sm btn-danger py-0 px-1" style="position:absolute;top:2px;right:2px;line-height:1.2" ${a}>&times;</button>`;
+    const cell=(src,cap,btn)=>`<div style="width:108px"><div style="position:relative;width:108px;height:84px;border:1px solid rgba(128,128,128,.4);border-radius:8px;overflow:hidden">${src?`<img src="${src}" style="width:100%;height:100%;object-fit:cover">`:'<div class="text-center text-muted-2 pt-4"><i class="bi bi-image"></i></div>'}${btn}</div>${cap}</div>`;
+    const draw=()=>{
+      grid.innerHTML=ada().map(f=>cell(thumbs[f.ID],`<div class="text-muted-2" style="font-size:11px">${E(f.KETERANGAN||'')}</div>`,x('data-del="'+E(f.ID)+'"'))).join('')
+        +ctl.baru.map((f,i)=>cell(f.preview,`<input class="form-control form-control-sm mt-1" style="font-size:11px;padding:2px 4px" placeholder="Keterangan" data-cap="${i}" value="${E(f.ket||'')}">`,x('data-rm="'+i+'"'))).join('');
+      $$('[data-del]',grid).forEach(b=>b.onclick=()=>{ctl.hapus.push(b.dataset.del);draw();});
+      $$('[data-rm]',grid).forEach(b=>b.onclick=()=>{ctl.baru.splice(+b.dataset.rm,1);draw();});
+      $$('[data-cap]',grid).forEach(i=>i.oninput=()=>{ctl.baru[+i.dataset.cap].ket=i.value;});
+      $('#ifAdd',host).disabled=ada().length+ctl.baru.length>=self.MAKS;
+    };
+    $('#ifAdd',host).onclick=()=>$('#ifFile',host).click();
+    $('#ifFile',host).onchange=async e=>{
+      const fs=[...e.target.files];e.target.value='';
+      for(const f of fs){
+        if(ada().length+ctl.baru.length>=self.MAKS){SRIT.Notify('Maksimal '+self.MAKS+' foto','warn');break;}
+        try{const k=await self.kompres(f);k.cid=Math.random().toString(36).slice(2,8);k.ket='';ctl.baru.push(k);}catch(err){SRIT.Notify('Foto dilewati: '+err.message,'warn');}
+      }
+      draw();
+    };
+    const ids=ada().map(f=>f.ID);
+    if(ids.length)SRIT.Server.call('apiInsFotoGet',ids,false).then(g=>{Object.assign(thumbs,g);draw();}).catch(()=>{});
+    draw();return ctl;
+  },
+  // hapus yang ditandai, unggah yang baru; kembalikan {ok,gagal}
+  async unggah(id,ctl,say){
+    let ok=0,gagal=0;
+    for(const fid of ctl.hapus){try{await SRIT.Server.call('apiInsFotoHapus',fid);SRIT.Repo.remove('INSIDEN_FOTO',fid);}catch(e){gagal++;}}
+    for(let i=0;i<ctl.baru.length;i++){
+      const f=ctl.baru[i];if(say)say('Mengunggah foto '+(i+1)+' / '+ctl.baru.length+'...');
+      try{
+        const r=await SRIT.Server.call('apiInsFotoUpload',{insidenId:id,base64:f.base64,ukuranKb:f.kb,clientId:f.cid});
+        SRIT.Repo.insert('INSIDEN_FOTO',{ID:SRIT.Util.uid('IF'),INSIDEN_ID:id,FILE_ID:r.fileId,NAMA_FILE:r.nama,KETERANGAN:String(f.ket||'').trim(),UKURAN_KB:f.kb,DIBUAT_OLEH:(SRIT.Auth.user||{}).NAME||'',DIBUAT_PADA:new Date().toISOString()});ok++;
+      }catch(e){gagal++;}
+    }
+    return {ok,gagal};
+  },
+  // galeri kecil di modal detail
+  galeri(host,id){
+    const fl=this.list(id);if(!host)return;if(!fl.length){host.innerHTML='';return;}
+    const E=SRIT.Util.esc;
+    host.innerHTML=`<div class="fw-semibold mb-1" style="font-size:13px"><i class="bi bi-camera"></i> Dokumentasi foto (${fl.length})</div><div class="d-flex flex-wrap gap-2 mb-3" id="ifG">${fl.map(f=>`<div style="width:120px"><div data-ifid="${E(f.ID)}" style="width:120px;height:90px;border:1px solid rgba(128,128,128,.4);border-radius:8px;overflow:hidden;cursor:zoom-in" class="text-center text-muted-2 pt-4"><i class="bi bi-image"></i></div><div class="text-muted-2" style="font-size:11px">${E(f.KETERANGAN||'')}</div></div>`).join('')}</div>`;
+    SRIT.Server.call('apiInsFotoGet',fl.map(f=>f.ID),false).then(g=>{
+      $$('[data-ifid]',host).forEach(d=>{const v=g[d.dataset.ifid];if(v){d.innerHTML=`<img src="${v}" style="width:100%;height:100%;object-fit:cover">`;d.classList.remove('pt-4');}
+        d.onclick=async()=>{const w=window.open('','_blank');if(!w)return;w.document.write('<p style="font-family:sans-serif">Memuat foto...</p>');
+          try{const full=await SRIT.Server.call('apiInsFotoGet',[d.dataset.ifid],true);w.document.open();w.document.write('<body style="margin:0;background:#111"><img src="'+full[d.dataset.ifid]+'" style="max-width:100%;display:block;margin:auto"></body>');w.document.close();}catch(e){w.document.body.innerHTML='Foto tidak dapat dimuat';}};});
+    }).catch(()=>{});
+  },
+  hapusSemua(id){this.list(id).forEach(f=>{SRIT.Server.call('apiInsFotoHapus',f.ID).catch(()=>{});SRIT.Repo.remove('INSIDEN_FOTO',f.ID);});}
+};
 SRIT.Kasus=(function(){
   const TINGKAT={
     RINGAN:{t:'Ringan',cls:'st-HADIR',prio:'LOW',oleh:'Satgas SR (selesai di sekolah)'},
@@ -6298,7 +6383,7 @@ SRIT.Features.insiden={
       <td>${K.laporBadge(r)}${r.DILAPORKAN_KE?`<div class="text-muted-2" style="font-size:11px">ke ${K.LAPOR_KE[r.DILAPORKAN_KE]||esc(r.DILAPORKAN_KE)}${r.WAKTU_LAPOR?' · '+K.fmtDT(r.WAKTU_LAPOR):''}</div>`:(r.WAJIB_JENIS&&K.aktif(r)?'<div style="font-size:11px;color:var(--srit-danger)">belum dilaporkan</div>':'')}${pusat?`<div class="mt-1">${pusat}</div>`:''}</td>
       <td style="min-width:130px"><span class="badge-soft ${th===6?'st-BELUM':'st-IZIN'}">${th}/6 ${K.TAHAP[th]}</span></td>
       <td class="text-end text-nowrap">
-        <button class="btn btn-sm btn-outline-info py-0" title="Detail" onclick="SRIT.Features.insiden.detail('${r.ID}')"><i class="bi bi-eye"></i></button>
+        ${SRIT.InsFoto.n(r.ID)?`<span class="text-muted-2 me-1" title="Dokumentasi foto"><i class="bi bi-camera"></i> ${SRIT.InsFoto.n(r.ID)}</span>`:''}<button class="btn btn-sm btn-outline-info py-0" title="Detail" onclick="SRIT.Features.insiden.detail('${r.ID}')"><i class="bi bi-eye"></i></button>
         ${(r.TINGKAT&&r.KLASIFIKASI_STATUS!=='DITETAPKAN'&&SRIT.Approval.canKasus())?`<button class="btn btn-sm btn-outline-success py-0 ms-1" title="Tetapkan klasifikasi (Kepala Sekolah)" onclick="SRIT.Features.insiden.tetapkan('${r.ID}')"><i class="bi bi-patch-check"></i></button>`:''}
         ${canU&&th<6&&(tk==='RINGAN'||th<5||SRIT.Approval.canKasus())?`<button class="btn btn-sm btn-outline-primary py-0 ms-1" title="Lanjut ke tahap berikutnya" onclick="SRIT.Features.insiden.maju('${r.ID}')"><i class="bi bi-arrow-right-circle"></i></button>`:''}
         ${canU?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Edit" onclick="SRIT.Features.insiden.form('${r.ID}')"><i class="bi bi-pencil"></i></button>`:''}
@@ -6323,14 +6408,14 @@ SRIT.Features.insiden={
   },
   del(id){
     if(!confirm('Hapus data kasus ini? Tindakan ini tidak dapat dibatalkan.'))return;
-    SRIT.Repo.remove('INSIDEN',id);SRIT.Audit.log('DELETE','insiden',id);SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');SRIT.Notify('Kasus dihapus','warn');this.load();
+    SRIT.InsFoto.hapusSemua(id);SRIT.Repo.remove('INSIDEN',id);SRIT.Audit.log('DELETE','insiden',id);SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');SRIT.Notify('Kasus dihapus','warn');this.load();
   },
   detail(id){
     const r=SRIT.Repo.getById('INSIDEN',id);if(!r)return;const K=SRIT.Kasus,esc=SRIT.Util.esc,tk=K.tingkatOf(r),T=K.TINGKAT[tk],th=K.tahapOf(r),pl=r.PILAR||K.PILAR_OF[r.KATEGORI]||'';
     const b=K.batas(r);
     const row=(l,v)=>`<tr><td class="text-muted-2" style="width:38%">${l}</td><td class="fw-semibold">${v||'-'}</td></tr>`;
     const steps=[1,2,3,4,5,6].map(n=>`<li class="${n===th?'fw-bold':n<th?'text-muted-2':''}" style="margin:2px 0">${n<th?'<i class="bi bi-check-circle-fill text-success"></i>':n===th?'<i class="bi bi-arrow-right-circle-fill text-primary"></i>':'<i class="bi bi-circle"></i>'} ${n}. ${K.TAHAP[n]}${n===th?`<div class="text-muted-2 fw-normal" style="font-size:11px;margin-left:22px">Peran wali asrama: ${K.TAHAP_PERAN[n]}</div>`:''}</li>`).join('');
-    SRIT.Modal.open({title:'Detail Kasus',size:'modal-lg',body:`<table class="table table-sm table-srit mb-3"><tbody>
+    const dm=SRIT.Modal.open({title:'Detail Kasus',size:'modal-lg',body:`<table class="table table-sm table-srit mb-3"><tbody>
       ${row('Ditemukan',r.WAKTU_TEMU?K.fmtDT(r.WAKTU_TEMU):SRIT.Util.fmtDateShort(r.TANGGAL))}
       ${row('Anak',r.ANAK?esc(SRIT.nm('ANAK',r.ANAK)||r.NAMA_ANAK):esc(r.NAMA_ANAK))}
       ${row('Kategori / pilar',esc(r.KATEGORI||'-')+(pl?' · '+(K.PILAR[pl]||pl):''))}
@@ -6343,9 +6428,10 @@ SRIT.Features.insiden={
       ${row('Eskalasi ke Satgas Pusat',tk==='RINGAN'?'Tidak diperlukan (selesai di sekolah)':(r.KE_PUSAT==='YA'?'Sudah':'Belum — wajib untuk kasus '+K.TINGKAT[tk].t.toLowerCase()))}
       ${row('Pelapor / petugas',esc([r.PELAPOR,r.PETUGAS].filter(Boolean).join(' / ')))}
       </tbody></table>
-      <div class="fw-semibold mb-1" style="font-size:13px">Tahap manajemen kasus</div><ul class="list-unstyled mb-2" style="font-size:13px">${steps}</ul>
+      <div id="ksFotoDet"></div><div class="fw-semibold mb-1" style="font-size:13px">Tahap manajemen kasus</div><ul class="list-unstyled mb-2" style="font-size:13px">${steps}</ul>
       <div class="text-muted-2" style="font-size:11px">Alur: wali asrama menemukan dan mengamankan → Satgas SR mencatat, memverifikasi, asesmen awal → Kepala Sekolah menetapkan klasifikasi (case conference) → ringan selesai di sekolah; sedang dan berat dieskalasikan ke Satgas Pusat.</div>`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button>`});
+    SRIT.InsFoto.galeri($('#ksFotoDet',dm.el),id);
   },
   form(id){
     const K=SRIT.Kasus,esc=SRIT.Util.esc,self=this;
@@ -6377,6 +6463,7 @@ SRIT.Features.insiden={
         <div class="col-12 col-md-6"><label class="form-label-sm">Tahap manajemen kasus</label><select class="form-select form-select-sm" name="TAHAP">${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${th0===n?'selected':''} ${(n===6&&th0<6&&tk0!=='RINGAN'&&!canK)?'disabled':''}>${n}. ${K.TAHAP[n]}</option>`).join('')}</select></div>
         <div class="col-6 col-md-3"><label class="form-label-sm">Pelapor</label><input class="form-control form-control-sm" name="PELAPOR" value="${esc(r.PELAPOR||(SRIT.Auth.user||{}).NAME||'')}"></div>
         <div class="col-6 col-md-3"><label class="form-label-sm">Petugas penanganan</label><input class="form-control form-control-sm" name="PETUGAS" value="${esc(r.PETUGAS||'')}"></div>
+        <div class="col-12" id="ksFoto"></div>
       </div></form>`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="ksSave">Simpan</button>`});
     const el=m.el,F=()=>Object.fromEntries(new FormData($('#ksForm',el)));
@@ -6393,7 +6480,8 @@ SRIT.Features.insiden={
     $('#ksNow',el).onclick=()=>{$('input[name=WAKTU_LAPOR]',el).value=K.nowLocal();hint();};
     $$('#ksForm input,#ksForm select',el).forEach(i=>{i.addEventListener('change',hint);});
     hint();
-    $('#ksSave',el).onclick=()=>{
+    const foto=SRIT.InsFoto.panel($('#ksFoto',el),id||'');
+    $('#ksSave',el).onclick=async()=>{
       const fm=$('#ksForm',el);if(!fm.reportValidity())return;
       const f=F(),tk=f.TINGKAT||tk0||'RINGAN',th=+f.TAHAP||1;
       const tmp={TINGKAT:tk,WAJIB_JENIS:f.WAJIB_JENIS,WAKTU_TEMU:f.WAKTU_TEMU},b=K.batas(tmp);
@@ -6408,7 +6496,10 @@ SRIT.Features.insiden={
       if(id){SRIT.Repo.update('INSIDEN',id,row);SRIT.Audit.log('UPDATE','insiden',id);}
       else{row.ID=SRIT.Util.uid('IN');SRIT.Repo.insert('INSIDEN',row);SRIT.Audit.log('CREATE','insiden',row.ID);}
       SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
-      m.close();SRIT.Notify('Kasus tersimpan','ok');
+      const incId=id||row.ID;let fr=null;
+      if(foto.baru.length||foto.hapus.length){const bt=$('#ksSave',el);bt.disabled=true;fr=await SRIT.InsFoto.unggah(incId,foto,t=>{bt.innerHTML='<span class="spinner-border spinner-border-sm"></span> '+t;});}
+      m.close();SRIT.Notify('Kasus tersimpan'+(fr&&fr.ok?' ('+fr.ok+' foto diunggah)':''),'ok');
+      if(fr&&fr.gagal)SRIT.Notify(fr.gagal+' foto gagal diproses (periksa koneksi). Buka Edit untuk mengulang.','warn');
       const msg=(row.WAJIB_JENIS&&!row.DILAPORKAN_KE)?'Kasus wajib diteruskan: segera laporkan ke Satgas SR / Kepala Sekolah.':'';if(msg)SRIT.Notify(msg,'warn');
       self.render(self._host);
     };
@@ -8788,49 +8879,68 @@ SRIT.LiveTV={
       +this.pnl('Petugas piket hari ini','',pkH,'c4',true)
       +this.pnl('Program pembinaan aktif','',prog.length?prog.map(x=>`<div class="in" style="align-items:center"><span style="flex:1">${E(x.nama)}</span><span class="lv-b b-in">${E(x.kategori||'')}</span></div>`).join(''):this.emp('Belum ada program aktif'),'c3',true);
   },
-  /* =====================  HALAMAN 9 - IZIN & KEPULANGAN (nama + rekap jenjang x jenis kelamin)  ===================== */
+  /* =====================  HALAMAN 9 - IZIN & KEPULANGAN  =====================
+     Nama yang sedang izin keluar/belum kembali, izin terbanyak per jenjang x jenis kelamin, dan paling sering izin (jendela 30 hari/90 hari/1 tahun). */
+  izinWin:90,
+  setIzinWin(n){this.izinWin=n;this.render();},
   pg9(v){
     const {d,all}=v,C=this.COL,E=SRIT.Util.esc,Z=d.izin;
-    if(!Z||Z.error)return this.pnl('Izin & Kepulangan','',this.emp(Z&&Z.error?'Data izin belum dapat dimuat':'Belum ada data izin'),'c12');
+    if(Z===undefined)return this.pnl('Izin & Kepulangan','',this.emp('Data izin belum diterima dari server. Pastikan Api_LiveTV.gs versi terbaru sudah di-deploy (Deploy &gt; Kelola deployment &gt; Versi baru).'),'c12');
+    if(!Z||Z.error)return this.pnl('Izin & Kepulangan','',this.emp('Data izin belum dapat dimuat'+(Z&&Z.error?': '+E(Z.error):'')),'c12');
     const hist=this.isHist();
     const catOf=x=>x.telat?'telat':x.status==='BERANGKAT'?'luar':x.status==='DISETUJUI'?'setuju':x.status==='MENUNGGU'?'tunggu':'kembali';
     const CAT={tunggu:['Menunggu',C.sakit],setuju:['Disetujui',C.izin],luar:['Di luar asrama','#5eead4'],telat:['Terlambat',C.alpa],kembali:['Sudah kembali',C.hadir]};
     const inSegSel=x=>(!this.fJJ||x.jj===this.fJJ)&&(!this.fJK||x.jk===this.fJK);
-    const rows=(Z.list||[]).filter(x=>(!this.fJJ&&!this.fJK)||inSegSel(x));
+    const rows=(Z.list||[]).filter(inSegSel);
     const cnt=l=>{const o={tunggu:0,setuju:0,luar:0,telat:0,kembali:0};l.forEach(x=>o[catOf(x)]++);return o;};
     const T=cnt(rows),nPeserta=this.sum(v.cs,c=>c.n),diLuar=T.luar+T.telat;
     const badge=x=>{const c=catOf(x);return c==='telat'?`<span class="lv-b b-bd">Terlambat ${x.telat} hari</span>`:c==='luar'?'<span class="lv-b b-in">Di luar asrama</span>':c==='setuju'?'<span class="lv-b b-in">Disetujui</span>':c==='tunggu'?'<span class="lv-b b-wr">Menunggu</span>':'<span class="lv-b b-ok">Sudah kembali</span>';};
     const seg=x=>x.jj&&x.jk?x.jj+' '+(x.jk==='L'?'Putra':'Putri'):'-';
     const tgl=(t,j)=>t?SRIT.Util.fmtDateShort(t)+(j?' '+E(j):''):'-';
-    // rekap per jenjang x JK
-    const segRows=all.filter(c=>c.n>0).map(c=>{const o=cnt((Z.list||[]).filter(x=>x.jj===c.jj&&x.jk===c.jk));return {c,o,tot:o.tunggu+o.setuju+o.luar+o.telat+o.kembali};});
-    const sel=segRows.filter(r=>this.inSel(r.c));
-    const sumO=k=>sel.reduce((a,r)=>a+r.o[k],0);
-    const segT=`<table class="lv-t"><thead><tr><th>Segmen</th><th>Peserta</th><th>Menunggu</th><th>Disetujui</th><th>Di luar</th><th>Terlambat</th><th>Kembali</th><th>% di luar</th></tr></thead><tbody>${segRows.map(r=>`<tr class="${this.inSel(r.c)?'':'dim'}"><td><i class="lv-dot" style="background:${C[r.c.jk]}"></i>${this.segName(r.c)}</td><td><b>${r.c.n}</b></td><td>${r.o.tunggu||'-'}</td><td>${r.o.setuju||'-'}</td><td>${r.o.luar||'-'}</td><td style="color:${r.o.telat?C.alpa:'inherit'}">${r.o.telat||'-'}</td><td>${r.o.kembali||'-'}</td><td><b>${this.f1(this.pc(r.o.luar+r.o.telat,r.c.n))}%</b></td></tr>`).join('')}</tbody><tfoot><tr><td>Total (${this.filterLabel()})</td><td>${this.fn(nPeserta)}</td><td>${sumO('tunggu')}</td><td>${sumO('setuju')}</td><td>${sumO('luar')}</td><td>${sumO('telat')}</td><td>${sumO('kembali')}</td><td>${this.f1(this.pc(sumO('luar')+sumO('telat'),nPeserta))}%</td></tr></tfoot></table>`;
-    // rekap per jenis izin
-    const jn=['REGULER','KHUSUS','DARURAT'];Object.keys(rows.reduce((a,x)=>(a[x.jenis]=1,a),{})).forEach(k=>{if(jn.indexOf(k)<0)jn.push(k);});
+    const th=h=>`<thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead>`;
+    // A. sedang izin keluar / belum kembali (nama)
+    const luar=rows.filter(x=>x.status==='BERANGKAT'||x.status==='TERLAMBAT').sort((p,q)=>(q.telat-p.telat)||String(p.kb).localeCompare(String(q.kb))||String(p.nama).localeCompare(String(q.nama)));
+    const aT=luar.length?`<table class="lv-t">${th(['Nama','Segmen','Kelas','Berangkat','Kembali','Status'])}<tbody>${luar.map(x=>`<tr><td class="tx"><b>${E(x.nama)}</b></td><td>${seg(x)}</td><td>${E(x.kelas||'-')}</td><td>${tgl(x.tg,x.jamB)}</td><td>${tgl(x.kb,x.jamK)}</td><td>${badge(x)}</td></tr>`).join('')}</tbody></table>`:this.emp('Tidak ada peserta yang sedang izin keluar');
+    // jendela peringkat
+    const W=this.izinWin===30?0:this.izinWin===365?2:1,WL=['30 hari','90 hari','1 tahun'][W];
+    const wchip=(n,l)=>`<span class="lv-chip ${this.izinWin===n?'on':''}" style="padding:3px 10px;font-size:12px;display:inline-flex" onclick="SRIT.LiveTV.setIzinWin(${n})">${l}</span>`;
+    const wsel=`<span style="display:inline-flex;gap:6px;vertical-align:middle">${wchip(30,'30 hari')}${wchip(90,'90 hari')}${wchip(365,'1 tahun')}</span>`;
+    const R=(Z.rank||[]).filter(x=>x.n[W]>0&&inSegSel(x));
+    const cmp=(p,q)=>q.n[W]-p.n[W]||q.h[W]-p.h[W]||String(p.nama).localeCompare(String(q.nama));
+    // B. izin terbanyak per jenjang x jenis kelamin (3 teratas)
+    const segs=[];this.JJ.forEach(j=>['L','P'].forEach(k=>{if(this.inSel({jj:j,jk:k}))segs.push({jj:j,jk:k});}));
+    const bH=segs.length?segs.map(sg=>{
+      const top=(Z.rank||[]).filter(x=>x.jj===sg.jj&&x.jk===sg.jk&&x.n[W]>0).sort(cmp).slice(0,3);
+      return `<div style="margin:0 0 9px"><div style="font-weight:700;font-size:15px"><i class="lv-dot" style="background:${C[sg.jk]}"></i>${sg.jj} ${sg.jk==='L'?'Putra':'Putri'}</div>`
+        +(top.length?top.map((x,i)=>`<div style="display:flex;gap:8px;font-size:15px;line-height:1.45"><span style="color:var(--mu);width:16px">${i+1}.</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>${E(x.nama)}</b>${x.kelas?' <span style="color:var(--mu)">('+E(x.kelas)+')</span>':''}</span><span><b>${x.n[W]}&times;</b> <span style="color:var(--mu)">${x.h[W]} hari</span></span></div>`).join(''):'<div style="color:var(--mu);font-size:14px">Belum ada izin pada periode ini</div>')+'</div>';
+    }).join(''):this.emp('Tidak ada segmen pada filter ini');
+    // C. paling sering izin (semua sesuai filter)
+    const top10=R.slice().sort(cmp).slice(0,10);
+    const cH=top10.length?`<table class="lv-t">${th(['#','Nama','Segmen','Izin','Hari','Terakhir'])}<tbody>${top10.map((x,i)=>`<tr><td>${i+1}</td><td class="tx"><b>${E(x.nama)}</b>${x.kelas?'<div style="color:var(--mu);font-size:13px">'+E(x.kelas)+'</div>':''}</td><td>${seg(x)}</td><td><b>${x.n[W]}&times;</b></td><td>${x.h[W]}</td><td>${x.last?SRIT.Util.fmtDateShort(x.last):'-'}</td></tr>`).join('')}</tbody></table>`:this.emp('Belum ada data izin pada periode ini');
+    // D. rekap per jenjang x jenis kelamin
+    const segRows=all.filter(c=>c.n>0).map(c=>{const o=cnt((Z.list||[]).filter(x=>x.jj===c.jj&&x.jk===c.jk));return {c,o};});
+    const sel=segRows.filter(r=>this.inSel(r.c)),sumO=k=>sel.reduce((a,r)=>a+r.o[k],0);
+    const dT=`<table class="lv-t">${th(['Segmen','Peserta','Menunggu','Disetujui','Di luar','Terlambat','Kembali','% di luar'])}<tbody>${segRows.map(r=>`<tr class="${this.inSel(r.c)?'':'dim'}"><td><i class="lv-dot" style="background:${C[r.c.jk]}"></i>${this.segName(r.c)}</td><td><b>${r.c.n}</b></td><td>${r.o.tunggu||'-'}</td><td>${r.o.setuju||'-'}</td><td>${r.o.luar||'-'}</td><td style="color:${r.o.telat?C.alpa:'inherit'}">${r.o.telat||'-'}</td><td>${r.o.kembali||'-'}</td><td><b>${this.f1(this.pc(r.o.luar+r.o.telat,r.c.n))}%</b></td></tr>`).join('')}</tbody><tfoot><tr><td>Total (${this.filterLabel()})</td><td>${this.fn(nPeserta)}</td><td>${sumO('tunggu')}</td><td>${sumO('setuju')}</td><td>${sumO('luar')}</td><td>${sumO('telat')}</td><td>${sumO('kembali')}</td><td>${this.f1(this.pc(sumO('luar')+sumO('telat'),nPeserta))}%</td></tr></tfoot></table>`;
+    // E. pengajuan & kepulangan terbaru (menunggu, disetujui, sudah kembali)
+    const lain=rows.filter(x=>!(x.status==='BERANGKAT'||x.status==='TERLAMBAT'));
+    const eT=lain.length?`<table class="lv-t">${th(['Nama','Segmen','Kelas','Berangkat','Status'])}<tbody>${lain.map(x=>`<tr><td class="tx"><b>${E(x.nama)}</b></td><td>${seg(x)}</td><td>${E(x.kelas||'-')}</td><td>${tgl(x.tg,x.jamB)}</td><td>${badge(x)}</td></tr>`).join('')}</tbody></table>`:this.emp('Tidak ada pengajuan atau kepulangan lain');
+    // F. menurut jenis izin
+    const jn=['REGULER','KHUSUS','DARURAT'];rows.forEach(x=>{if(jn.indexOf(x.jenis)<0)jn.push(x.jenis);});
     const jRows=jn.map(k=>{const o=cnt(rows.filter(x=>x.jenis===k));const tot=o.tunggu+o.setuju+o.luar+o.telat+o.kembali;return {label:E(k.charAt(0)+k.slice(1).toLowerCase()),parts:Object.keys(CAT).map(c=>({v:o[c],c:CAT[c][1]})),right:tot,sub:'orang',tot};});
-    const jMax=Math.max(1,...jRows.map(r=>r.tot));
-    const jH=rows.length?this.stack(jRows,jMax)+this.legend(Object.keys(CAT).map(c=>[CAT[c][1],CAT[c][0]])):this.emp('Tidak ada izin pada filter ini');
-    // rekap per kelas
-    const kls={};rows.forEach(x=>{const k=x.kelas||'-';kls[k]=(kls[k]||0)+1;});
-    const klsH=Object.keys(kls).sort((a,b)=>kls[b]-kls[a]||a.localeCompare(b,'id',{numeric:true})).slice(0,6).map(k=>`<span class="lv-b" style="margin:3px 6px 3px 0">Kelas ${E(k)}: <b>${kls[k]}</b></span>`).join('');
-    // daftar terlambat
-    const lt=rows.filter(x=>x.telat).sort((a,b)=>b.telat-a.telat);
-    const ltH=lt.length?lt.map(x=>`<div class="in" style="align-items:center"><span style="flex:1"><b>${E(x.nama)}</b><br><span style="color:var(--mu);font-size:14px">${seg(x)}${x.kelas?' &middot; Kelas '+E(x.kelas):''} &middot; seharusnya kembali ${x.kb?SRIT.Util.fmtDateShort(x.kb):'-'}</span></span><span class="lv-b b-bd">${x.telat} hari</span></div>`).join(''):this.emp('Tidak ada yang terlambat kembali');
-    // daftar nama
-    const dT=rows.length?`<table class="lv-t"><thead><tr><th>Nama</th><th>Segmen</th><th>Kelas</th><th>Jenis</th><th>Berangkat</th><th>Kembali</th><th>Status</th></tr></thead><tbody>${rows.map(x=>`<tr><td class="tx"><b>${E(x.nama)}</b></td><td>${seg(x)}</td><td>${E(x.kelas||'-')}</td><td>${E(x.jenis.charAt(0)+x.jenis.slice(1).toLowerCase())}</td><td>${tgl(x.tg,x.jamB)}</td><td>${tgl(x.kb,x.jamK)}</td><td>${badge(x)}</td></tr>`).join('')}</tbody></table>`:this.emp('Tidak ada izin atau kepulangan');
-    const note=(Z.showNama===false?'Nama disamarkan (inisial)':'Urut: terlambat, di luar asrama, disetujui, menunggu')+(hist?' &middot; status saat ini, bukan arsip tanggal tsb':'');
+    const fH=rows.length?this.stack(jRows,Math.max(1,...jRows.map(r=>r.tot)))+this.legend(Object.keys(CAT).map(c=>[CAT[c][1],CAT[c][0]])):this.emp('Tidak ada izin pada filter ini');
+    const note=(Z.showNama===false?'Nama disamarkan (inisial)':'Terlambat di atas')+(hist?' &middot; status saat ini, bukan arsip tanggal tsb':'');
     return this.kpi('Izin & kepulangan',this.fn(rows.length),this.filterLabel(),'#e8eefc',null,'c2')
       +this.kpi('Menunggu persetujuan',this.fn(T.tunggu),'belum diputuskan',C.sakit,null,'c2')
       +this.kpi('Disetujui',this.fn(T.setuju),'belum berangkat',C.izin,null,'c2')
       +this.kpi('Di luar asrama',this.fn(diLuar),`${this.f1(this.pc(diLuar,nPeserta))}% dari peserta`,'#5eead4',null,'c2')
       +this.kpi('Terlambat kembali',this.fn(T.telat),'melewati tanggal kembali',T.telat?C.alpa:C.hadir,null,'c2')
       +this.kpi('Sudah kembali',this.fn(T.kembali),'berangkat/kembali hari ini',C.hadir,null,'c2')
-      +this.pnl('Rekap per jenjang dan jenis kelamin','Redup = di luar filter',segT,'c7',true)
-      +this.pnl('Rekap menurut jenis izin',this.filterLabel(),jH+(klsH?`<div style="margin-top:10px"><span style="color:var(--mu);font-size:13px">Kelas terbanyak</span><div>${klsH}</div></div>`:''),'c5',true)
-      +this.pnl('Daftar nama izin & kepulangan',note,dT,'c8',true)
-      +this.pnl('Belum kembali (terlambat)','Terlama di atas',ltH,'c4',true);
+      +this.pnl('Sedang izin keluar / belum kembali',`${luar.length} orang &middot; ${note}${Z.dibaca!=null?' &middot; '+Z.dibaca+' data izin terbaca':''}`,aT,'c5',true)
+      +this.pnl('Izin terbanyak per jenjang &amp; jenis kelamin',`${wsel} &middot; 3 teratas`,bH,'c4',true)
+      +this.pnl('Paling sering izin',`${wsel} &middot; 10 teratas`,cH,'c3',true)
+      +this.pnl('Rekap per jenjang &amp; jenis kelamin','Redup = di luar filter',dT,'c5',true)
+      +this.pnl('Pengajuan &amp; kepulangan lain',`Menunggu, disetujui, sudah kembali`,eT,'c4',true)
+      +this.pnl('Menurut jenis izin',this.filterLabel(),fH,'c3',true);
   },
   /* =====================  HALAMAN 8 — GAMIFIKASI & PERINGKAT (agregat kamar/kelompok, tanpa nama anak)  ===================== */
   pg8(v){
