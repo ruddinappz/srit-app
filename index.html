@@ -1271,6 +1271,63 @@ SRIT.Approval=(function(){
   return A;
 })();
 
+// ---------- FILTER JENJANG / JENIS KELAMIN / TANGGAL + REKAP JUMLAH (dipakai daftar Izin, Pelanggaran, Pembinaan, Kasus, dll.) ----------
+// mo = {date:'TANGGAL', dateEnd:'KEMBALI' (opsional: rentang, dihitung bila beririsan), anak:'ANAK' | kamar:'KAMAR' (penentu jenjang/JK)}
+SRIT.Monitor={
+  JJ(){const b=['SRD','SRMP','SRMA'];SRIT.Store.read('ANAK').forEach(a=>{const j=String(a.JENJANG||'').toUpperCase();if(j&&b.indexOf(j)<0)b.push(j);});return b;},
+  D(r,mo){return String((mo.dateOf?mo.dateOf(r):r[mo.date])||'').slice(0,10);},
+  seg(r,mo){const x=mo.anak?(SRIT.Repo.getById('ANAK',r[mo.anak])||{}):mo.kamar?(SRIT.Repo.getById('KAMAR',r[mo.kamar])||{}):{};return {jj:String(x.JENJANG||'').toUpperCase(),jk:x.JK==='L'||x.JK==='P'?x.JK:''};},
+  rng(p){const t=SRIT.Util.todayISO(),g=n=>SRIT.Asuh._geser(t,n),y=+t.slice(0,4),mm=+t.slice(5,7),iso=d=>d.toISOString().slice(0,10);
+    if(p==='hari')return {from:t,to:t};if(p==='7')return {from:g(-6),to:t};if(p==='30')return {from:g(-29),to:t};
+    if(p==='bulan')return {from:iso(new Date(Date.UTC(y,mm-1,1))),to:iso(new Date(Date.UTC(y,mm,0)))};
+    if(p==='lalu')return {from:iso(new Date(Date.UTC(y,mm-2,1))),to:iso(new Date(Date.UTC(y,mm-1,0)))};
+    return {from:'',to:''};},
+  // predikat baris; skip='seg' = abaikan filter jenjang/JK (untuk menghitung sebaran per jenjang)
+  pred(mo,m,skip){return r=>{
+      if((mo.anak||mo.kamar)&&skip!=='seg'&&(m.jj||m.jk)){const g=this.seg(r,mo);if(m.jj&&g.jj!==m.jj)return false;if(m.jk&&g.jk!==m.jk)return false;}
+      const d=this.D(r,mo),e=mo.dateEnd?(String(r[mo.dateEnd]||'').slice(0,10)||d):d;
+      if(m.from&&e<m.from)return false;if(m.to&&d>m.to)return false;return true;};},
+  ctl(mo,m){const E=SRIT.Util.esc,seg=(mo.anak||mo.kamar);
+    return (seg?`<div><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm sf-mon" data-mk="jj"><option value="">Semua</option>${this.JJ().map(j=>`<option value="${E(j)}" ${m.jj===j?'selected':''}>${E(j)}</option>`).join('')}</select></div>
+      <div><label class="form-label-sm">Jenis kelamin</label><select class="form-select form-select-sm sf-mon" data-mk="jk"><option value="">Semua</option><option value="L" ${m.jk==='L'?'selected':''}>Putra</option><option value="P" ${m.jk==='P'?'selected':''}>Putri</option></select></div>`:'')
+     +`<div><label class="form-label-sm">Periode</label><select class="form-select form-select-sm" id="sfMonPer">${[['','Semua tanggal'],['hari','Hari ini'],['7','7 hari terakhir'],['30','30 hari terakhir'],['bulan','Bulan ini'],['lalu','Bulan lalu'],['x','Pilih tanggal']].map(o=>`<option value="${o[0]}" ${(m.per||'')===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
+      <div><label class="form-label-sm">Dari</label><input type="date" class="form-control form-control-sm sf-mon" data-mk="from" value="${E(m.from||'')}"></div>
+      <div><label class="form-label-sm">Sampai</label><input type="date" class="form-control form-control-sm sf-mon" data-mk="to" value="${E(m.to||'')}"></div>`;},
+  sync(root,m){$$('.sf-mon',root).forEach(el=>{el.value=m[el.dataset.mk]||'';});const p=$('#sfMonPer',root);if(p)p.value=m.per||'';},
+  wire(root,m,onChange){
+    $$('.sf-mon',root).forEach(el=>el.onchange=()=>{m[el.dataset.mk]=el.value;if(el.dataset.mk==='from'||el.dataset.mk==='to')m.per=(m.from||m.to)?'x':'';this.sync(root,m);onChange();});
+    const p=$('#sfMonPer',root);if(p)p.onchange=e=>{const v=e.target.value;m.per=v;if(v!=='x'){const r=this.rng(v);m.from=r.from;m.to=r.to;}this.sync(root,m);onChange();};},
+  chips(mo,m,root){const fd=SRIT.Util.fmtDateShort,out=[];
+    const reset=ks=>()=>{ks.forEach(k=>{m[k]='';});if(ks.indexOf('from')>=0)m.per='';this.sync(root||document,m);};
+    if(m.jj)out.push({label:'Jenjang: '+m.jj,clear:reset(['jj'])});
+    if(m.jk)out.push({label:'Jenis kelamin: '+(m.jk==='L'?'Putra':'Putri'),clear:reset(['jk'])});
+    if(m.from||m.to)out.push({label:'Tanggal: '+(m.from&&m.to?(m.from===m.to?fd(m.from):fd(m.from)+' - '+fd(m.to)):m.from?'sejak '+fd(m.from):'sampai '+fd(m.to)),clear:reset(['from','to'])});
+    return out;},
+  clearAll(m){m.jj='';m.jk='';m.from='';m.to='';m.per='';},
+  // kotak rekap: total, jumlah anak berbeda, sebaran jenjang x JK (klik untuk memilih jenjang), rincian per tanggal
+  rekap(box,noSeg,full,mo,m,onPick){
+    if(!box)return;const E=SRIT.Util.esc,fd=SRIT.Util.fmtDateShort,JJ=this.JJ(),cnt={};JJ.forEach(j=>{cnt[j]={L:0,P:0,T:0};});let lain=0;
+    noSeg.forEach(r=>{const g=(mo.anak||mo.kamar)?this.seg(r,mo):{jj:'',jk:''};if(cnt[g.jj]){cnt[g.jj].T++;if(g.jk)cnt[g.jj][g.jk]++;}else lain++;});
+    const anakBeda=mo.anak?new Set(full.map(r=>r[mo.anak]).filter(Boolean)).size:0;
+    const seg=(mo.anak||mo.kamar),tot=noSeg.length;
+    // per tanggal (rentang dihitung per hari, maks 62 hari)
+    const days={},t=SRIT.Util.todayISO();
+    full.forEach(r=>{const a=this.D(r,mo);if(!a)return;
+      if(mo.dateEnd){const b=String(r[mo.dateEnd]||'').slice(0,10)||a;let d=m.from&&m.from>a?m.from:a;const lim=(m.to&&m.to<b)?m.to:b;for(let i=0;d<=lim&&i<62;i++){days[d]=(days[d]||0)+1;d=SRIT.Asuh._geser(d,1);}}
+      else days[a]=(days[a]||0)+1;});
+    const dk=Object.keys(days).sort().reverse().slice(0,31);
+    box.innerHTML=`<div class="card-srit p-3 mb-3"><div class="d-flex flex-wrap gap-4 align-items-start">
+      <div><div class="text-muted-2" style="font-size:11px">Total sesuai filter</div><div style="font-size:28px;font-weight:700;line-height:1.1">${full.length}</div>${mo.anak?`<div class="text-muted-2" style="font-size:12px">${anakBeda} anak berbeda</div>`:''}</div>
+      ${seg?`<div style="flex:1;min-width:280px;overflow:auto"><table class="table table-sm table-srit mb-0" style="font-size:13px"><thead><tr><th>Jenjang</th><th class="text-end">Putra</th><th class="text-end">Putri</th><th class="text-end">Total</th></tr></thead><tbody>
+        ${JJ.map(j=>`<tr data-pickjj="${E(j)}" style="cursor:pointer" class="${m.jj===j?'table-active':''}"><td><b>${E(j)}</b></td><td class="text-end">${cnt[j].L}</td><td class="text-end">${cnt[j].P}</td><td class="text-end"><b>${cnt[j].T}</b></td></tr>`).join('')}
+        ${lain?`<tr><td class="text-muted-2">Tanpa data jenjang</td><td></td><td></td><td class="text-end">${lain}</td></tr>`:''}
+        </tbody><tfoot><tr><td><b>Total</b></td><td class="text-end">${JJ.reduce((a,j)=>a+cnt[j].L,0)}</td><td class="text-end">${JJ.reduce((a,j)=>a+cnt[j].P,0)}</td><td class="text-end"><b>${tot}</b></td></tr></tfoot></table>
+        <div class="text-muted-2" style="font-size:11px">Sebaran memakai periode &amp; filter lain; klik baris untuk memilih jenjang.</div></div>`:''}
+      </div>
+      ${dk.length?`<details class="mt-2"><summary class="text-muted-2" style="font-size:12px;cursor:pointer">Rincian per tanggal (${dk.length} hari${Object.keys(days).length>31?', 31 terbaru':''})</summary><div class="d-flex flex-wrap gap-2 mt-2">${dk.map(d=>`<span class="sf-chip" style="cursor:default">${fd(d)}: <b>${days[d]}</b></span>`).join('')}</div></details>`:''}</div>`;
+    $$('[data-pickjj]',box).forEach(tr=>tr.onclick=()=>{m.jj=m.jj===tr.dataset.pickjj?'':tr.dataset.pickjj;onPick();});
+  }
+};
 function simpleFeature(cfg){
   const mod=cfg.module||cfg.perm;
   return {
@@ -1295,12 +1352,14 @@ function simpleFeature(cfg){
           </div>
         </div>
         ${extraFilters}
+        ${cfg.monitor?SRIT.Monitor.ctl(cfg.monitor,this.state.mon=this.state.mon||{jj:'',jk:'',from:'',to:'',per:''}):''}
         ${(cfg.toolbar||[]).filter(b=>!b.perm||SRIT.Auth.can(b.perm)||SRIT.Auth.isSuper()).map(b=>`<div><label class="form-label-sm d-block">&nbsp;</label><button class="btn ${b.cls||'btn-outline-primary'} btn-sm" data-tb="${b.id}"><i class="bi ${b.icon||'bi-gear'}"></i> ${b.label}</button></div>`).join('')}
         <div><label class="form-label-sm">Per Halaman</label><select class="form-select form-select-sm" id="sfSize"><option>25</option><option>50</option><option>100</option></select></div>
         ${canImport?`<div><label class="form-label-sm d-block">&nbsp;</label><button class="btn btn-outline-success btn-sm" id="sfImport"><i class="bi bi-file-earmark-excel"></i> Impor</button></div>`:''}
         ${canExport?`<div><label class="form-label-sm d-block">&nbsp;</label><button class="btn btn-outline-secondary btn-sm" id="sfExport"><i class="bi bi-download"></i> Ekspor</button></div>`:''}
         ${canCreate?`<div><label class="form-label-sm d-block">&nbsp;</label><button class="btn btn-primary btn-sm" id="sfAdd"><i class="bi bi-plus-lg"></i> Tambah</button></div>`:''}
       </div><div id="sfActiveChips"></div></div>
+      ${cfg.monitor?'<div id="sfRekap"></div>':''}
       <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="sfTable"></table></div><div class="p-3 border-top" id="sfPag"></div></div>`;
       $('#sfSearch').oninput=e=>{
         $('#sfSearchClear').style.display=e.target.value?'flex':'none';
@@ -1310,6 +1369,7 @@ function simpleFeature(cfg){
       $('#sfSearchClear').onclick=()=>{$('#sfSearch').value='';$('#sfSearchClear').style.display='none';this.state.search='';this.state.page=1;this.load();};
       $('#sfSize').onchange=e=>{this.state.size=+e.target.value;this.state.page=1;this.load();};
       $$('.sf-filter').forEach(sel=>sel.onchange=e=>{this.state.filters=this.state.filters||{};this.state.filters[e.target.dataset.k]=e.target.value;this.state.page=1;this.load();});
+      if(cfg.monitor)SRIT.Monitor.wire(host,this.state.mon,()=>{this.state.page=1;this.load();});
       const add=$('#sfAdd');if(add)add.onclick=()=>this.form();
       const exp=$('#sfExport');if(exp)exp.onclick=()=>this.exportCSV();
       const imp=$('#sfImport');if(imp)imp.onclick=()=>this.importXLSX();
@@ -1327,6 +1387,7 @@ function simpleFeature(cfg){
         const ot=(opts.find(o=>String(o.v)===String(v))||{}).t||v;
         chips.push({label:(f?f.label:k)+': '+ot,clear:()=>{this.state.filters[k]='';const el=document.querySelector('.sf-filter[data-k="'+k+'"]');if(el)el.value='';}});
       });
+      if(cfg.monitor)SRIT.Monitor.chips(cfg.monitor,this.state.mon,document).forEach(c=>chips.push(c));
       if(!chips.length){box.innerHTML='';return;}
       box.innerHTML=`<div class="d-flex align-items-center gap-2 flex-wrap mt-2">
         <span class="text-muted-2" style="font-size:11px">Filter aktif:</span>
@@ -1336,6 +1397,7 @@ function simpleFeature(cfg){
       box.querySelectorAll('[data-chip]').forEach((el,i)=>{el.onclick=()=>{chips[i].clear();this.state.page=1;this.load();};});
       const ca=$('#sfClearAll');if(ca)ca.onclick=()=>{
         this.state.search='';this.state.filters={};
+        if(cfg.monitor){SRIT.Monitor.clearAll(this.state.mon);SRIT.Monitor.sync(document,this.state.mon);}
         const se=$('#sfSearch');if(se)se.value='';
         const cx=$('#sfSearchClear');if(cx)cx.style.display='none';
         $$('.sf-filter').forEach(s=>s.value='');
@@ -1354,7 +1416,8 @@ function simpleFeature(cfg){
         onDone:()=>this.load()});
     },
     load(){
-      const r=SRIT.Api.list(cfg.table,{page:this.state.page,size:this.state.size,search:this.state.search,searchFields:cfg.searchFields,refSearch:cfg.refSearch||[],filters:this.state.filters||{}});
+      const mo=cfg.monitor,mon=this.state.mon||{};
+      const r=SRIT.Api.list(cfg.table,{page:this.state.page,size:this.state.size,search:this.state.search,searchFields:cfg.searchFields,refSearch:cfg.refSearch||[],filters:this.state.filters||{},where:mo?SRIT.Monitor.pred(mo,mon):null});
       const canU=SRIT.Auth.can(mod+':UPDATE'),canD=SRIT.Auth.can(mod+':DELETE');
       const hasActions=cfg.fields&&(canU||canD||cfg.detail||(cfg.rowActions&&cfg.rowActions.length));
       const nCols=cfg.cols.length+(hasActions?1:0);
@@ -1371,10 +1434,13 @@ function simpleFeature(cfg){
       $('#sfPag').innerHTML=SRIT.UI.pagination(r);
       $$('#sfPag [data-pg]').forEach(a=>a.onclick=()=>{this.state.page=+a.dataset.pg;this.load();});
       this.renderChips();
+      if(mo){const base={page:1,size:1000000,search:this.state.search,searchFields:cfg.searchFields,refSearch:cfg.refSearch||[],filters:this.state.filters||{}};
+        const noSeg=SRIT.Api.list(cfg.table,Object.assign({},base,{where:SRIT.Monitor.pred(mo,mon,'seg')})).rows,full=SRIT.Api.list(cfg.table,Object.assign({},base,{where:SRIT.Monitor.pred(mo,mon)})).rows;
+        SRIT.Monitor.rekap($('#sfRekap'),noSeg,full,mo,mon,()=>{SRIT.Monitor.sync(document,mon);this.state.page=1;this.load();});}
       if(cfg.afterLoad)cfg.afterLoad.call(this);
     },
     exportCSV(){
-      const all=SRIT.Api.list(cfg.table,{page:1,size:100000,search:this.state.search,searchFields:cfg.searchFields,refSearch:cfg.refSearch||[],filters:this.state.filters||{}}).rows;
+      const all=SRIT.Api.list(cfg.table,{page:1,size:100000,search:this.state.search,searchFields:cfg.searchFields,refSearch:cfg.refSearch||[],filters:this.state.filters||{},where:cfg.monitor?SRIT.Monitor.pred(cfg.monitor,this.state.mon||{}):null}).rows;
       if(!all.length){SRIT.Notify('Tidak ada data untuk diekspor','warn');return;}
       const cols=cfg.cols.map(c=>c.h);
       let csv=cols.join(',')+'\n';
@@ -5769,7 +5835,7 @@ SRIT.OPS={
 };
 // register each OPS module as a CRUD feature keyed 'ops-<key>'
 Object.entries(SRIT.OPS).forEach(([k,c])=>{
-  regFeature('ops-'+k,{title:c.title,table:c.table,perm:'ops',module:'ops',idPrefix:c.idPrefix,searchFields:c.searchFields,cols:c.cols,fields:c.fields});
+  regFeature('ops-'+k,{title:c.title,table:c.table,perm:'ops',module:'ops',idPrefix:c.idPrefix,searchFields:c.searchFields,cols:c.cols,fields:c.fields,monitor:(c.fields||[]).some(x=>x.k==='TANGGAL')?((c.fields||[]).some(x=>x.k==='ANAK')?{date:'TANGGAL',anak:'ANAK'}:{date:'TANGGAL'}):undefined});
 });
 // single dispatcher feature for router route 'ops-module'
 SRIT.Features['ops-module']={
@@ -5974,7 +6040,7 @@ regFeature('program',{title:'Program Pembinaan',table:'PROGRAM',
 <script>
 //# sourceURL=View_Izin.html
 // Izin & Kepulangan (dengan alur persetujuan)
-regFeature('izin',{title:'Izin & Kepulangan',table:'IZIN',perm:'izin',module:'izin',idPrefix:'IZ',searchFields:['NAMA_ANAK','TUJUAN','PENJEMPUT'],refSearch:SRIT.anakRefSearch,detail:true,
+regFeature('izin',{monitor:{date:'TANGGAL',dateEnd:'KEMBALI',anak:'ANAK'},title:'Izin & Kepulangan',table:'IZIN',perm:'izin',module:'izin',idPrefix:'IZ',searchFields:['NAMA_ANAK','TUJUAN','PENJEMPUT'],refSearch:SRIT.anakRefSearch,detail:true,
   filters:[{k:'STATUS',label:'Status',options:['MENUNGGU','DISETUJUI','DITOLAK','BERANGKAT','KEMBALI','TERLAMBAT','SELESAI'].map(v=>({v,t:v}))},{k:'JENIS',label:'Jenis',options:['REGULER','KHUSUS','DARURAT'].map(v=>({v,t:v}))}],
   cols:[
     {h:'Anak & Keterangan',f:r=>`<div class="fw-semibold">${SRIT.Util.esc(SRIT.nm('ANAK',r.ANAK))}</div>${SRIT.anakKet(r.ANAK,{asrama:false,gedung:false})}`},
@@ -6130,7 +6196,7 @@ SRIT.Features.izin.cetak=function(rec){
 <script>
 //# sourceURL=View_Tamu.html
 // Buku Tamu
-regFeature('tamu',{title:'Buku Tamu Digital',table:'BUKU_TAMU',perm:'tamu',module:'tamu',idPrefix:'TM',searchFields:['NAMA','ANAK'],detail:true,
+regFeature('tamu',{monitor:{date:'TANGGAL'},title:'Buku Tamu Digital',table:'BUKU_TAMU',perm:'tamu',module:'tamu',idPrefix:'TM',searchFields:['NAMA','ANAK'],detail:true,
   filters:[{k:'STATUS',label:'Status',options:['DI DALAM','SELESAI'].map(v=>({v,t:v}))}],
   cols:[{h:'Tanggal',f:r=>SRIT.Util.fmtDateShort(r.TANGGAL)},{h:'Tamu',k:'NAMA'},{h:'Keperluan',k:'KEPERLUAN'},{h:'Menemui',k:'ANAK'},{h:'Masuk',k:'MASUK'},{h:'Keluar',k:'KELUAR'},{h:'Status',f:r=>`<span class="badge-soft ${r.STATUS==='SELESAI'?'st-BELUM':'st-HADIR'}">${r.STATUS}</span>`}],
   rowActions:[{id:'keluar',label:'Check-out',icon:'bi-box-arrow-right',cls:'btn-outline-success',show:r=>r.STATUS!=='SELESAI',run:function(rec,reload){SRIT.Repo.update('BUKU_TAMU',rec.ID,{STATUS:'SELESAI',KELUAR:new Date().toTimeString().slice(0,5)});SRIT.Audit.log('CHECK_OUT','tamu',rec.ID);SRIT.Notify('Tamu check-out','ok');reload();}}],
@@ -6153,7 +6219,7 @@ regFeature('tatatertib',{title:'Tata Tertib',table:'TATA_TERTIB',perm:'tataterti
 <script>
 //# sourceURL=View_Pelanggaran.html
 // Pelanggaran (Kedisiplinan)
-regFeature('pelanggaran',{title:'Kedisiplinan & Pelanggaran',table:'PELANGGARAN',perm:'pelanggaran',module:'pelanggaran',idPrefix:'PL',searchFields:['NAMA_ANAK','KEJADIAN'],refSearch:SRIT.anakRefSearch,detail:true,
+regFeature('pelanggaran',{monitor:{date:'TANGGAL',anak:'ANAK'},title:'Kedisiplinan & Pelanggaran',table:'PELANGGARAN',perm:'pelanggaran',module:'pelanggaran',idPrefix:'PL',searchFields:['NAMA_ANAK','KEJADIAN'],refSearch:SRIT.anakRefSearch,detail:true,
   filters:[{k:'TINGKAT',label:'Tingkat',options:['RINGAN','SEDANG','BERAT'].map(v=>({v,t:v}))},{k:'STATUS',label:'Status',options:['PROSES','SELESAI'].map(v=>({v,t:v}))}],
   cols:[{h:'Tanggal',f:r=>SRIT.Util.fmtDateShort(r.TANGGAL)},{h:'Anak & Keterangan',f:r=>`<div class="fw-semibold">${SRIT.Util.esc(SRIT.nm('ANAK',r.ANAK))}</div>${SRIT.anakKet(r.ANAK,{tanggal:r.TANGGAL})}`},{h:'Wali Asuh',f:r=>{const a=SRIT.Repo.getById('ANAK',r.ANAK)||{};return (SRIT.Repo.getById('WALI_ASUH',a.WALI_ASUH)||{}).NAME||'-';}},{h:'Aturan',f:r=>(SRIT.Repo.getById('TATA_TERTIB',r.ATURAN)||{}).JUDUL||'-'},{h:'Tingkat',f:r=>`<span class="badge-soft ${r.TINGKAT==='BERAT'?'st-ALPA':r.TINGKAT==='SEDANG'?'st-SAKIT':'st-HADIR'}">${r.TINGKAT}</span>`},{h:'Status',f:r=>`<span class="badge-soft ${r.STATUS==='SELESAI'?'st-BELUM':'st-IZIN'}">${r.STATUS}</span>`}],
   rowActions:[
@@ -6169,7 +6235,7 @@ regFeature('pelanggaran',{title:'Kedisiplinan & Pelanggaran',table:'PELANGGARAN'
 <script>
 //# sourceURL=View_Pembinaan.html
 // Pembinaan
-regFeature('pembinaan',{title:'Pembinaan',table:'PEMBINAAN',perm:'pembinaan',module:'pembinaan',idPrefix:'PB',searchFields:['NAMA_ANAK','MATERI'],refSearch:SRIT.anakRefSearch,detail:true,
+regFeature('pembinaan',{monitor:{date:'TANGGAL',anak:'ANAK'},title:'Pembinaan',table:'PEMBINAAN',perm:'pembinaan',module:'pembinaan',idPrefix:'PB',searchFields:['NAMA_ANAK','MATERI'],refSearch:SRIT.anakRefSearch,detail:true,
   filters:[{k:'JENIS',label:'Jenis',options:['NASIHAT','PENDAMPINGAN','MENTORING','REFLEKSI','PEMBIASAAN','KONSELING','TUGAS','KEGIATAN POSITIF'].map(v=>({v,t:v}))},{k:'STATUS',label:'Status',options:['BERLANGSUNG','SELESAI'].map(v=>({v,t:v}))}],
   cols:[{h:'Tanggal',f:r=>SRIT.Util.fmtDateShort(r.TANGGAL)},{h:'Anak & Keterangan',f:r=>`<div class="fw-semibold">${SRIT.Util.esc(SRIT.nm('ANAK',r.ANAK))}</div>${SRIT.anakKet(r.ANAK,{tanggal:r.TANGGAL})}`},{h:'Wali Asuh',f:r=>{const a=SRIT.Repo.getById('ANAK',r.ANAK)||{};return (SRIT.Repo.getById('WALI_ASUH',a.WALI_ASUH)||{}).NAME||'-';}},{h:'Jenis',f:r=>`<span class="badge-soft st-IZIN">${r.JENIS}</span>`},{h:'Materi',k:'MATERI'},{h:'Status',f:r=>`<span class="badge-soft ${r.STATUS==='SELESAI'?'st-BELUM':'st-HADIR'}">${r.STATUS}</span>`}],
   rowActions:[{id:'selesai',label:'Tandai Selesai',icon:'bi-check-lg',cls:'btn-outline-success',show:r=>r.STATUS!=='SELESAI',run:_setStatus('PEMBINAAN','STATUS','SELESAI')}],
@@ -6326,7 +6392,8 @@ SRIT.Kasus=(function(){
 })();
 
 SRIT.Features.insiden={
-  state:{page:1,size:20,search:'',tingkat:'',pilar:'',tampil:'AKTIF'},
+  state:{page:1,size:20,search:'',tingkat:'',pilar:'',tampil:'AKTIF',mon:{jj:'',jk:'',from:'',to:'',per:''}},
+  MON:{date:'TANGGAL',dateOf:r=>r.WAKTU_TEMU||r.TANGGAL,anak:'ANAK'},
   render(host){SRIT.UI.setPage('Insiden & Manajemen Kasus','Insiden');this._host=host;
     const s=this.state,K=SRIT.Kasus,sm=K.ringkas();
     host.innerHTML=`<div class="row g-2 mb-3">
@@ -6340,20 +6407,24 @@ SRIT.Features.insiden={
       <div><label class="form-label-sm">Tingkat</label><select class="form-select form-select-sm" id="ksTingkat"><option value="">Semua</option>${Object.keys(K.TINGKAT).map(k=>`<option value="${k}" ${s.tingkat===k?'selected':''}>${K.TINGKAT[k].t}</option>`).join('')}</select></div>
       <div><label class="form-label-sm">Pilar</label><select class="form-select form-select-sm" id="ksPilar"><option value="">Semua</option>${Object.keys(K.PILAR).map(k=>`<option value="${k}" ${s.pilar===k?'selected':''}>${K.PILAR[k]}</option>`).join('')}</select></div>
       <div><label class="form-label-sm">Tampilkan</label><select class="form-select form-select-sm" id="ksTampil">${[['AKTIF','Aktif'],['LEWAT','Lewat batas lapor'],['SELESAI','Selesai'],['SEMUA','Semua']].map(o=>`<option value="${o[0]}" ${s.tampil===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
+      ${SRIT.Monitor.ctl(this.MON,s.mon)}
       ${SRIT.Auth.can('insiden:CREATE')?'<div><button class="btn btn-primary btn-sm" id="ksAdd"><i class="bi bi-plus-lg"></i> Catat Kejadian</button></div>':''}
     </div>
     <div class="text-muted-2 mt-2" style="font-size:12px">Batas lapor mengikat: kasus berat 1×24 jam, sedang 2×24 jam sejak ditemukan. Amankan anak lebih dulu, catat dan laporkan kemudian. Jaga kerahasiaan.</div></div>
+    <div id="ksRekap"></div>
     <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="ksTable"></table></div><div class="p-3 border-top" id="ksPag"></div></div>`;
     $('#ksSearch').oninput=e=>{clearTimeout(this._t);this._t=setTimeout(()=>{s.search=e.target.value;s.page=1;this.load();},300);};
     $('#ksTingkat').onchange=e=>{s.tingkat=e.target.value;s.page=1;this.load();};
     $('#ksPilar').onchange=e=>{s.pilar=e.target.value;s.page=1;this.load();};
     $('#ksTampil').onchange=e=>{s.tampil=e.target.value;s.page=1;this.load();};
+    SRIT.Monitor.wire(host,s.mon,()=>{s.page=1;this.load();});
     const add=$('#ksAdd');if(add)add.onclick=()=>this.form();
     this.load();
   },
-  _rows(){
-    const s=this.state,K=SRIT.Kasus,q=(s.search||'').toLowerCase(),now=new Date();
+  _rows(skip){
+    const s=this.state,K=SRIT.Kasus,q=(s.search||'').toLowerCase(),now=new Date(),mp=SRIT.Monitor.pred(this.MON,s.mon,skip);
     let rows=SRIT.Store.read('INSIDEN').filter(r=>{
+      if(!mp(r))return false;
       if(s.tingkat&&K.tingkatOf(r)!==s.tingkat)return false;
       if(s.pilar&&(r.PILAR||K.PILAR_OF[r.KATEGORI])!==s.pilar)return false;
       const a=K.aktif(r);
@@ -6367,6 +6438,7 @@ SRIT.Features.insiden={
   },
   load(){
     const s=this.state,K=SRIT.Kasus,esc=SRIT.Util.esc,all=this._rows();
+    SRIT.Monitor.rekap($('#ksRekap'),this._rows('seg'),all,this.MON,s.mon,()=>{SRIT.Monitor.sync(document,s.mon);s.page=1;this.load();});
     const total=all.length,pages=Math.ceil(total/s.size)||1;if(s.page>pages)s.page=pages;
     const rows=all.slice((s.page-1)*s.size,s.page*s.size);
     const canU=SRIT.Auth.can('insiden:UPDATE'),canD=SRIT.Auth.can('insiden:DELETE');
@@ -6513,7 +6585,7 @@ SRIT.Features.insiden={
 <script>
 //# sourceURL=View_Inspeksi.html
 // Inspeksi Kamar
-regFeature('inspeksi',{title:'Inspeksi Kamar',table:'INSPEKSI',perm:'inspeksi',module:'inspeksi',idPrefix:'IS',searchFields:['CATATAN'],refSearch:[{get:r=>waliAsramaName(r.PETUGAS)}],detail:true,
+regFeature('inspeksi',{monitor:{date:'TANGGAL',kamar:'KAMAR'},title:'Inspeksi Kamar',table:'INSPEKSI',perm:'inspeksi',module:'inspeksi',idPrefix:'IS',searchFields:['CATATAN'],refSearch:[{get:r=>waliAsramaName(r.PETUGAS)}],detail:true,
   filters:[{k:'KAMAR',label:'Kamar',options:()=>SRIT.Store.read('KAMAR').map(k=>({v:k.ID,t:k.NAME}))},{k:'PETUGAS',label:'Petugas (Wali Asrama)',options:waliAsramaOpts}],
   cols:[{h:'Tanggal',f:r=>SRIT.Util.fmtDateShort(r.TANGGAL)},{h:'Kamar',f:r=>(SRIT.Repo.getById('KAMAR',r.KAMAR)||{}).NAME||r.KAMAR},{h:'Kebersihan',f:r=>`<span class="badge-soft ${r.KEBERSIHAN==='BAIK'?'st-HADIR':r.KEBERSIHAN==='CUKUP'?'st-SAKIT':'st-ALPA'}">${r.KEBERSIHAN}</span>`},{h:'Skor',f:r=>`<b>${r.SKOR}</b>`},{h:'Petugas (Wali Asrama)',f:r=>waliAsramaName(r.PETUGAS)}],
   fields:[{k:'TANGGAL',label:'Tanggal',type:'date',default:SRIT.Util.todayISO()},{k:'KAMAR',label:'Kamar',type:'select',options:kamarOpts},{k:'PETUGAS',label:'Petugas (Wali Asrama)',type:'select',col:12,options:waliAsramaOpts},{k:'KEBERSIHAN',label:'Kebersihan',type:'select',options:['BAIK','CUKUP','PERLU_PERBAIKAN'].map(v=>({v,t:v}))},{k:'KERAPIAN',label:'Kerapian',type:'select',options:['BAIK','CUKUP','PERLU_PERBAIKAN'].map(v=>({v,t:v}))},{k:'TEMPAT_TIDUR',label:'Tempat Tidur',type:'select',options:['BAIK','CUKUP','PERLU_PERBAIKAN'].map(v=>({v,t:v}))},{k:'FASILITAS',label:'Fasilitas',type:'select',options:['BAIK','CUKUP','PERLU_PERBAIKAN'].map(v=>({v,t:v}))},{k:'SKOR',label:'Skor (0-100)',type:'number'},{k:'CATATAN',label:'Catatan',type:'textarea',col:12}]});
