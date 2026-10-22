@@ -694,12 +694,16 @@ SRIT.Import = {
       if(c.ref)ket='Isi dengan NAMA yang terdaftar di menu '+c.ref;
       guide.push([c.label,c.required?'WAJIB':'opsional',ket]);
     });
-    const wg=XLSX.utils.aoa_to_sheet(guide);wg['!cols']=[{wch:20},{wch:10},{wch:60}];
+    if(cfg.notes&&cfg.notes.length){guide.push(['','','']);guide.push(['CATATAN','','']);cfg.notes.forEach(n=>guide.push(['','',n]));}
+    const wg=XLSX.utils.aoa_to_sheet(guide);wg['!cols']=[{wch:20},{wch:10},{wch:90}];
     XLSX.utils.book_append_sheet(wb,wg,'Petunjuk');
-    XLSX.writeFile(wb,'Template_'+cfg.table+'.xlsx');
+    XLSX.writeFile(wb,cfg.templateName||('Template_'+cfg.table+'.xlsx'));
     SRIT.Notify('Template diunduh','ok');
   },
   // buka dialog impor
+  // Pengait opsional (menu lain tidak terpengaruh): cfg.optionsHtml (pilihan tambahan di dialog), cfg.afterValidate(parsed,el)
+  // (aturan lintas-baris: duplikat, cocokkan data lama; boleh mengisi r._errs/r._valid/r._skip/r._note), cfg.commit(validRows,el)
+  // (penyimpanan sendiri; kembalikan jumlah baris, atau null untuk membatalkan), cfg.notes (catatan di lembar Petunjuk), cfg.templateName.
   open(cfg){
     const m=SRIT.Modal.open({title:'Impor Data — '+cfg.title,size:'modal-lg',
       body:`<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
@@ -708,22 +712,29 @@ SRIT.Import = {
           <span class="text-muted-2 small" id="impFileName"></span>
         </div>
         <div class="alert alert-info py-2" style="font-size:12px"><i class="bi bi-info-circle"></i> Unduh template terlebih dahulu, isi datanya, lalu unggah. Kolom berlabel <b>WAJIB</b> harus diisi. Kolom relasi (Asrama, Kamar, dll) diisi dengan <b>nama</b> yang sudah terdaftar.</div>
+        <div id="impOpts">${cfg.optionsHtml||''}</div>
         <div id="impPreview"></div>`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button><button class="btn btn-success btn-sm" id="impSave" disabled><i class="bi bi-check2-circle"></i> Simpan Data Valid</button>`});
     $('#impDl',m.el).onclick=()=>this.downloadTemplate(cfg);
-    let parsed=[];
+    let parsed=[],rawRows=[];
+    const run=()=>{
+      parsed=this._validate(cfg,rawRows);
+      if(cfg.afterValidate){try{cfg.afterValidate(parsed,m.el);}catch(err){console.error(err);SRIT.Notify('Pemeriksaan data gagal: '+err.message,'err');}}
+      this._preview(m.el,cfg,parsed);
+      $('#impSave',m.el).disabled=!parsed.some(r=>r._valid);
+    };
+    $('#impOpts',m.el).addEventListener('change',()=>{if(rawRows.length)run();});
     $('#impFile',m.el).onchange=e=>{
       const f=e.target.files[0];if(!f)return;
+      if(typeof XLSX==='undefined'){SRIT.Notify('Pustaka Excel belum termuat, tunggu sebentar lalu coba lagi','warn');return;}
       $('#impFileName',m.el).textContent=f.name;
       const rd=new FileReader();
       rd.onload=ev=>{
         try{
           const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
           const ws=wb.Sheets[wb.SheetNames[0]];
-          const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-          parsed=this._validate(cfg,rows);
-          this._preview(m.el,cfg,parsed);
-          $('#impSave',m.el).disabled=!parsed.some(r=>r._valid);
+          rawRows=XLSX.utils.sheet_to_json(ws,{defval:''});
+          run();
         }catch(err){SRIT.Notify('Gagal membaca file: '+err.message,'err');}
       };
       rd.readAsArrayBuffer(f);
@@ -732,12 +743,17 @@ SRIT.Import = {
       const valid=parsed.filter(r=>r._valid);
       if(!valid.length){SRIT.Notify('Tidak ada baris valid','warn');return;}
       let n=0;
-      valid.forEach(r=>{
-        const rec={ID:SRIT.Util.uid(cfg.idPrefix||'ID')};
-        cfg.columns.forEach(c=>{rec[c.key]=r._data[c.key];});
-        if(cfg.onRow)cfg.onRow(rec,r._raw);
-        SRIT.Repo.insert(cfg.table,rec);n++;
-      });
+      if(cfg.commit){
+        n=cfg.commit(valid,m.el);
+        if(n===null||n===undefined||n===false)return;
+      }else{
+        valid.forEach(r=>{
+          const rec={ID:SRIT.Util.uid(cfg.idPrefix||'ID')};
+          cfg.columns.forEach(c=>{rec[c.key]=r._data[c.key];});
+          if(cfg.onRow)cfg.onRow(rec,r._raw);
+          SRIT.Repo.insert(cfg.table,rec);n++;
+        });
+      }
       SRIT.Audit.log('IMPORT',cfg.module||cfg.table.toLowerCase(),cfg.table,null,{jumlah:n});
       SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
       m.close();SRIT.Notify(n+' data berhasil diimpor','ok');
@@ -770,14 +786,17 @@ SRIT.Import = {
     });
   },
   _preview(root,cfg,parsed){
-    const okN=parsed.filter(r=>r._valid).length,badN=parsed.length-okN;
+    const skipN=parsed.filter(r=>r._skip).length,okN=parsed.filter(r=>r._valid).length,badN=parsed.length-okN-skipN;
     const head=cfg.columns.map(c=>`<th>${c.label}</th>`).join('');
+    const cell=(r,c)=>c.secret?(r._raw[c.label]||r._data[c.key]?'\u2022\u2022\u2022\u2022\u2022\u2022':''):SRIT.Util.esc(r._raw[c.label]??r._data[c.key]??'');
     $('#impPreview',root).innerHTML=`
-      <div class="d-flex gap-2 mb-2"><span class="badge-soft st-HADIR">${okN} valid</span>${badN?`<span class="badge-soft st-ALPA">${badN} bermasalah</span>`:''}<span class="badge-soft st-BELUM">${parsed.length} total</span></div>
+      <div class="d-flex flex-wrap gap-2 mb-2"><span class="badge-soft st-HADIR">${okN} valid</span>${skipN?`<span class="badge-soft st-BELUM">${skipN} dilewati</span>`:''}${badN?`<span class="badge-soft st-ALPA">${badN} bermasalah</span>`:''}<span class="badge-soft st-BELUM">${parsed.length} total</span></div>
       <div class="table-responsive" style="max-height:320px"><table class="table table-sm table-srit mb-0"><thead><tr><th>#</th><th>Status</th>${head}</tr></thead><tbody>
-      ${parsed.slice(0,100).map(r=>`<tr class="${r._valid?'':'table-danger'}"><td>${r._row}</td>
-        <td>${r._valid?'<i class="bi bi-check-circle-fill text-success"></i>':`<span class="text-danger" title="${SRIT.Util.esc(r._errs.join('; '))}" style="font-size:11px"><i class="bi bi-exclamation-triangle"></i> ${SRIT.Util.esc(r._errs[0]||'')}</span>`}</td>
-        ${cfg.columns.map(c=>`<td>${SRIT.Util.esc(r._raw[c.label]??r._data[c.key]??'')}</td>`).join('')}</tr>`).join('')}
+      ${parsed.slice(0,100).map(r=>`<tr class="${r._valid?'':(r._skip?'text-muted':'table-danger')}"><td>${r._row}</td>
+        <td>${r._valid?`<i class="bi bi-check-circle-fill text-success"></i>${r._note?` <span style="font-size:11px">${SRIT.Util.esc(r._note)}</span>`:''}`
+          :(r._skip?`<span style="font-size:11px" title="${SRIT.Util.esc(r._note||'')}"><i class="bi bi-dash-circle"></i> ${SRIT.Util.esc(r._note||'Dilewati')}</span>`
+          :`<span class="text-danger" title="${SRIT.Util.esc(r._errs.join('; '))}" style="font-size:11px"><i class="bi bi-exclamation-triangle"></i> ${SRIT.Util.esc(r._errs[0]||'')}</span>`)}</td>
+        ${cfg.columns.map(c=>`<td>${cell(r,c)}</td>`).join('')}</tr>`).join('')}
       </tbody></table></div>${parsed.length>100?'<div class="text-muted-2 small mt-1">Menampilkan 100 baris pertama…</div>':''}`;
   }
 };
@@ -2146,7 +2165,7 @@ SRIT.Features.absensi={
             <option value="">Semua jenis</option><option value="JADWAL">Jadwal Rutin</option><option value="KEGIATAN">Kegiatan Khusus</option></select></div>
           <div style="min-width:260px"><label class="form-label-sm">Sesi Kegiatan <span id="abHari" class="text-muted-2"></span> <span id="abKegN" class="text-muted-2"></span></label><select class="form-select form-select-sm" id="abKeg"></select></div>
         </div>
-        <div id="abSesInfo" class="mt-2"></div>
+        <div id="abSesInfo" class="mt-2"></div><div id="abHidden" class="mt-1"></div>
         <hr class="my-2">
         <style>.ab-ddrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}@media(max-width:575px){.ab-ddrow{grid-template-columns:1fr}}
 .ab-dd{position:relative}.ab-dd-lbl{display:block;font-size:11px;color:var(--srit-text-2);margin-bottom:3px}
@@ -2273,12 +2292,31 @@ SRIT.Features.absensi={
     $$('#abTabs a').forEach(a=>a.classList.toggle('active',a.dataset.tab===tab));
     this.renderTab();
   },
+  // kegiatan hari ini yang TANPA absensi tidak muncul di pilihan sesi; beri tahu jumlahnya dan sediakan daftar (+ aktifkan absensi bila berhak)
+  _hiddenNote(){
+    const box=$('#abHidden');if(!box)return;
+    const hid=SRIT.Api.getSessionsForDate(this.state.date,true).filter(s=>!s.absensi);
+    if(!hid.length){box.innerHTML='';return;}
+    box.innerHTML=`<span class="text-muted-2" style="font-size:12px"><i class="bi bi-eye-slash"></i> ${hid.length} kegiatan <b>tanpa absensi</b> tidak ditampilkan di pilihan sesi. <a class="pointer" id="abHidLihat" style="text-decoration:underline">Lihat daftar</a></span>`;
+    $('#abHidLihat').onclick=()=>this._hiddenList();
+  },
+  _hiddenList(){
+    const E=SRIT.Util.esc,hid=SRIT.Api.getSessionsForDate(this.state.date,true).filter(s=>!s.absensi);
+    const can=s=>SRIT.Auth.can((s.source==='JADWAL'?'jadwal':'kegiatan')+':UPDATE');
+    const m=SRIT.Modal.open({title:'Kegiatan tanpa absensi - '+SRIT.Util.fmtDateShort(this.state.date),body:`<div class="text-muted-2 mb-2" style="font-size:12px">Kegiatan ini hanya jadwal, tidak muncul di pilihan sesi absensi dan tidak dihitung di rekap kehadiran.</div>
+      <table class="table table-sm table-srit mb-0"><tbody>${hid.map(s=>`<tr><td class="text-nowrap">${E(s.jamMulai||'')}-${E(s.jamSelesai||'')}</td><td><b>${E(s.nama)}</b><div class="text-muted-2" style="font-size:11px">${s.source==='JADWAL'?'Jadwal rutin (berlaku tiap pekan)':'Kegiatan khusus'}${s.jenjang!=='SEMUA'?' &middot; '+E(s.jenjang):''}</div></td><td class="text-end">${can(s)?`<button class="btn btn-sm btn-outline-primary py-0" data-on="${E(s.source)}|${E(s.id)}">Pakai absensi</button>`:''}</td></tr>`).join('')}</tbody></table>`,
+      footer:'<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button>'});
+    $$('[data-on]',m.el).forEach(b=>b.onclick=()=>{const [src,id]=b.dataset.on.split('|');
+      if(src==='JADWAL'&&!window.confirm('Jadwal rutin ini akan memakai absensi setiap pekan. Lanjutkan?'))return;
+      SRIT.Repo.update(src==='JADWAL'?'JADWAL':'KEGIATAN',id,{ABSENSI:'YA'});SRIT.Notify('Kegiatan kini memakai absensi','ok');m.close();this.buildSessions();});
+  },
   buildSessions(){
     const allSes=SRIT.Api.getSessionsForDate(this.state.date);
     const kq=String(this.state.kgQ||'').trim().toLowerCase(),ks=this.state.kgSrc;
     const sessions=allSes.filter(s=>(!ks||s.source===ks)&&(!kq||String(s.nama||'').toLowerCase().indexOf(kq)>=0));
     const nEl=$('#abKegN');if(nEl)nEl.textContent=(kq||ks)?'\u00b7 '+sessions.length+' dari '+allSes.length+' sesi':'';
     $('#abHari').textContent='('+SRIT.Util.hariOf(this.state.date)+')';
+    this._hiddenNote();
     const sel=$('#abKeg');
     if(!sessions.length){sel.innerHTML='<option value="">\u2014 Tidak ada sesi \u2014</option>';this.state.keg='';
       $('#abSesInfo').innerHTML=allSes.length
@@ -3202,7 +3240,7 @@ Object.assign(SRIT.Features.jadwal,{
         <div id="baList" style="max-height:50vh;overflow:auto"></div>`,
       footer:'<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="baSave">Terapkan</button>'});
     const rows=()=>{const jj=$('#baJj').value;return SRIT.Store.read('JADWAL').filter(r=>!jj||r.JENJANG===jj);};
-    const names=()=>{const q=($('#baQ').value||'').toLowerCase(),o={};rows().forEach(r=>{const n=String(r.NAMA||'').trim();if(q&&!n.toLowerCase().includes(q))return;const x=o[n]||(o[n]={n,c:0,ya:0});x.c++;if((r.ABSENSI||'YA')!=='TIDAK')x.ya++;});return Object.values(o).sort((a,b)=>a.n.localeCompare(b.n));};
+    const names=()=>{const q=($('#baQ').value||'').toLowerCase(),o={};rows().forEach(r=>{const n=String(r.NAMA||'').trim();if(q&&!n.toLowerCase().includes(q))return;const x=o[n]||(o[n]={n,c:0,ya:0});x.c++;if(SRIT.Api.absensiYa(r.ABSENSI))x.ya++;});return Object.values(o).sort((a,b)=>a.n.localeCompare(b.n));};
     const draw=()=>{
       const l=names();
       $('#baList').innerHTML=`<table class="table table-sm align-middle mb-0"><thead><tr><th>Kegiatan</th><th class="text-end">Jadwal</th><th>Saat ini</th><th>Ubah menjadi</th></tr></thead><tbody>${l.map((x,i)=>`<tr><td>${esc(x.n)}</td><td class="text-end">${x.c}</td><td>${x.ya===x.c?'<span class="badge-soft st-HADIR">Ya</span>':x.ya===0?'<span class="badge-soft st-BELUM">Tidak</span>':'<span class="badge-soft st-SAKIT">Campur ('+x.ya+' ya)</span>'}</td>
@@ -3212,7 +3250,7 @@ Object.assign(SRIT.Features.jadwal,{
     $('#baJj').onchange=draw;$('#baQ').oninput=draw;
     $('#baY').onclick=()=>{names().forEach(x=>choice[x.n]='YA');draw();};$('#baN').onclick=()=>{names().forEach(x=>choice[x.n]='TIDAK');draw();};
     $('#baSave').onclick=()=>{
-      let n=0;rows().forEach(r=>{const c=choice[String(r.NAMA||'').trim()];if(!c||(r.ABSENSI||'YA')===c)return;SRIT.Repo.update('JADWAL',r.ID,{ABSENSI:c});n++;});
+      let n=0;rows().forEach(r=>{const c=choice[String(r.NAMA||'').trim()];if(!c||(SRIT.Api.absensiYa(r.ABSENSI)?'YA':'TIDAK')===c)return;SRIT.Repo.update('JADWAL',r.ID,{ABSENSI:c});n++;});
       SRIT.Audit.log('UPDATE','jadwal','JADWAL',null,{absensiMassal:n});SRIT.Cache.invalidate('dash');m.close();SRIT.Notify(n+' jadwal diperbarui','ok');self.load();
     };
     draw();
@@ -4181,7 +4219,11 @@ SRIT.Features.user={
       <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-2">
         <div><div class="fw-semibold">Data Tenaga Kependidikan</div>
           <div class="text-muted-2" style="font-size:12px">Satu data untuk pegawai sekaligus akun login: wali asuh, wali asrama, kepala sekolah, guru, keamanan, dll.</div></div>
-        ${SRIT.Auth.can('user:CREATE')?'<button class="btn btn-primary btn-sm" id="usAdd"><i class="bi bi-plus-lg"></i> Tambah Tenaga Kependidikan</button>':''}
+        <div class="d-flex flex-wrap gap-2">
+          ${SRIT.Auth.can('user:CREATE')?'<button class="btn btn-outline-success btn-sm" id="usImport"><i class="bi bi-file-earmark-excel"></i> Impor XLSX</button>':''}
+          ${SRIT.Auth.can('user:EXPORT')?'<div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" id="usExportX" title="Ekspor sesuai filter ke Excel"><i class="bi bi-download"></i> Ekspor Excel</button><button class="btn btn-outline-secondary" id="usExportC" title="Ekspor sesuai filter ke CSV">CSV</button></div>':''}
+          ${SRIT.Auth.can('user:CREATE')?'<button class="btn btn-primary btn-sm" id="usAdd"><i class="bi bi-plus-lg"></i> Tambah Tenaga Kependidikan</button>':''}
+        </div>
       </div>
       <div id="usSumm" class="d-flex flex-wrap gap-2 mb-2"></div>
       <div class="filter-bar">
@@ -4203,15 +4245,16 @@ SRIT.Features.user={
     $('#usAkun').onchange=e=>{S.akun=e.target.value;S.page=1;this.load();};
     $('#usStatus').onchange=e=>{S.status=e.target.value;S.page=1;this.load();};
     const add=$('#usAdd');if(add)add.onclick=()=>this.form();
+    const imp=$('#usImport');if(imp)imp.onclick=()=>this.importXLSX();
+    const ex1=$('#usExportX');if(ex1)ex1.onclick=()=>this.exportData('xlsx');
+    const ex2=$('#usExportC');if(ex2)ex2.onclick=()=>this.exportData('csv');
     this.load();
   },
 
-  load(){
-    const S=this.state,esc=this._esc,all=this._rows(),q=S.search.trim().toLowerCase();
-    const sumAkun=all.filter(u=>this._hasAkun(u)&&u.STATUS!=='NONAKTIF').length;
-    $('#usSumm').innerHTML=[['Tenaga kependidikan',all.length,'#1c6ef2'],['Akun login aktif',sumAkun,'#16a34a'],['Belum punya akun',all.filter(u=>!this._hasAkun(u)).length,'#f59e0b'],['Wali Asuh',all.filter(u=>this._waliTable(u.JABATAN)==='WALI_ASUH').length,'#00b8a9'],['Wali Asrama',all.filter(u=>this._waliTable(u.JABATAN)==='WALI_ASRAMA').length,'#8b5cf6']]
-      .map(([l,n,c])=>`<span class="badge-soft" style="background:${c}1a;color:${c};font-size:12px;padding:5px 10px"><b>${n}</b> ${l}</span>`).join('');
-    let rows=all.filter(u=>{
+  /** Daftar sesuai filter aktif (dipakai tabel dan ekspor). */
+  _filtered(all){
+    const S=this.state,q=S.search.trim().toLowerCase();
+    return (all||this._rows()).filter(u=>{
       if(S.jab&&u.JABATAN!==S.jab)return false;
       if(S.status&&(u.STATUS||'AKTIF')!==S.status)return false;
       if(S.akun==='ya'&&!this._hasAkun(u))return false;
@@ -4219,6 +4262,14 @@ SRIT.Features.user={
       if(q&&[u.NAME,u.NIP,u.EMAIL,u.HP,this._jabName(u.JABATAN)].every(v=>String(v||'').toLowerCase().indexOf(q)<0))return false;
       return true;
     }).sort((a,b)=>String(a.NAME||'').localeCompare(String(b.NAME||''),'id'));
+  },
+
+  load(){
+    const S=this.state,esc=this._esc,all=this._rows();
+    const sumAkun=all.filter(u=>this._hasAkun(u)&&u.STATUS!=='NONAKTIF').length;
+    $('#usSumm').innerHTML=[['Tenaga kependidikan',all.length,'#1c6ef2'],['Akun login aktif',sumAkun,'#16a34a'],['Belum punya akun',all.filter(u=>!this._hasAkun(u)).length,'#f59e0b'],['Wali Asuh',all.filter(u=>this._waliTable(u.JABATAN)==='WALI_ASUH').length,'#00b8a9'],['Wali Asrama',all.filter(u=>this._waliTable(u.JABATAN)==='WALI_ASRAMA').length,'#8b5cf6']]
+      .map(([l,n,c])=>`<span class="badge-soft" style="background:${c}1a;color:${c};font-size:12px;padding:5px 10px"><b>${n}</b> ${l}</span>`).join('');
+    let rows=this._filtered(all);
     const total=rows.length,pages=Math.ceil(total/S.size)||1;if(S.page>pages)S.page=pages;
     const r={rows:rows.slice((S.page-1)*S.size,S.page*S.size),total,page:S.page,size:S.size,pages};
     const canU=SRIT.Auth.can('user:UPDATE'),canC=SRIT.Auth.can('user:CREATE');
@@ -4319,6 +4370,178 @@ SRIT.Features.user={
       }
       m.close();SRIT.Notify(akun?'Tersimpan. Akun login aktif.':'Data tenaga kependidikan tersimpan','ok');this.load();
     };
+  },
+
+
+  /* ====================== IMPOR / EKSPOR ====================== */
+  // Judul kolom ekspor = judul kolom template impor, jadi hasil ekspor bisa diedit lalu diimpor kembali (mode "perbarui").
+  EXPORT_HEADERS:['Nama Lengkap','NIP / NIK','Jenis Kelamin','No HP','Jabatan','Jenjang','Asrama','Gedung','Status','Akun Login','Email / Nama Pengguna','Peran','Cakupan Akses'],
+
+  _exportRows(){
+    const nm=(t,id)=>(SRIT.Repo.getById(t,id)||{}).NAME||'';
+    return this._filtered().map(u=>{
+      const has=this._hasAkun(u);
+      return [u.NAME||'',u.NIP||'',u.JK||'',u.HP||'',this._jabName(u.JABATAN),u.JENJANG||'',nm('ASRAMA',u.ASRAMA),nm('GEDUNG',u.GEDUNG),
+        u.STATUS||'AKTIF',has?'YA':'TIDAK',u.EMAIL||'',has?nm('ROLES',u.ROLE):'',has?(u.SCOPE||''):''].map(v=>String(v==null?'':v));
+    });
+  },
+  /** Ekspor data sesuai filter aktif. Kata sandi tidak pernah ikut (tidak ada di browser). */
+  exportData(fmt){
+    if(!SRIT.Auth.can('user:EXPORT')){SRIT.Notify('Anda tidak memiliki izin ekspor','warn');return;}
+    const rows=this._exportRows();
+    if(!rows.length){SRIT.Notify('Tidak ada data untuk diekspor','warn');return;}
+    const fn='data_tenaga_kependidikan_'+SRIT.Util.todayISO();
+    if(fmt==='csv'){
+      const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+      const csv='\ufeff'+[this.EXPORT_HEADERS].concat(rows).map(r=>r.map(q).join(',')).join('\r\n')+'\r\n';
+      const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=fn+'.csv';
+      document.body.appendChild(a);a.click();a.remove();
+    }else{
+      if(typeof XLSX==='undefined'){SRIT.Notify('Pustaka Excel belum termuat, tunggu sebentar lalu coba lagi','warn');return;}
+      const ws=XLSX.utils.aoa_to_sheet([this.EXPORT_HEADERS].concat(rows));   // semua sel berupa teks: NIP/NIK & HP tetap utuh
+      ws['!cols']=[28,22,14,16,22,10,20,20,10,12,30,22,14].map(w=>({wch:w}));
+      ws['!freeze']={xSplit:0,ySplit:1};
+      const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Data');
+      XLSX.writeFile(wb,fn+'.xlsx');
+    }
+    SRIT.Audit.log('EXPORT','user','USERS',null,{jumlah:rows.length,format:fmt});
+    SRIT.Notify('Data tenaga kependidikan diekspor ('+rows.length+' baris)','ok');
+  },
+
+  importXLSX(){
+    if(!SRIT.Auth.can('user:CREATE')){SRIT.Notify('Anda tidak memiliki izin menambah data','warn');return;}
+    const self=this,canU=SRIT.Auth.can('user:UPDATE'),esc=this._esc;
+    const nz=s=>String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]+/g,'');
+    const text=v=>String(v).trim().replace(/^=?"+|"+$/g,'').replace(/^'+/,'').trim();   // buang tanda kutip sisa ekspor CSV/Excel
+    const roles=()=>SRIT.Store.read('ROLES');
+    const columns=[
+      {key:'NAME',label:'Nama Lengkap',aliases:['Nama'],required:true,normalize:v=>v.replace(/\s+/g,' ')},
+      {key:'NIP',label:'NIP / NIK',aliases:['NIP','NIK','NIP/NIK','NIP NIK'],hint:'opsional · format kolom sebagai TEKS agar angka panjang tidak berubah',
+        pattern:'^(?!\\d+(\\.\\d+)?[eE]\\+?\\d+$)\\S+$',patternMsg:'NIP/NIK terbaca sebagai angka ilmiah (E+) — format kolom sebagai Teks lalu ketik ulang',normalize:v=>text(v).replace(/\s+/g,'')},
+      {key:'JK',label:'Jenis Kelamin',aliases:['JK'],type:'select',options:[{v:'L'},{v:'P'}],hint:'L / P (Laki-laki / Perempuan juga dikenali)',
+        normalize:v=>{const s=String(v).trim().toLowerCase();return /^(l|lk|laki|pria)/.test(s)?'L':/^(p|pr|perempuan|wanita)/.test(s)?'P':String(v).trim();}},
+      {key:'HP',label:'No HP',aliases:['No. HP','Nomor HP','HP','WhatsApp','No HP / WhatsApp','No Telepon'],hint:'opsional',
+        normalize:v=>{let d=text(v).replace(/[^\d+]/g,'');if(/^\+?62/.test(d))d='0'+d.replace(/^\+?62/,'');else if(/^8\d{8,11}$/.test(d))d='0'+d;return d;}},
+      {key:'JABATAN',label:'Jabatan',required:true,ref:'Jabatan',refTable:'JABATAN',refField:'NAME',normalize:v=>v.replace(/\s+/g,' ')},
+      {key:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD'},{v:'SRMP'},{v:'SRMA'}],hint:'opsional',
+        normalize:v=>{const s=String(v).trim().toUpperCase().replace(/\s+/g,'');return ({SD:'SRD',SDN:'SRD',SRD:'SRD',SMP:'SRMP',SRMP:'SRMP',SMA:'SRMA',SMK:'SRMA',SRMA:'SRMA'})[s]||s;}},
+      {key:'ASRAMA',label:'Asrama',ref:'Struktur & Data Induk',refTable:'ASRAMA',refField:'NAME'},
+      {key:'GEDUNG',label:'Gedung',ref:'Struktur & Data Induk',refTable:'GEDUNG',refField:'NAME'},
+      {key:'STATUS',label:'Status',type:'select',options:[{v:'AKTIF'},{v:'NONAKTIF'}],hint:'kosong = AKTIF (baru) / tidak diubah (perbarui)',
+        normalize:v=>{const s=nz(v);return /^(aktif|active|ya)$/.test(s)?'AKTIF':/^(nonaktif|tidakaktif|inactive|tidak)$/.test(s)?'NONAKTIF':String(v).trim().toUpperCase();}},
+      {key:'AKUN',label:'Akun Login',aliases:['Akun','Jadikan Akun Pengguna'],type:'select',options:[{v:'YA'},{v:'TIDAK'}],
+        hint:'YA = bisa login (wajib Email, Peran, Kata Sandi). Kosong = YA bila Email diisi, selain itu TIDAK',
+        normalize:v=>{const s=nz(v);return /^(ya|y|yes|aktif|true|1)$/.test(s)?'YA':/^(tidak|t|no|n|false|0|nonaktif)$/.test(s)?'TIDAK':String(v).trim().toUpperCase();}},
+      {key:'EMAIL',label:'Email / Nama Pengguna',aliases:['Email','Nama Pengguna','Username','Email/Nama Pengguna'],hint:'wajib bila Akun Login = YA · harus unik',normalize:v=>text(v)},
+      {key:'ROLE',label:'Peran',aliases:['Peran (Hak Akses)','Role','Hak Akses'],type:'select',options:()=>roles().map(r=>({v:r.ID,t:r.NAME})),
+        hint:'kosong = otomatis sesuai Jabatan',
+        normalize:v=>{const s=nz(v),r=roles().find(x=>nz(x.NAME)===s||nz(x.ID)===s);return r?r.ID:String(v).trim();}},
+      {key:'SCOPE',label:'Cakupan Akses',aliases:['Cakupan','Scope'],type:'select',options:['GLOBAL','SEKOLAH','ASRAMA','GEDUNG','KAMAR','WALI_ASUH'].map(v=>({v})),
+        hint:'kosong = otomatis sesuai Peran',normalize:v=>String(v).trim().toUpperCase().replace(/\s+/g,'_')},
+      {key:'PW',label:'Kata Sandi',aliases:['Password','Sandi','Kata Sandi Awal'],secret:true,hint:'min. 6 karakter · wajib untuk akun baru; bila diisi pada akun lama = atur ulang sandi'}
+    ];
+    const optionsHtml=`<div class="p-2 mb-2 rounded" style="border:1px dashed var(--srit-border);font-size:12px">
+      <div class="fw-semibold mb-1"><i class="bi bi-people"></i> Jika orang tersebut sudah terdaftar (dicocokkan lewat NIP/NIK, lalu Email, lalu Nama + Jabatan)</div>
+      <div class="form-check"><input class="form-check-input" type="radio" name="usImpMode" id="usImpSkip" value="skip" checked><label class="form-check-label" for="usImpSkip">Lewati — hanya tambah yang baru</label></div>
+      ${canU?`<div class="form-check"><input class="form-check-input" type="radio" name="usImpMode" id="usImpUpd" value="update"><label class="form-check-label" for="usImpUpd">Perbarui data yang sudah ada <span class="text-muted-2">(sel kosong di file = tidak mengubah isian lama)</span></label></div>`:''}
+    </div>`;
+    const notes=[
+      'Mode "Lewati": orang yang sudah terdaftar tidak diubah. Mode "Perbarui": hanya sel yang terisi yang menimpa data lama; sel kosong dibiarkan.',
+      'Hasil Ekspor Excel memakai judul kolom yang sama, sehingga bisa diedit lalu diimpor kembali dengan mode Perbarui (kolom Kata Sandi tidak ikut terekspor; tambahkan kolomnya hanya bila ingin mengatur ulang sandi).',
+      'Isi NIP/NIK dan No HP sebagai TEKS. Jika Excel mengubahnya menjadi angka (mis. 3.5E+15), digit terakhir hilang dan baris akan ditolak.',
+      'Jabatan "Wali Asuh" dan "Wali Asrama" otomatis muncul sebagai pilihan wali di data Anak, Kamar, dan Kelompok Asuh.',
+      'Satu baris bermasalah tidak menghentikan baris lain: hanya baris yang valid yang disimpan.'
+    ];
+    const lc=s=>String(s==null?'':s).trim().toLowerCase();
+    const afterValidate=(parsed,el)=>{
+      const mode=(($('input[name="usImpMode"]:checked',el)||{}).value)==='update'&&canU?'update':'skip';
+      const all=self._rows(),isSuper=SRIT.Auth.isSuper();
+      const byNip=new Map(),byEmail=new Map(),byNJ=new Map();
+      all.forEach(u=>{
+        if(u.NIP)byNip.set(lc(u.NIP),u);
+        if(u.EMAIL)byEmail.set(lc(u.EMAIL),u);
+        const k=lc(u.NAME)+'|'+(u.JABATAN||'');(byNJ.get(k)||byNJ.set(k,[]).get(k)).push(u);
+      });
+      const seenNip=new Map(),seenEmail=new Map(),seenEx=new Map();
+      // nilai angka mentah > 15 digit sudah terpotong oleh Excel
+      const rawNum=(raw)=>{for(const k in raw){if(['nip','nik','nipnik'].indexOf(nz(k))>=0&&typeof raw[k]==='number'&&Math.abs(raw[k])>Number.MAX_SAFE_INTEGER)return true;}return false;};
+      parsed.forEach(r=>{
+        if(!r._valid)return;
+        const d=r._data,errs=[];
+        if(rawNum(r._raw))errs.push('NIP/NIK tersimpan sebagai angka sehingga digit terakhir terpotong — format kolom sebagai Teks lalu ketik ulang');
+        // gedung harus anggota asrama yang dipilih
+        if(d.GEDUNG&&d.ASRAMA){const g=SRIT.Repo.getById('GEDUNG',d.GEDUNG);if(g&&g.ASRAMA&&g.ASRAMA!==d.ASRAMA)errs.push('Gedung "'+g.NAME+'" bukan bagian dari asrama yang dipilih');}
+        // cocokkan dengan data lama
+        let ex=d.NIP?byNip.get(lc(d.NIP)):null,by=ex?'NIP/NIK':'';
+        const exMail=d.EMAIL?byEmail.get(lc(d.EMAIL)):null;
+        if(!ex&&exMail){ex=exMail;by='Email';}
+        if(!ex&&!d.NIP&&!d.EMAIL){const c=byNJ.get(lc(d.NAME)+'|'+d.JABATAN);if(c&&c.length===1){ex=c[0];by='Nama + Jabatan';}}
+        if(ex&&exMail&&exMail.ID!==ex.ID)errs.push('NIP/NIK cocok dengan "'+ex.NAME+'" tetapi Email dipakai "'+exMail.NAME+'"');
+        // duplikat di dalam file
+        const dup=(map,key,label)=>{if(!key)return;if(map.has(key))errs.push(label+' sama dengan baris '+map.get(key));else map.set(key,r._row);};
+        dup(seenNip,lc(d.NIP),'NIP/NIK');
+        if(ex&&mode==='update')dup(seenEx,ex.ID,'Orang yang sama (sudah terdaftar)');
+        if(errs.length){r._errs.push(...errs);r._valid=false;return;}
+        if(ex&&mode==='skip'){r._skip=true;r._valid=false;r._note='Sudah terdaftar (cocok '+by+': '+ex.NAME+') — dilewati';return;}
+        // ---- susun data yang akan disimpan ----
+        const had=ex?self._hasAkun(ex):false;
+        const akun=d.AKUN?d.AKUN==='YA':(had?true:!!d.EMAIL);
+        const rec={};
+        ['NAME','NIP','JK','HP','JABATAN','JENJANG','ASRAMA','GEDUNG'].forEach(k=>{if(d[k]!=='')rec[k]=d[k];});
+        if(d.STATUS)rec.STATUS=d.STATUS;else if(!ex)rec.STATUS='AKTIF';
+        const eff=Object.assign({},ex||{},rec);
+        rec.AKUN=akun?'YA':'TIDAK';
+        let pw='';
+        if(akun){
+          const email=d.EMAIL||(ex&&ex.EMAIL)||'';
+          if(!email)errs.push('Email / Nama Pengguna wajib untuk akun login');
+          const role=d.ROLE||(ex&&ex.ROLE)||self._roleFor(eff.JABATAN);
+          if(!role||!roles().some(x=>x.ID===role))errs.push('Peran tidak dikenal');
+          if(!isSuper&&(role==='SUPER_ADMIN'||(ex&&ex.ROLE==='SUPER_ADMIN')))errs.push('Akun Super Admin hanya dapat dibuat/diubah oleh Super Admin');
+          if(email){
+            const other=all.find(u=>u.ID!==(ex&&ex.ID)&&lc(u.EMAIL)===lc(email));
+            if(other)errs.push('Email "'+email+'" sudah dipakai '+other.NAME);
+            dup(seenEmail,lc(email),'Email');
+          }
+          pw=d.PW||'';
+          if(pw&&pw.length<6)errs.push('Kata sandi minimal 6 karakter');
+          if(!had&&!pw)errs.push('Kata sandi wajib diisi untuk akun baru (min. 6 karakter)');
+          if(!errs.length){
+            rec.EMAIL=email;rec.ROLE=role;
+            rec.SCOPE=d.SCOPE||(ex&&ex.SCOPE)||self.SCOPE_BY_ROLE[role]||'SEKOLAH';
+          }
+        }else if(!ex){rec.EMAIL='';rec.ROLE='';rec.SCOPE='';}
+        else if(ex.ROLE==='SUPER_ADMIN'&&!isSuper)errs.push('Akun Super Admin hanya dapat diubah oleh Super Admin');
+        if(errs.length){r._errs.push(...errs);r._valid=false;return;}
+        r._act=ex?'U':'I';r._ex=ex||null;r._rec=rec;r._pw=pw;
+        r._note=ex?'Perbarui '+ex.NAME:(akun?'Baru + akun':'Baru');
+      });
+    };
+    const commit=valid=>{
+      let n=0;const now=new Date().toISOString();
+      valid.forEach(r=>{
+        if(r._act==='U'){
+          SRIT.Repo.update('USERS',r._ex.ID,r._rec);
+          if(r._pw)SRIT.Sync.setPassword(r._ex.ID,r._pw);
+        }else{
+          const row=Object.assign({ID:SRIT.Util.uid('U'),CREATED_AT:now},r._rec);
+          SRIT.Repo.insert('USERS',row);
+          if(r._pw)SRIT.Sync.setPassword(row.ID,r._pw);
+        }
+        n++;
+      });
+      self._refreshWali();
+      return n;
+    };
+    SRIT.Import.open({
+      table:'USERS',title:'Tenaga Kependidikan & Akun',module:'user',idPrefix:'U',templateName:'Template_Tenaga_Kependidikan.xlsx',
+      columns,optionsHtml,notes,afterValidate,commit,
+      sample:[
+        ['Contoh Wali Asuh Satu','3517000000000001','L','081234567890','Wali Asuh','SRMP','','','AKTIF','YA','wali.asuh1@contoh.id','Wali Asuh','WALI_ASUH','Ganti@123'],
+        ['Contoh Guru Dua','198500000000000001','P','081298765432','Guru','','','','AKTIF','TIDAK','','','','']
+      ],
+      onDone:()=>this.load()
+    });
   },
 
   resetPw(id){
@@ -4953,7 +5176,7 @@ SRIT.Features.laporan={
      {id:'wr-harian',grp:'WALI ASRAMA',name:'Laporan Harian Keasramaan',periode:'Harian',icon:'bi-calendar-day',build(){
         const iso=T.to||SRIT.Util.todayISO();
         const rek=SRIT.Store.read('REKAP_HARIAN').find(r=>r.TANGGAL===iso)||{TOTAL:0,HADIR:0,IZIN:0,SAKIT:0,ALPA:0};
-        const keg=SRIT.Api.getSessionsForDate(iso);
+        const ses=SRIT.Api.getSessionsForDate(iso,true),keg=ses.filter(s=>s.absensi),tnp=ses.filter(s=>!s.absensi);
         const mon=SRIT.Store.read('OPS_MONITORING').filter(m=>m.TANGGAL===iso);
         const log=SRIT.Store.read('OPS_LOGKEJADIAN').filter(m=>m.TANGGAL===iso);
         const plg=SRIT.Store.read('PELANGGARAN').filter(m=>m.TANGGAL===iso);
@@ -4962,7 +5185,8 @@ SRIT.Features.laporan={
           ['Tanggal',SRIT.Util.fmtDate(iso)],
           ['Total Peserta',rek.TOTAL],['Hadir',rek.HADIR+' ('+SRIT.Util.pct(rek.HADIR,rek.TOTAL)+'%)'],
           ['Izin / Sakit / Alpa',rek.IZIN+' / '+rek.SAKIT+' / '+rek.ALPA],
-          ['Jumlah Kegiatan',keg.length],
+          ['Kegiatan dengan absensi',keg.length+(keg.length?' ('+keg.map(s=>s.nama).slice(0,6).join(', ')+(keg.length>6?', ...':'')+')':'')],
+          ['Kegiatan tanpa absensi (hanya jadwal)',tnp.length+(tnp.length?' ('+tnp.map(s=>s.nama).slice(0,6).join(', ')+(tnp.length>6?', ...':'')+')':'')],
           ['Monitoring Kondisi',mon.length?mon.map(m=>m.LOKASI+': '+m.KONDISI).join('; '):'-'],
           ['Kejadian 24 Jam',log.length?log.map(l=>(l.JAM||'')+' '+l.KEJADIAN).join('; '):'Nihil'],
           ['Pelanggaran',plg.length?plg.length+' kasus':'Nihil']
@@ -5616,7 +5840,7 @@ SRIT.Features.laporan={
       const set=SRIT.Store.readObj('SETTINGS');const iso=this.to||SRIT.Util.todayISO();
       const rek=SRIT.Store.read('REKAP_HARIAN').find(r=>r.TANGGAL===iso)||{TOTAL:SRIT.Repo.count('ANAK'),HADIR:0,IZIN:0,SAKIT:0,ALPA:0};
       const att=this._attDayRows(iso);
-      const sesi=SRIT.Api.getSessionsForDate(iso);
+      const sesiAll=SRIT.Api.getSessionsForDate(iso,true),sesi=sesiAll.filter(s=>s.absensi),sesiTnp=sesiAll.filter(s=>!s.absensi);
       const rowsK=sesi.map((s,i)=>{
         const rel=att.filter(r=>r.KEGIATAN_ID===s.id);
         let pes=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF');
@@ -5637,6 +5861,7 @@ SRIT.Features.laporan={
           <tr><td>Wali Asrama</td><td>: ......................................................</td></tr>
           <tr><td>Jumlah Penghuni</td><td>: ${rek.TOTAL} peserta didik</td></tr></table>
         <table><thead><tr><th style="width:34px">No</th><th style="width:110px">Waktu</th><th>Kegiatan</th><th style="width:80px">Kehadiran</th><th>Kondisi/Keterangan</th></tr></thead><tbody>${rowsK}</tbody></table>
+        ${sesiTnp.length?`<h4>Kegiatan Tanpa Absensi</h4><table><thead><tr><th style="width:34px">No</th><th style="width:110px">Waktu</th><th>Kegiatan</th><th>Keterangan</th></tr></thead><tbody>${sesiTnp.map((s,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${s.jamMulai}\u2013${s.jamSelesai}</td><td>${SRIT.Util.esc(s.nama)}</td><td>Tanpa absensi (hanya jadwal)</td></tr>`).join('')}</tbody></table>`:''}
         <h4>Kondisi Umum Asrama</h4><div>${SRIT.Util.esc(kondisi)}</div>
         <h4>Permasalahan yang Ditemukan</h4><div>${SRIT.Util.esc(masalah)}</div>
         <h4>Tindak Lanjut</h4><div>Wali Asuh melakukan pendampingan dan pemantauan perkembangan peserta didik terkait.</div>
