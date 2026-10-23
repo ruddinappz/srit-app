@@ -6135,10 +6135,7 @@ SRIT.Features['keasramaan-master']={
     {k:'WALI_ASRAMA',t:'Wali Asrama',managed:true,searchFields:['NAME'],
       filters:[{k:'ASRAMA',label:'Asrama',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'STATUS',label:'Status',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}],
       cols:[{h:'Nama',k:'NAME'},{h:'Asrama',f:r=>(SRIT.Repo.getById('ASRAMA',r.ASRAMA)||{}).NAME||'-'},{h:'Gedung',f:r=>(SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-'},{h:'Jenjang',k:'JENJANG'},{h:'Status',f:r=>`<span class="badge-soft st-HADIR">${r.STATUS||'AKTIF'}</span>`}],idPrefix:'WR',fields:[{k:'NAME',label:'Nama',col:12,required:true},{k:'USER_ID',label:'User Akun (opsional)',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('USERS').map(u=>({v:u.ID,t:u.NAME})))},{k:'ASRAMA',label:'Asrama',type:'select',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME})))},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'STATUS',label:'Status',type:'select',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}]},
-    {k:'KELOMPOK_ASUH',t:'Kelompok Asuh',searchFields:['NAME'],
-      afterUpdate:(id)=>{const n=SRIT.Asuh.sebarKelompok(id);if(n)SRIT.Notify('Wali asuh anggota kelompok disamakan ('+n+' perubahan)','ok');},
-      filters:[{k:'ASRAMA',label:'Asrama',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'WALI_ASUH',label:'Wali Asuh',options:()=>SRIT.Store.read('WALI_ASUH').map(w=>({v:w.ID,t:w.NAME}))}],
-      cols:[{h:'Nama',k:'NAME'},{h:'Gedung',f:r=>(SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-'},{h:'Jenjang',k:'JENJANG'},{h:'Wali Asuh',f:r=>(SRIT.Repo.getById('WALI_ASUH',r.WALI_ASUH)||{}).NAME||'-'},{h:'Anggota',f:r=>SRIT.Store.read('ANAK').filter(a=>a.KELOMPOK===r.ID).length},{h:'Kapasitas',k:'KAPASITAS'}],idPrefix:'KA',fields:[{k:'NAME',label:'Nama Kelompok',col:12,required:true},{k:'ASRAMA',label:'Asrama',type:'select',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'GEDUNG',label:'Gedung',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME})))},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'WALI_ASUH',label:'Wali Asuh',type:'select',options:()=>SRIT.Store.read('WALI_ASUH').map(w=>({v:w.ID,t:w.NAME}))},{k:'KAPASITAS',label:'Kapasitas',type:'number'}]}
+    {k:'DISTRIBUSI',t:'Pendistribusian Anak Asuh',custom:true}
   ],
   _managed(body,t){
     const esc=SRIT.Util.esc,tbl=t.k,S=this._ms||(this._ms={});
@@ -6170,9 +6167,137 @@ SRIT.Features['keasramaan-master']={
     $$('#kmTabs a').forEach(a=>a.onclick=()=>{this.active=+a.dataset.i;this.render(host);});
     const t=this.tabs[this.active];
     if(t.managed){this._managed($('#kmBody'),t);return;}
-    if(t.k==='KELOMPOK_ASUH')this._asuhChk($('#kmAsuhChk'),host);
+    if(t.custom){this._asuhChk($('#kmAsuhChk'),host);this._distribusi($('#kmBody'),host);return;}
     regFeature('_km',{title:t.t,table:t.k,perm:'keasramaan-master',module:'keasramaan-master',idPrefix:t.idPrefix,searchFields:t.searchFields||['NAME'],filters:t.filters||[],cols:t.cols,fields:t.fields,onCreate:t.onCreate,afterUpdate:t.afterUpdate});
     SRIT.Features._km.render($('#kmBody'));
+  },
+  // ===================== PENDISTRIBUSIAN ANAK ASUH =====================
+  // 1) pilih wali asuh, 2) filter (jenjang dll.) -> semua anak aktif tampil, centang banyak sekaligus (klik baris / Shift+klik rentang), 3) simpan.
+  // Aturan "satu anak = satu wali asuh" dijaga: wali anak diganti, riwayat tanggal tercatat (SRIT.Asuh.catat), dan bila anak masih
+  // tergabung di kelompok lama yang walinya BERBEDA, ia dikeluarkan dari kelompok itu agar wali barunya tidak tertimpa.
+  _ds:{wali:'',jenjang:'',asrama:'',jk:'',tampil:'',q:'',sel:new Set(),last:-1},
+  _distribusi(body,host){
+    const E=SRIT.Util.esc,D=this._ds,A=SRIT.Asuh,self=this;
+    const canDist=SRIT.Auth.can('anak:UPDATE')||SRIT.Auth.can('penghuni:UPDATE');
+    const wali=SRIT.Store.read('WALI_ASUH').filter(w=>(w.STATUS||'AKTIF')==='AKTIF'||w.ID===D.wali).sort((x,y)=>String(x.NAME||'').localeCompare(String(y.NAME||''),'id'));
+    if(D.wali&&!wali.some(w=>w.ID===D.wali)){D.wali='';D.sel=new Set();}
+    const aktif=()=>SRIT.Store.read('ANAK').filter(a=>A.aktif(a));
+    const cntWali=id=>aktif().filter(a=>A.waliAnak(a)===id).length;
+    const asr=SRIT.Store.read('ASRAMA');
+    body.innerHTML=`<div class="card-srit p-3 mb-3">
+        <div class="fw-semibold mb-1"><i class="bi bi-1-circle"></i> Pilih wali asuh</div>
+        <div class="row g-2 align-items-end">
+          <div class="col-md-6"><select class="form-select" id="dsWali"><option value="">- Pilih wali asuh -</option>${wali.map(w=>`<option value="${E(w.ID)}" ${D.wali===w.ID?'selected':''}>${E(w.NAME)} (${cntWali(w.ID)} anak asuh)</option>`).join('')}</select></div>
+          <div class="col-md-6" id="dsWaliInfo"></div>
+        </div>
+        ${wali.length?'':'<div class="text-muted-2 mt-2" style="font-size:12px">Belum ada wali asuh. Tambahkan di menu Tenaga Kependidikan dengan jabatan "Wali Asuh".</div>'}
+        ${canDist?'':'<div class="alert alert-warning py-2 mt-2 mb-0" style="font-size:12px"><i class="bi bi-lock"></i> Anda hanya dapat melihat. Mengubah wali asuh anak membutuhkan izin Ubah pada menu Data Anak atau Penghuni.</div>'}
+      </div>
+      <div id="dsStep2"></div>`;
+    const info=()=>{
+      const box=$('#dsWaliInfo',body);
+      if(!D.wali){box.innerHTML='<span class="text-muted-2" style="font-size:12px">Pilih wali asuh dulu, lalu daftar anak akan muncul di bawah.</span>';return;}
+      const mine=aktif().filter(a=>A.waliAnak(a)===D.wali),by=j=>mine.filter(a=>a.JENJANG===j).length;
+      const w=SRIT.Repo.getById('WALI_ASUH',D.wali)||{};
+      box.innerHTML=`<div style="font-size:13px"><b>${mine.length}</b> anak asuh saat ini <span class="text-muted-2">(SRD ${by('SRD')} &middot; SRMP ${by('SRMP')} &middot; SRMA ${by('SRMA')})</span>${w.JENJANG||w.ASRAMA?`<div class="text-muted-2" style="font-size:11px">Penempatan wali: ${E([(SRIT.Repo.getById('ASRAMA',w.ASRAMA)||{}).NAME,w.JENJANG].filter(Boolean).join(' · '))}</div>`:''}</div>`;
+    };
+    const step2=()=>{
+      const box=$('#dsStep2',body);
+      if(!D.wali){box.innerHTML='';return;}
+      box.innerHTML=`<div class="card-srit p-3 mb-3">
+        <div class="fw-semibold mb-2"><i class="bi bi-2-circle"></i> Pilih anak yang diasuh</div>
+        <div class="filter-bar">
+          <div style="flex:1;min-width:200px"><label class="form-label-sm">Cari nama / NIS / kelas</label><input class="form-control form-control-sm" id="dsQ" value="${E(D.q)}" placeholder="Ketik untuk mencari&hellip;"></div>
+          <div style="min-width:120px"><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm" id="dsJ"><option value="">Semua</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${D.jenjang===j?'selected':''}>${j}</option>`).join('')}</select></div>
+          <div style="min-width:120px"><label class="form-label-sm">Jenis Kelamin</label><select class="form-select form-select-sm" id="dsJk"><option value="">Semua</option><option value="L" ${D.jk==='L'?'selected':''}>Putra</option><option value="P" ${D.jk==='P'?'selected':''}>Putri</option></select></div>
+          <div style="min-width:150px"><label class="form-label-sm">Asrama</label><select class="form-select form-select-sm" id="dsA"><option value="">Semua</option>${asr.map(a=>`<option value="${E(a.ID)}" ${D.asrama===a.ID?'selected':''}>${E(a.NAME)}</option>`).join('')}</select></div>
+          <div style="min-width:190px"><label class="form-label-sm">Tampilkan</label><select class="form-select form-select-sm" id="dsT"><option value="">Semua anak</option><option value="belum" ${D.tampil==='belum'?'selected':''}>Belum punya wali asuh</option><option value="lain" ${D.tampil==='lain'?'selected':''}>Diasuh wali lain</option><option value="ini" ${D.tampil==='ini'?'selected':''}>Diasuh wali ini</option></select></div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center my-2" style="font-size:12px"><span id="dsCount" class="text-muted-2"></span>
+          <button class="btn btn-sm btn-outline-secondary py-0" id="dsAll">Pilih semua yang tampil</button><button class="btn btn-sm btn-outline-secondary py-0" id="dsNone">Kosongkan pilihan</button></div>
+        <div class="table-responsive" style="max-height:60vh;overflow:auto"><table class="table table-srit table-hover mb-0" id="dsTbl"></table></div>
+      </div>
+      ${canDist?`<div class="card-srit p-3 mb-3" style="position:sticky;bottom:8px;z-index:5;box-shadow:0 -2px 12px rgba(0,0,0,.12)"><div class="row g-2 align-items-end">
+        <div class="col-6 col-md-3"><label class="form-label-sm">Berlaku mulai</label><input type="date" class="form-control form-control-sm" id="dsTgl" value="${SRIT.Util.todayISO()}"></div>
+        <div class="col-6 col-md-4"><label class="form-label-sm">Keterangan (opsional)</label><input class="form-control form-control-sm" id="dsAlasan" placeholder="mis. pembagian anak asuh tahun ajaran baru"></div>
+        <div class="col-12 col-md-5 text-md-end"><button class="btn btn-primary" id="dsSave" disabled><i class="bi bi-diagram-3"></i> Distribusikan ke wali ini</button></div></div></div>`:''}`;
+      $('#dsQ',box).oninput=e=>{D.q=e.target.value;clearTimeout(self._dsT);self._dsT=setTimeout(list,200);};
+      $('#dsJ',box).onchange=e=>{D.jenjang=e.target.value;list();};
+      $('#dsJk',box).onchange=e=>{D.jk=e.target.value;list();};
+      $('#dsA',box).onchange=e=>{D.asrama=e.target.value;list();};
+      $('#dsT',box).onchange=e=>{D.tampil=e.target.value;list();};
+      $('#dsAll',box).onclick=()=>{visible.forEach(a=>{if(A.waliAnak(a)!==D.wali)D.sel.add(a.ID);});list();};
+      $('#dsNone',box).onclick=()=>{D.sel.clear();list();};
+      const sv=$('#dsSave',box);if(sv)sv.onclick=save;
+      list();
+    };
+    let visible=[];
+    const list=()=>{
+      const q=D.q.trim().toLowerCase();
+      visible=aktif().filter(a=>{
+        const w=A.waliAnak(a);
+        if(D.jenjang&&a.JENJANG!==D.jenjang)return false;
+        if(D.jk&&a.JK!==D.jk)return false;
+        if(D.asrama&&a.ASRAMA!==D.asrama)return false;
+        if(D.tampil==='belum'&&w)return false;
+        if(D.tampil==='lain'&&(!w||w===D.wali))return false;
+        if(D.tampil==='ini'&&w!==D.wali)return false;
+        if(q&&[a.NAMA,a.NIS,a.KELAS].every(v=>String(v||'').toLowerCase().indexOf(q)<0))return false;
+        return true;
+      }).sort((x,y)=>String(x.NAMA||'').localeCompare(String(y.NAMA||''),'id'));
+      const tb=$('#dsTbl',body);if(!tb)return;
+      const sel=a=>D.sel.has(a.ID);
+      tb.innerHTML=`<thead style="position:sticky;top:0;z-index:2"><tr><th style="width:36px"><input type="checkbox" class="form-check-input" id="dsHead" title="Pilih semua yang tampil"></th><th>Nama</th><th>Kelas</th><th>Jenjang</th><th>JK</th><th>Asrama / Kamar</th><th>Wali asuh saat ini</th></tr></thead><tbody>${
+        visible.map((a,i)=>{const w=A.waliAnak(a),mine=w===D.wali,wn=w?A.nama(w):'';
+          return `<tr data-i="${i}" class="${mine?'':'pointer'}" ${sel(a)?'style="background:rgba(28,110,242,.10)"':''}>
+            <td><input type="checkbox" class="form-check-input dsCk" ${sel(a)?'checked':''} ${mine||!canDist?'disabled':''} ${mine?'checked':''}></td>
+            <td><div class="fw-semibold">${E(a.NAMA)}</div><div class="text-muted-2" style="font-size:11px">${a.NIS?'NIS '+E(a.NIS):'&nbsp;'}</div></td>
+            <td>${E(a.KELAS||'-')}</td><td><span class="badge-soft st-IZIN">${E(a.JENJANG||'-')}</span></td><td>${a.JK==='L'?'L':a.JK==='P'?'P':'-'}</td>
+            <td>${E((SRIT.Repo.getById('ASRAMA',a.ASRAMA)||{}).NAME||'-')}<div class="text-muted-2" style="font-size:11px">${E((SRIT.Repo.getById('KAMAR',a.KAMAR)||{}).NAME||'')}</div></td>
+            <td>${mine?'<span class="badge-soft st-HADIR">Wali ini</span>':(w?`<span class="badge-soft st-IZIN">${E(wn)}</span>`:'<span class="badge-soft st-BELUM">Belum ada</span>')}</td></tr>`;}).join('')||'<tr><td colspan="7" class="text-center text-muted-2 py-4">Tidak ada anak yang cocok dengan filter</td></tr>'}</tbody>`;
+      const toggle=(i,shift)=>{
+        const a=visible[i];if(!a||A.waliAnak(a)===D.wali||!canDist)return;
+        const on=!D.sel.has(a.ID);
+        if(shift&&D.last>=0&&D.last<visible.length){
+          const lo=Math.min(D.last,i),hi=Math.max(D.last,i);
+          for(let k=lo;k<=hi;k++){const b=visible[k];if(A.waliAnak(b)===D.wali)continue;on?D.sel.add(b.ID):D.sel.delete(b.ID);}
+        }else{on?D.sel.add(a.ID):D.sel.delete(a.ID);}
+        D.last=i;list();
+      };
+      $$('#dsTbl tbody tr[data-i]',body).forEach(tr=>tr.onclick=e=>toggle(+tr.dataset.i,e.shiftKey));
+      const head=$('#dsHead',tb),sel0=visible.filter(a=>A.waliAnak(a)!==D.wali),n0=sel0.filter(a=>D.sel.has(a.ID)).length;
+      head.checked=sel0.length>0&&n0===sel0.length;head.indeterminate=n0>0&&n0<sel0.length;head.disabled=!canDist||!sel0.length;
+      head.onclick=e=>{e.stopPropagation();sel0.forEach(a=>head.checked?D.sel.add(a.ID):D.sel.delete(a.ID));list();};
+      const hidden=[...D.sel].filter(id=>!visible.some(a=>a.ID===id)).length;
+      $('#dsCount',body).textContent=visible.length+' anak tampil · '+D.sel.size+' dipilih'+(hidden?' ('+hidden+' tidak tampil karena filter)':'')+' · klik baris untuk memilih, Shift+klik untuk rentang';
+      const sv=$('#dsSave',body);if(sv){sv.disabled=!D.sel.size;sv.innerHTML='<i class="bi bi-diagram-3"></i> Distribusikan '+(D.sel.size?D.sel.size+' anak ':'')+'ke wali ini';}
+    };
+    const save=()=>{
+      if(!D.wali||!D.sel.size)return;
+      const R=SRIT.Repo,wId=D.wali,wn=A.nama(wId),t=($('#dsTgl',body).value||SRIT.Util.todayISO()),alasan=($('#dsAlasan',body).value||'').trim()||'Pendistribusian anak asuh';
+      const anak=[...D.sel].map(id=>R.getById('ANAK',id)).filter(a=>a&&A.aktif(a)&&A.waliAnak(a)!==wId);
+      if(!anak.length){D.sel.clear();list();return;}
+      const pindah=anak.filter(a=>A.waliAnak(a)).length;
+      if(!window.confirm('Distribusikan '+anak.length+' anak ke wali asuh '+wn+'?'+(pindah?'\n'+pindah+' di antaranya saat ini diasuh wali lain dan akan dipindahkan.':'')+'\nBerlaku mulai '+t+'. Riwayat wali asuh dicatat.'))return;
+      const syncMap=SRIT.Auth.can('anak:UPDATE');   // tabel pemetaan WALI_ASUH_ANAK hanya boleh diubah pemegang izin Data Anak
+      let ok=0,tolak=0,keluarKel=0;
+      anak.forEach(a=>{
+        const kw=A.waliKelompok(a.KELOMPOK),kel=(a.KELOMPOK&&kw&&kw!==wId)?'':(a.KELOMPOK||'');
+        const r=A.catat(a.ID,wId,kel,{tanggal:t,alasan});
+        if(r<0){tolak++;return;}
+        if(kel!==(a.KELOMPOK||''))keluarKel++;
+        R.update('ANAK',a.ID,{WALI_ASUH:wId,KELOMPOK:kel});
+        if(syncMap)A.selaraskan(R.getById('ANAK',a.ID),alasan);
+        ok++;
+      });
+      SRIT.Audit.log('UPDATE','keasramaan-master','distribusi-anak-asuh',null,{wali:wId,jumlah:ok,mulai:t});
+      SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
+      D.sel.clear();D.last=-1;
+      SRIT.Notify(ok+' anak didistribusikan ke '+wn+(keluarKel?' ('+keluarKel+' dikeluarkan dari kelompok lama)':'')+(tolak?' · '+tolak+' ditolak: tanggal berlaku sebelum awal masa berjalan':''),tolak&&!ok?'err':'ok',6000);
+      this.render(host);
+    };
+    $('#dsWali',body).onchange=e=>{D.wali=e.target.value;D.sel=new Set();D.last=-1;info();step2();};
+    info();step2();
   },
   // panel pemeriksaan: satu anak = satu wali asuh
   _asuhChk(box,host){
