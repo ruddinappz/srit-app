@@ -1352,7 +1352,7 @@ function simpleFeature(cfg){
   return {
     cfg,
     state:{page:1,size:25,search:''},
-    _opts(f){ let o=typeof f.options==='function'?f.options():(f.options||[]); return o; },
+    _opts(f,rec){ let o=typeof f.options==='function'?f.options(rec):(f.options||[]); return o; },   // options(rec): pilihan boleh bergantung pada data yang sedang diubah (mis. ketua kamar = anak di kamar itu)
     render(host){SRIT.UI.setPage(cfg.title,cfg.title);
       const canCreate=cfg.fields&&SRIT.Auth.can(mod+':CREATE');
       const canExport=SRIT.Auth.can(mod+':EXPORT')||SRIT.Auth.isSuper();
@@ -1425,7 +1425,7 @@ function simpleFeature(cfg){
     },
     importXLSX(){
       // bangun kolom impor dari definisi field (lewati field auto seperti STATUS default)
-      const columns=cfg.fields.map(f=>{
+      const columns=cfg.fields.filter(f=>!f.noImport).map(f=>{
         const col={key:f.k,label:f.label.replace(/\s*\(.*\)/,''),required:!!f.required,type:f.type==='days'?'text':f.type,hint:f.type==='days'?'Pisahkan dengan koma, mis. Senin,Selasa,Rabu':f.hint};
         if(f.type==='select')col.options=f.options;
         return col;
@@ -1485,7 +1485,7 @@ function simpleFeature(cfg){
       const body=`<form id="sfForm"><div class="row g-2">${cfg.fields.map(f=>{
         const val=rec[f.k]??f.default??'';
         let input;
-        if(f.type==='select'){input=`<select class="form-select form-select-sm" name="${f.k}" ${f.required?'required':''}>${this._opts(f).map(o=>`<option value="${o.v}" ${String(val)===String(o.v)?'selected':''}>${o.t}</option>`).join('')}</select>`;}
+        if(f.type==='select'){input=`<select class="form-select form-select-sm" name="${f.k}" ${f.required?'required':''}>${this._opts(f,rec).map(o=>`<option value="${o.v}" ${String(val)===String(o.v)?'selected':''}>${o.t}</option>`).join('')}</select>`;}
         else if(f.type==='textarea'){input=`<textarea class="form-control form-control-sm" name="${f.k}" rows="2" ${f.required?'required':''}>${SRIT.Util.esc(val)}</textarea>`;}
         else if(f.type==='days'){const sel=String(val).split(',').map(s=>s.trim());
           input=`<div class="d-flex flex-wrap gap-2" data-days="${f.k}">${['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'].map(d=>`<label class="badge-soft st-BELUM pointer" style="user-select:none"><input type="checkbox" class="me-1" value="${d}" ${sel.includes(d)?'checked':''}>${d}</label>`).join('')}</div>`;}
@@ -1531,16 +1531,40 @@ const waliAsramaName=id=>(SRIT.Repo.getById('WALI_ASRAMA',id)||{}).NAME||id||'-'
 // snippet keterangan kecil untuk anak (kelas, asrama, gedung, kamar, wali asuh) — resolve realtime dari ID
 // opt: {asrama:true,gedung:true} untuk menyembunyikan bagian tertentu (default tampil semua)
 // ---------- ATURAN: satu anak = satu wali asuh. Wali KELOMPOK ASUH menjadi acuan; ANAK.WALI_ASUH & WALI_ASUH_ANAK mengikuti ----------
+// ---------- KETUA KAMAR & KETUA ASRAMA: dipilih dari ANAK (bukan wali asuh). Disimpan di KAMAR.KETUA / ASRAMA.KETUA (ID anak). ----------
+// Ketua hanya sah bila anak itu masih aktif dan masih berada di kamar / asrama tersebut; bila pindah atau nonaktif, tampil "Pilih ulang"
+// (tanpa menulis ke tabel lain, jadi pemegang izin Penghuni tetap bisa memindahkan anak tanpa gagal simpan).
+SRIT.Ketua={
+  _nama:(x,y)=>String(x.NAMA||'').localeCompare(String(y.NAMA||''),'id'),
+  _ok(id,fn){const a=id?SRIT.Repo.getById('ANAK',id):null;return a&&SRIT.Asuh.aktif(a)&&fn(a)?a:null;},
+  kamar(kid){const k=kid?SRIT.Repo.getById('KAMAR',kid):null;return k?this._ok(k.KETUA,a=>a.KAMAR===kid):null;},
+  asrama(aid){const k=aid?SRIT.Repo.getById('ASRAMA',aid):null;return k?this._ok(k.KETUA,a=>a.ASRAMA===aid):null;},
+  calonKamar(kid){return SRIT.Store.read('ANAK').filter(a=>SRIT.Asuh.aktif(a)&&a.KAMAR===kid).sort(this._nama);},
+  calonAsrama(aid){return SRIT.Store.read('ANAK').filter(a=>SRIT.Asuh.aktif(a)&&a.ASRAMA===aid).sort(this._nama);},
+  // opsi <select> untuk form (jenis: 'kamar' | 'asrama'); rec = baris yang sedang diubah
+  opsi(jenis,rec){
+    const E=SRIT.Util.esc,ada=rec&&rec.ID,list=!ada?[]:(jenis==='kamar'?this.calonKamar(rec.ID):this.calonAsrama(rec.ID));
+    const kosong=!ada?'- Simpan dulu, lalu pilih ketua -':(list.length?'- Belum ditentukan -':'- Belum ada anak penghuni -');
+    return [{v:'',t:kosong}].concat(list.map(a=>({v:a.ID,t:E(a.NAMA+(a.KELAS?' ('+a.KELAS+')':''))})));
+  },
+  // isi sel tabel
+  sel(jenis,row){
+    const E=SRIT.Util.esc,a=jenis==='kamar'?this.kamar(row.ID):this.asrama(row.ID);
+    if(a)return '<b>'+E(a.NAMA)+'</b>'+(a.KELAS?'<div class="text-muted-2" style="font-size:11px">'+E(a.KELAS)+'</div>':'');
+    return row.KETUA?'<span class="badge-soft st-SAKIT" title="Ketua sebelumnya sudah pindah atau nonaktif">Pilih ulang</span>':'-';
+  }
+};
+
 SRIT.Asuh={
   aktif(a){return !a.STATUS||a.STATUS==='AKTIF';},
   nama(id){return (SRIT.Repo.getById('WALI_ASUH',id)||{}).NAME||id||'-';},
   waliKelompok(kid){const k=kid?SRIT.Repo.getById('KELOMPOK_ASUH',kid):null;return k&&k.WALI_ASUH?k.WALI_ASUH:'';},
   waliAnak(a){return this.waliKelompok(a.KELOMPOK)||a.WALI_ASUH||'';},
-  // periksa: anak dengan >1 wali berbeda (data anak / kelompok / pemetaan), duplikat pemetaan, dan wali kamar yang berbeda
+  // periksa: anak dengan >1 wali berbeda (data anak / kelompok / pemetaan) dan duplikat pemetaan
   audit(){
     const S=SRIT.Store,R=SRIT.Repo,map={};
     S.read('WALI_ASUH_ANAK').forEach(r=>{(map[r.ANAK_ID]=map[r.ANAK_ID]||[]).push(r);});
-    const out={diperiksa:0,ganda:[],duplikat:[],kamar:[]};
+    const out={diperiksa:0,ganda:[],duplikat:[]};
     S.read('ANAK').filter(a=>this.aktif(a)).forEach(a=>{
       out.diperiksa++;
       const kw=this.waliKelompok(a.KELOMPOK),rs=map[a.ID]||[],eff=this.waliAnak(a);
@@ -1548,8 +1572,6 @@ SRIT.Asuh={
       add(a.WALI_ASUH);add(kw);rs.forEach(r=>add(r.WALI_ASUH));
       if(ids.length>1)out.ganda.push({a,eff,detail:'Data anak: '+this.nama(a.WALI_ASUH)+(kw?' \u00b7 Kelompok: '+this.nama(kw):'')+(rs.length&&rs.some(r=>r.WALI_ASUH&&r.WALI_ASUH!==a.WALI_ASUH)?' \u00b7 Pemetaan: '+rs.map(r=>this.nama(r.WALI_ASUH)).join(', '):'')});
       else if(rs.length>1)out.duplikat.push({a,eff,detail:rs.length+' baris pemetaan wali asuh'});
-      const kmw=(R.getById('KAMAR',a.KAMAR)||{}).WALI_ASUH;
-      if(kmw&&eff&&kmw!==eff)out.kamar.push({a,eff,detail:'Wali anak: '+this.nama(eff)+' \u00b7 Wali kamar: '+this.nama(kmw)});
     });
     out.perluPerbaikan=out.ganda.length+out.duplikat.length;
     return out;
@@ -6115,7 +6137,7 @@ SRIT.Features['keasramaan-master']={
   tabs:[
     {k:'ASRAMA',t:'Asrama',searchFields:['NAME','KODE'],
       filters:[{k:'JK',label:'Jenis Kelamin',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'STATUS',label:'Status',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}],
-      cols:[{h:'Kode',k:'KODE'},{h:'Nama',k:'NAME'},{h:'JK',f:r=>r.JK==='L'?'Putra':'Putri'},{h:'Kapasitas',k:'KAPASITAS'},{h:'Terisi',f:r=>SRIT.Store.read('ANAK').filter(a=>a.ASRAMA===r.ID&&a.STATUS==='AKTIF').length},{h:'Status',f:r=>`<span class="badge-soft st-HADIR">${r.STATUS||'AKTIF'}</span>`}],idPrefix:'AS',fields:[{k:'KODE',label:'Kode'},{k:'NAME',label:'Nama Asrama'},{k:'JK',label:'Jenis Kelamin',type:'select',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'KAPASITAS',label:'Kapasitas',type:'number'},{k:'PJ',label:'Penanggung Jawab',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('USERS').map(u=>({v:u.ID,t:u.NAME})))},{k:'STATUS',label:'Status',type:'select',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}]},
+      cols:[{h:'Kode',k:'KODE'},{h:'Nama',k:'NAME'},{h:'JK',f:r=>r.JK==='L'?'Putra':'Putri'},{h:'Kapasitas',k:'KAPASITAS'},{h:'Terisi',f:r=>SRIT.Store.read('ANAK').filter(a=>a.ASRAMA===r.ID&&a.STATUS==='AKTIF').length},{h:'Ketua Asrama',f:r=>SRIT.Ketua.sel('asrama',r)},{h:'Status',f:r=>`<span class="badge-soft st-HADIR">${r.STATUS||'AKTIF'}</span>`}],idPrefix:'AS',fields:[{k:'KODE',label:'Kode'},{k:'NAME',label:'Nama Asrama'},{k:'JK',label:'Jenis Kelamin',type:'select',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'KAPASITAS',label:'Kapasitas',type:'number'},{k:'PJ',label:'Penanggung Jawab',type:'select',options:()=>[{v:'',t:'—'}].concat(SRIT.Store.read('USERS').map(u=>({v:u.ID,t:u.NAME})))},{k:'KETUA',label:'Ketua Asrama (dipilih dari anak penghuni asrama ini)',type:'select',col:12,noImport:true,options:rec=>SRIT.Ketua.opsi('asrama',rec)},{k:'STATUS',label:'Status',type:'select',options:[{v:'AKTIF',t:'AKTIF'},{v:'NONAKTIF',t:'NONAKTIF'}]}]},
     {k:'GEDUNG',t:'Gedung',searchFields:['NAME','KODE'],
       filters:[{k:'ASRAMA',label:'Asrama',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'JK',label:'JK',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]}],
       cols:[{h:'Kode',k:'KODE'},{h:'Nama',k:'NAME'},{h:'Asrama',f:r=>(SRIT.Repo.getById('ASRAMA',r.ASRAMA)||{}).NAME||'-'},{h:'Jenjang',k:'JENJANG'},{h:'JK',f:r=>r.JK==='L'?'Putra':r.JK==='P'?'Putri':'-'},{h:'Jml Lantai',k:'JML_LANTAI'}],idPrefix:'GD',fields:[{k:'NAME',label:'Nama Gedung',col:12,required:true},{k:'KODE',label:'Kode'},{k:'ASRAMA',label:'Asrama',type:'select',options:()=>SRIT.Store.read('ASRAMA').map(a=>({v:a.ID,t:a.NAME}))},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'JK',label:'JK',type:'select',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'JML_LANTAI',label:'Jumlah Lantai',type:'number'}]},
@@ -6124,7 +6146,7 @@ SRIT.Features['keasramaan-master']={
       cols:[{h:'Nama',k:'NAME'},{h:'Gedung',f:r=>(SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-'},{h:'Nomor',k:'NOMOR'},{h:'Jml Kamar',f:r=>SRIT.Store.read('KAMAR').filter(k=>k.LANTAI===r.ID).length}],idPrefix:'LT',fields:[{k:'GEDUNG',label:'Gedung',type:'select',col:12,options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'NOMOR',label:'Nomor Lantai'},{k:'NAME',label:'Nama Lantai'}]},
     {k:'KAMAR',t:'Kamar',searchFields:['NAME','KODE'],
       filters:[{k:'GEDUNG',label:'Gedung',options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'LANTAI',label:'Lantai',options:()=>SRIT.Store.read('LANTAI').map(l=>({v:l.ID,t:(SRIT.Repo.getById('GEDUNG',l.GEDUNG)||{}).NAME+' - '+l.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'JK',label:'JK',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]}],
-      cols:[{h:'Kode',k:'KODE'},{h:'Nama',k:'NAME'},{h:'Gedung',f:r=>(SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-'},{h:'Jenjang',f:r=>`<span class="badge-soft st-IZIN">${r.JENJANG||'-'}</span>`},{h:'JK',f:r=>r.JK==='L'?'Putra':r.JK==='P'?'Putri':'-'},{h:'Kapasitas',k:'KAPASITAS'},{h:'Penghuni',f:r=>{const n=SRIT.Store.read('ANAK').filter(a=>a.KAMAR===r.ID&&a.STATUS==='AKTIF').length;return `<span class="badge-soft ${n>=(r.KAPASITAS||16)?'st-ALPA':n>=(r.KAPASITAS||16)*0.8?'st-SAKIT':'st-HADIR'}">${n}/${r.KAPASITAS||16}</span>`;}},{h:'Wali Asuh',f:r=>(SRIT.Repo.getById('WALI_ASUH',r.WALI_ASUH)||{}).NAME||'-'}],idPrefix:'KM',fields:[{k:'KODE',label:'Kode'},{k:'NAME',label:'Nama Kamar'},{k:'GEDUNG',label:'Gedung',type:'select',options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'LANTAI',label:'Lantai',type:'select',options:()=>SRIT.Store.read('LANTAI').map(l=>({v:l.ID,t:(SRIT.Repo.getById('GEDUNG',l.GEDUNG)||{}).NAME+' - '+l.NAME}))},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'JK',label:'JK',type:'select',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'KAPASITAS',label:'Kapasitas',type:'number'},{k:'WALI_ASUH',label:'Wali Asuh',type:'select',options:()=>SRIT.Store.read('WALI_ASUH').map(w=>({v:w.ID,t:w.NAME}))}]},
+      cols:[{h:'Kode',k:'KODE'},{h:'Nama',k:'NAME'},{h:'Gedung',f:r=>(SRIT.Repo.getById('GEDUNG',r.GEDUNG)||{}).NAME||'-'},{h:'Jenjang',f:r=>`<span class="badge-soft st-IZIN">${r.JENJANG||'-'}</span>`},{h:'JK',f:r=>r.JK==='L'?'Putra':r.JK==='P'?'Putri':'-'},{h:'Kapasitas',k:'KAPASITAS'},{h:'Penghuni',f:r=>{const n=SRIT.Store.read('ANAK').filter(a=>a.KAMAR===r.ID&&a.STATUS==='AKTIF').length;return `<span class="badge-soft ${n>=(r.KAPASITAS||16)?'st-ALPA':n>=(r.KAPASITAS||16)*0.8?'st-SAKIT':'st-HADIR'}">${n}/${r.KAPASITAS||16}</span>`;}},{h:'Ketua Kamar',f:r=>SRIT.Ketua.sel('kamar',r)}],idPrefix:'KM',fields:[{k:'KODE',label:'Kode'},{k:'NAME',label:'Nama Kamar'},{k:'GEDUNG',label:'Gedung',type:'select',options:()=>SRIT.Store.read('GEDUNG').map(g=>({v:g.ID,t:g.NAME}))},{k:'LANTAI',label:'Lantai',type:'select',options:()=>SRIT.Store.read('LANTAI').map(l=>({v:l.ID,t:(SRIT.Repo.getById('GEDUNG',l.GEDUNG)||{}).NAME+' - '+l.NAME}))},{k:'JENJANG',label:'Jenjang',type:'select',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'JK',label:'JK',type:'select',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'KAPASITAS',label:'Kapasitas',type:'number'},{k:'KETUA',label:'Ketua Kamar (dipilih dari anak penghuni kamar ini)',type:'select',col:12,noImport:true,options:rec=>SRIT.Ketua.opsi('kamar',rec)}]},
     {k:'TEMPAT_TIDUR',t:'Tempat Tidur',searchFields:['KODE'],
       onCreate:d=>{const km=SRIT.Repo.getById('KAMAR',d.KAMAR);if(km){if(!d.JENJANG)d.JENJANG=km.JENJANG||'';if(!d.JK)d.JK=km.JK||'';}},
       filters:[{k:'KAMAR',label:'Kamar',options:()=>SRIT.Store.read('KAMAR').map(k=>({v:k.ID,t:k.NAME}))},{k:'JENJANG',label:'Jenjang',options:[{v:'SRD',t:'SRD'},{v:'SRMP',t:'SRMP'},{v:'SRMA',t:'SRMA'}]},{k:'JK',label:'Jenis Kelamin',options:[{v:'L',t:'Putra'},{v:'P',t:'Putri'}]},{k:'STATUS',label:'Status',options:[{v:'KOSONG',t:'KOSONG'},{v:'TERISI',t:'TERISI'},{v:'RUSAK',t:'RUSAK'}]},{k:'POSISI',label:'Posisi',options:[{v:'ATAS',t:'ATAS'},{v:'BAWAH',t:'BAWAH'}]}],
@@ -6305,7 +6327,6 @@ SRIT.Features['keasramaan-master']={
     const li=(x)=>`<li><b>${E(x.a.NAMA)}</b>${x.a.KELAS?' ('+E(x.a.KELAS)+')':''} &mdash; <span class="text-muted-2">${E(x.detail)}</span></li>`;
     let h=n?`<div class="card-srit p-3 mb-3" style="border-left:4px solid var(--srit-danger)"><div class="d-flex flex-wrap align-items-center gap-2"><div class="flex-grow-1"><b><i class="bi bi-exclamation-triangle text-danger"></i> ${n} anak terdeteksi punya lebih dari satu wali asuh / data ganda</b><div class="text-muted-2" style="font-size:12px">Wali kelompok asuh menjadi acuan. Tombol di kanan menyamakan data anak dan pemetaan wali asuh.</div></div><button class="btn btn-sm btn-danger" id="kmAsuhFix"><i class="bi bi-magic"></i> Samakan dengan wali kelompok</button></div><ul class="mt-2 mb-0" style="font-size:13px;max-height:180px;overflow:auto">${A.ganda.concat(A.duplikat).slice(0,30).map(li).join('')}${n>30?'<li>dan '+(n-30)+' lainnya</li>':''}</ul></div>`
       :`<div class="card-srit p-2 px-3 mb-3" style="border-left:4px solid var(--srit-success)"><i class="bi bi-check-circle text-success"></i> Setiap anak hanya punya satu wali asuh <span class="text-muted-2">(${A.diperiksa} anak aktif diperiksa)</span></div>`;
-    if(A.kamar.length)h+=`<div class="card-srit p-2 px-3 mb-3" style="border-left:4px solid var(--srit-warning);font-size:13px"><b><i class="bi bi-info-circle text-warning"></i> ${A.kamar.length} anak wali kamarnya berbeda dengan wali kelompoknya</b> <span class="text-muted-2">(periksa manual; wali kamar tidak diubah otomatis)</span><ul class="mt-1 mb-0" style="max-height:120px;overflow:auto">${A.kamar.slice(0,15).map(li).join('')}${A.kamar.length>15?'<li>dan '+(A.kamar.length-15)+' lainnya</li>':''}</ul></div>`;
     box.innerHTML=h;
     const b=$('#kmAsuhFix',box);
     if(b)b.onclick=()=>{if(!window.confirm('Samakan wali asuh '+n+' anak dengan wali kelompoknya?'))return;const c=SRIT.Asuh.perbaiki();SRIT.Notify(c+' data wali asuh disamakan','ok');this.render(host);};
@@ -8082,7 +8103,7 @@ SRIT.Features.peta={
               const roomBeds=beds.filter(b=>b.KAMAR===k.ID);
               return `<div class="col-6 col-md-4 col-lg-3"><div class="card-srit p-3 h-100" style="background:var(--srit-hover)">
                 <div class="d-flex justify-content-between align-items-start mb-1"><b style="font-size:13px">${k.NAME}</b><span class="badge-soft" style="background:${col}22;color:${col};font-size:10px">${stt}</span></div>
-                <div class="text-muted-2" style="font-size:11px">${k.KODE||''}<br>Wali: ${(SRIT.Repo.getById('WALI_ASUH',k.WALI_ASUH)||{}).NAME||'-'}</div>
+                <div class="text-muted-2" style="font-size:11px">${k.KODE||''}<br>Ketua: ${SRIT.Util.esc((SRIT.Ketua.kamar(k.ID)||{}).NAMA||'-')}</div>
                 <div class="my-2"><div class="d-flex justify-content-between small"><span>Okupansi</span><b>${occ}/${cap}</b></div>
                 <div class="ltv-progress" style="background:var(--srit-surface)"><span style="width:${rate}%;background:${col}"></span></div></div>
                 <div class="d-flex flex-wrap gap-1">${roomBeds.map(b=>`<span title="${b.KODE} ${b.STATUS==='TERISI'?'· '+((SRIT.Repo.getById('ANAK',b.ANAK_ID)||{}).NAMA||''):''}" style="width:15px;height:15px;border-radius:4px;display:inline-block;background:${b.STATUS==='TERISI'?'var(--srit-primary)':b.STATUS==='RUSAK'?'var(--srit-danger)':'var(--srit-border)'}"></span>`).join('')}</div>
@@ -8124,7 +8145,7 @@ SRIT.anakKoord=(id,namaCadangan)=>{
   const nama=String(a.NAMA||namaCadangan||'').trim()||(id?String(SRIT.nm('ANAK',id)||'-'):'-');
   const kelas=String(a.KELAS||'').trim();
   const kel=R.getById('KELOMPOK_ASUH',a.KELOMPOK)||{},kmr=R.getById('KAMAR',a.KAMAR)||{};
-  const waliAsuh=String((R.getById('WALI_ASUH',SRIT.Asuh.waliAnak(a))||R.getById('WALI_ASUH',kel.WALI_ASUH)||R.getById('WALI_ASUH',kmr.WALI_ASUH)||{}).NAME||'').trim();
+  const waliAsuh=String((R.getById('WALI_ASUH',SRIT.Asuh.waliAnak(a))||R.getById('WALI_ASUH',kel.WALI_ASUH)||{}).NAME||'').trim();
   let was=SRIT.Store.read('WALI_ASRAMA').filter(w=>w.STATUS!=='NONAKTIF'&&a.ASRAMA&&w.ASRAMA===a.ASRAMA);
   const jj=String(a.JENJANG||'').toUpperCase(),byJJ=was.filter(w=>!w.JENJANG||!jj||String(w.JENJANG).toUpperCase().indexOf(jj)>=0);
   if(byJJ.length)was=byJJ;
