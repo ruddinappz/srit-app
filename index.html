@@ -16,7 +16,7 @@
 <script>
 /* SRIT — diagnostik pemuatan: bila halaman tampak putih/kosong, tampilkan PENYEBABNYA di layar (juga di HP tanpa konsol). */
 window.__srit=(function(){
-  var S={errs:[],booted:false,cur:'Index',parts:[],t0:Date.now(),server:null},EXPECT={"JS_Util": ["SRIT", "SRIT.Util"], "JS_Brand": ["SRIT.BrandAsset"], "JS_Data": ["SRIT.LS", "SRIT.Server", "SRIT.Store", "SRIT.Repo", "SRIT.Cache", "SRIT.Sync", "SRIT.Audit"], "JS_UI": ["SRIT.Notify", "SRIT.Loading", "SRIT.Modal", "SRIT.SS", "SRIT.Import"], "JS_Auth": ["SRIT.Auth"], "JS_Api": ["SRIT.Api"], "JS_Theme": ["SRIT.Theme", "SRIT.Brand"], "JS_Shell": ["SRIT.UI", "SRIT.MENU", "SRIT.Features"], "View_Shared": ["simpleFeature", "regFeature", "SRIT.anakKet", "SRIT.anakRefSearch"], "JS_Router": ["SRIT.Router"], "View_LiveTV": ["SRIT.LiveTV"], "View_Dashboard": ["SRIT.Features.dashboard"], "View_Anak": ["SRIT.Features.anak"], "View_Absensi": ["SRIT.Features.absensi"], "View_AbsensiKamera": ["SRIT.Features.absensi._showCamError"], "View_Jadwal": ["SRIT.Features.jadwal"], "View_Kegiatan": ["SRIT.Features.kegiatan"], "View_JadwalPiket": ["SRIT.Features.jadwal-piket"], "View_JurnalPiket": ["SRIT.Features.jurnal-piket"], "View_Dokumentasi": ["SRIT.Features.dokumentasi"], "View_Jabatan": ["SRIT.Features.jabatan"], "View_User": ["SRIT.Features.user"], "View_Role": ["SRIT.Features.role"], "View_Analytics": ["SRIT.Features.analytics"], "View_Laporan": ["SRIT.Features.laporan"], "View_Keasramaan": ["SRIT.Features.keasramaan", "SRIT.Features.ops-module"], "View_StrukturMaster": ["SRIT.Features.keasramaan-master"], "View_Sarpras": ["SRIT.Features.sarpras"], "View_Program": ["SRIT.Features.program"], "View_Izin": ["SRIT.Features.izin"], "View_Tamu": ["SRIT.Features.tamu"], "View_TataTertib": ["SRIT.Features.tatatertib"], "View_Pelanggaran": ["SRIT.Features.pelanggaran"], "View_Pembinaan": ["SRIT.Features.pembinaan"], "View_Insiden": ["SRIT.Features.insiden"], "View_Inspeksi": ["SRIT.Features.inspeksi"], "View_Refleksi": ["SRIT.Features.refleksi"], "View_Penghuni": ["SRIT.Features.penghuni"], "View_Penilaian": ["SRIT.Features.penilaian"], "View_Profiling": ["SRIT.Features.profiling"], "View_Gamifikasi": ["SRIT.Features.gamifikasi"], "View_Peta": ["SRIT.Features.peta"], "View_Alert": ["SRIT.Features.alert-center"], "View_Audit": ["SRIT.Features.audit"], "View_Settings": ["SRIT.Features.settings"]},CORE=["JS_Util", "JS_Data", "JS_UI", "JS_Auth", "JS_Api", "JS_Theme", "JS_Shell", "View_Shared", "JS_Router", "View_LiveTV"];
+  var S={errs:[],booted:false,cur:'Index',parts:[],t0:Date.now(),server:null},EXPECT={"JS_Util": ["SRIT", "SRIT.Util"], "JS_Brand": ["SRIT.BrandAsset"], "JS_Data": ["SRIT.LS", "SRIT.Server", "SRIT.Store", "SRIT.Repo", "SRIT.Cache", "SRIT.Sync", "SRIT.Audit"], "JS_UI": ["SRIT.Notify", "SRIT.Loading", "SRIT.Modal", "SRIT.SS", "SRIT.Import"], "JS_Auth": ["SRIT.Auth"], "JS_Api": ["SRIT.Api"], "JS_Theme": ["SRIT.Theme", "SRIT.Brand"], "JS_Shell": ["SRIT.UI", "SRIT.MENU", "SRIT.Features"], "View_Shared": ["simpleFeature", "regFeature", "SRIT.anakKet", "SRIT.anakRefSearch"], "JS_Router": ["SRIT.Router"], "View_LiveTV": ["SRIT.LiveTV"], "View_Dashboard": ["SRIT.Features.dashboard"], "View_Anak": ["SRIT.Features.anak"], "View_Absensi": ["SRIT.Features.absensi"], "View_AbsensiKamera": ["SRIT.Features.absensi._showCamError"], "View_Jadwal": ["SRIT.Features.jadwal"], "View_Kegiatan": ["SRIT.Features.kegiatan"], "View_JadwalPiket": ["SRIT.Features.jadwal-piket"], "View_JurnalPiket": ["SRIT.Features.jurnal-piket"], "View_Dokumentasi": ["SRIT.Features.dokumentasi"], "View_Dokumen": ["SRIT.Features.dokumen"], "View_Jabatan": ["SRIT.Features.jabatan"], "View_User": ["SRIT.Features.user"], "View_Role": ["SRIT.Features.role"], "View_Analytics": ["SRIT.Features.analytics"], "View_Laporan": ["SRIT.Features.laporan"], "View_Keasramaan": ["SRIT.Features.keasramaan", "SRIT.Features.ops-module"], "View_StrukturMaster": ["SRIT.Features.keasramaan-master"], "View_Sarpras": ["SRIT.Features.sarpras"], "View_Program": ["SRIT.Features.program"], "View_Izin": ["SRIT.Features.izin"], "View_Tamu": ["SRIT.Features.tamu"], "View_TataTertib": ["SRIT.Features.tatatertib"], "View_Pelanggaran": ["SRIT.Features.pelanggaran"], "View_Pembinaan": ["SRIT.Features.pembinaan"], "View_Insiden": ["SRIT.Features.insiden"], "View_Inspeksi": ["SRIT.Features.inspeksi"], "View_Refleksi": ["SRIT.Features.refleksi"], "View_Penghuni": ["SRIT.Features.penghuni"], "View_Penilaian": ["SRIT.Features.penilaian"], "View_Profiling": ["SRIT.Features.profiling"], "View_Gamifikasi": ["SRIT.Features.gamifikasi"], "View_Peta": ["SRIT.Features.peta"], "View_Alert": ["SRIT.Features.alert-center"], "View_Audit": ["SRIT.Features.audit"], "View_Settings": ["SRIT.Features.settings"]},CORE=["JS_Util", "JS_Data", "JS_UI", "JS_Auth", "JS_Api", "JS_Theme", "JS_Shell", "View_Shared", "JS_Router", "View_LiveTV"];
   S.n=function(name){S.cur=name;S.parts.push(name);};
   function get(p){try{return p.split('.').reduce(function(o,k){return o==null?undefined:o[k];},window);}catch(e){return undefined;}}
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -1331,6 +1331,9 @@ SRIT.MENU=[
   {sec:'UTAMA'},
   {r:'dashboard',t:'Beranda',i:'bi-speedometer2'},
   {r:'alert-center',t:'Pusat Peringatan',i:'bi-bell'},
+
+  {sec:'DOKUMEN & MATERI'},
+  {r:'dokumen',t:'Dokumen & Materi',i:'bi-folder2-open'},
 
   {sec:'DATA INDUK (MASTER)'},
   {r:'anak',t:'Data Anak / Siswa',i:'bi-people'},
@@ -4287,6 +4290,272 @@ SRIT.Features.dokumentasi={
       }catch(e){SRIT.Loading.hide();SRIT.Notify(e.message||'Gagal memeriksa','err');}
     };
     $('#shChk').onclick=()=>run(false);$('#shFix').onclick=()=>run(true);
+  }
+};
+</script>
+
+
+<script>__srit.n('View_Dokumen')</script>
+<script>
+//# sourceURL=View_Dokumen.html
+// v1.9.24 — DOKUMEN & MATERI: pusat unduhan modul / materi / formulir / panduan / regulasi, dikelompokkan menurut kegunaan.
+// Berkas di Drive (09_DOKUMEN/<kategori>) atau berupa tautan. Unduh lewat server (tanpa perlu akses Drive). Kategori bisa diatur (izin Kelola).
+SRIT.Features.dokumen={
+  state:{data:null,q:'',kat:'',tipe:'',sort:'new',busy:{}},
+  _PAL:['#1c6ef2','#0ea5e9','#16a34a','#f59e0b','#ea580c','#a855f7','#db2777','#64748b'],
+  _IK:[['bi-file-earmark-text','Dokumen'],['bi-book','Buku / panduan'],['bi-mortarboard','Pembelajaran'],['bi-journal-check','Peraturan'],['bi-bar-chart','Laporan'],['bi-briefcase','Administrasi'],['bi-people','Kelompok / santri'],['bi-shield-check','Keamanan'],['bi-heart-pulse','Kesehatan'],['bi-clipboard-check','Formulir'],['bi-tools','Sarana'],['bi-folder2','Folder']],
+  _TIPE:[['','Semua jenis'],['pdf','PDF'],['word','Word'],['excel','Excel'],['ppt','PowerPoint'],['img','Gambar'],['link','Tautan'],['lain','Lainnya']],
+  _MAXKB:10*1024,
+  _ACCEPT:'.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.csv,.txt,.rtf,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp,.mp3,.mp4',
+  _FT(x){
+    if(x.jenis==='TAUTAN')return{g:'link',i:'bi-link-45deg',c:'#0891b2',l:'LINK'};
+    const e=x.ext||'',L=e.toUpperCase();
+    if(e==='pdf')return{g:'pdf',i:'bi-file-earmark-pdf',c:'#dc2626',l:L};
+    if(['doc','docx','odt','rtf'].includes(e))return{g:'word',i:'bi-file-earmark-word',c:'#2563eb',l:L};
+    if(['xls','xlsx','ods','csv'].includes(e))return{g:'excel',i:'bi-file-earmark-excel',c:'#16a34a',l:L};
+    if(['ppt','pptx','odp'].includes(e))return{g:'ppt',i:'bi-file-earmark-slides',c:'#ea580c',l:L};
+    if(['jpg','jpeg','png','gif','webp'].includes(e))return{g:'img',i:'bi-file-earmark-image',c:'#9333ea',l:L};
+    if(['zip','rar'].includes(e))return{g:'lain',i:'bi-file-earmark-zip',c:'#64748b',l:L};
+    if(['mp3','mp4'].includes(e))return{g:'lain',i:'bi-file-earmark-play',c:'#db2777',l:L};
+    return{g:'lain',i:'bi-file-earmark-text',c:'#64748b',l:L||'FILE'};
+  },
+  _css(){
+    if(document.getElementById('dkuStyle'))return;
+    const s=document.createElement('style');s.id='dkuStyle';
+    s.textContent=`.dku-top{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 16px;margin-bottom:12px}
+.dku-top-t{display:flex;gap:12px;align-items:center;flex:1 1 280px;min-width:0}.dku-top-t h5{margin:0 0 2px;font-size:16px;font-weight:800}.dku-top-t .text-muted-2{font-size:12px}
+.dku-ic{width:44px;height:44px;border-radius:13px;background:rgba(var(--srit-primary-rgb),.12);color:var(--srit-primary);display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0}
+.dku-top-a{display:flex;gap:8px;flex-wrap:wrap}
+.dku-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.dku-search{position:relative;flex:1 1 260px;min-width:0}.dku-search i{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--srit-text-2)}
+.dku-search input{padding-left:34px}
+.dku-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 4px;margin-top:10px;scrollbar-width:thin}
+.dku-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--srit-border);background:var(--srit-card);color:var(--srit-text);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.12s;white-space:nowrap}
+.dku-chip:hover{border-color:var(--srit-primary)}.dku-chip.on{background:var(--srit-primary);border-color:var(--srit-primary);color:#fff}
+.dku-chip small{opacity:.75;font-weight:700}.dku-chip.zero:not(.on){opacity:.5}
+.dku-gh{display:flex;gap:10px;align-items:center;margin:20px 0 8px}.dku-gh:first-child{margin-top:4px}
+.dku-gi{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.dku-gh b{font-size:14px;font-weight:800;display:block;line-height:1.2}.dku-gh .text-muted-2{font-size:11px}
+.dku-gh .n{margin-left:auto;font-size:11px;font-weight:700;color:var(--srit-text-2)}
+.dku-list{display:flex;flex-direction:column;gap:8px}
+.dku-row{display:flex;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--srit-border);border-radius:12px;background:var(--srit-card);transition:.12s}
+.dku-row:hover{border-color:var(--srit-primary)}
+.dku-fi{width:50px;height:54px;border-radius:11px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:22px}
+.dku-fi small{font-size:9px;font-weight:800;letter-spacing:.3px}
+.dku-bd{flex:1;min-width:0}.dku-t{font-weight:700;font-size:14px;line-height:1.3;word-break:break-word}
+.dku-d{font-size:12px;color:var(--srit-text-2);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dku-m{font-size:11px;color:var(--srit-text-2);margin-top:4px;display:flex;flex-wrap:wrap;gap:2px 10px}.dku-m span{white-space:nowrap}
+.dku-new{display:inline-block;background:#16a34a;color:#fff;border-radius:6px;font-size:9px;font-weight:800;padding:1px 6px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
+.dku-ac{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.dkk-r{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--srit-border);border-radius:10px;margin-bottom:8px;background:var(--srit-card)}
+.dkk-o{display:flex;flex-direction:column;gap:2px}.dkk-o .btn{padding:0 6px;line-height:1.2}
+.dkk-p{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--srit-hover);color:var(--srit-primary);flex-shrink:0;margin-top:1px}
+.dkk-i{width:150px;flex-shrink:0}
+@media(max-width:575px){.dku-top-a{width:100%}.dku-top-a .btn{flex:1}.dku-row{flex-wrap:wrap}.dku-ac{width:100%}.dku-ac .btn-primary{flex:1}.dkk-r{flex-wrap:wrap}.dkk-i{width:100%;order:3}}`;
+    document.head.appendChild(s);
+  },
+  _can:{},
+  async render(host){
+    SRIT.UI.setPage('Dokumen & Materi','Dokumen & Materi');this._host=host;this._css();
+    const can=a=>SRIT.Auth.can('dokumen:'+a);
+    this._can={C:can('CREATE'),U:can('UPDATE'),D:can('DELETE'),M:can('MANAGE')};
+    host.innerHTML=`<div class="dku-top card-srit">
+        <div class="dku-top-t"><div class="dku-ic"><i class="bi bi-folder2-open"></i></div>
+          <div style="min-width:0"><h5>Dokumen &amp; Materi</h5><div class="text-muted-2">Unduh modul, materi, formulir, panduan, dan regulasi \u2014 dikelompokkan menurut kegunaannya.</div></div></div>
+        <div class="dku-top-a" id="dkuAct"></div></div>
+      <div class="card-srit p-3 mb-3">
+        <div class="dku-tools">
+          <div class="dku-search"><i class="bi bi-search"></i><input class="form-control" id="dkuQ" placeholder="Cari judul, keterangan, atau nama berkas\u2026" value="${SRIT.Util.esc(this.state.q)}" autocomplete="off"></div>
+          <select class="form-select" id="dkuT" style="width:auto">${this._TIPE.map(t=>`<option value="${t[0]}" ${this.state.tipe===t[0]?'selected':''}>${t[1]}</option>`).join('')}</select>
+          <select class="form-select" id="dkuS" style="width:auto"><option value="new">Terbaru</option><option value="az">Judul A\u2013Z</option><option value="top">Paling banyak diunduh</option></select>
+        </div>
+        <div class="dku-chips" id="dkuChips"></div></div>
+      <div id="dkuList"><div class="p-4 text-center text-muted-2"><span class="spinner-border spinner-border-sm me-2"></span>Memuat dokumen\u2026</div></div>`;
+    $('#dkuS').value=this.state.sort;
+    let t;$('#dkuQ').oninput=e=>{clearTimeout(t);t=setTimeout(()=>{this.state.q=e.target.value;this._draw();},200);};
+    $('#dkuT').onchange=e=>{this.state.tipe=e.target.value;this._draw();};
+    $('#dkuS').onchange=e=>{this.state.sort=e.target.value;this._draw();};
+    $('#dkuChips').onclick=e=>{const c=e.target.closest('[data-k]');if(!c)return;this.state.kat=c.dataset.k;this._draw();};
+    $('#dkuList').onclick=e=>this._click(e);
+    this._acts();
+    if(this.state.data)this._draw();
+    await this._load();
+  },
+  destroy(){},
+  async _load(){
+    try{
+      const r=await SRIT.Server.call('apiDkuList');
+      if(SRIT.currentFeature!=='dokumen')return;
+      this.state.data=r;this._acts();this._draw();
+    }catch(e){
+      const el=$('#dkuList');if(el&&!this.state.data)el.innerHTML=`<div class="empty-state"><i class="bi bi-exclamation-triangle d-block"></i>${SRIT.Util.esc(e.message||'Gagal memuat dokumen')}<div class="mt-2"><button class="btn btn-outline-primary btn-sm" id="dkuRetry">Coba lagi</button></div></div>`;
+      const b=$('#dkuRetry');if(b)b.onclick=()=>{$('#dkuList').innerHTML='<div class="p-4 text-center text-muted-2">Memuat\u2026</div>';this._load();};
+    }
+  },
+  _acts(){
+    const box=$('#dkuAct');if(!box)return;const d=this.state.data||{},E=SRIT.Util.esc;
+    box.innerHTML=(this._can.C?'<button class="btn btn-primary btn-sm" id="dkuAdd"><i class="bi bi-plus-lg"></i> Tambah dokumen</button>':'')
+      +(this._can.M?'<button class="btn btn-outline-secondary btn-sm" id="dkuKat"><i class="bi bi-tags"></i> Kelola kategori</button>':'')
+      +(d.folderUrl?`<a class="btn btn-outline-secondary btn-sm" href="${E(d.folderUrl)}" target="_blank" rel="noopener" title="Buka folder 09_DOKUMEN di Google Drive"><i class="bi bi-folder2-open"></i> Folder Drive</a>`:'');
+    const a=$('#dkuAdd');if(a)a.onclick=()=>this._form();
+    const k=$('#dkuKat');if(k)k.onclick=()=>this._kat();
+  },
+  // ---------- util ----------
+  _addDay(iso,n){const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');},
+  _size(kb){return !kb?'':kb<1024?kb+' KB':(kb/1024).toFixed(1)+' MB';},
+  _host_(u){try{return new URL(u).hostname.replace(/^www\./,'');}catch(e){return u;}},
+  _by(id){return ((this.state.data||{}).items||[]).find(x=>x.id===id);},
+  _katOf(id){const ks=(this.state.data||{}).kategori||[];return ks.find(k=>k.id===id)||ks.find(k=>k.id==='lainnya')||{id:'lainnya',nama:'Lainnya',desk:'',ikon:'bi-folder2'};},
+  _color(id){const ks=(this.state.data||{}).kategori||[],i=Math.max(0,ks.findIndex(k=>k.id===id));return this._PAL[i%this._PAL.length];},
+  _filtered(){ // setelah pencarian + jenis (belum kategori)
+    const st=this.state,terms=st.q.toLowerCase().split(/\s+/).filter(Boolean);
+    return ((st.data||{}).items||[]).filter(x=>{
+      if(st.tipe&&this._FT(x).g!==st.tipe)return false;
+      if(!terms.length)return true;
+      const hay=(x.judul+' '+x.desk+' '+x.nama+' '+x.oleh+' '+this._katOf(x.kat).nama).toLowerCase();
+      return terms.every(t=>hay.indexOf(t)>=0);
+    });
+  },
+  // ---------- tampilan ----------
+  _draw(){
+    const st=this.state,d=st.data,E=SRIT.Util.esc,list=$('#dkuList');if(!d||!list)return;
+    const base=this._filtered(),cnt={};base.forEach(x=>{const k=this._katOf(x.kat).id;cnt[k]=(cnt[k]||0)+1;});
+    if(st.kat&&!d.kategori.some(k=>k.id===st.kat))st.kat='';
+    $('#dkuChips').innerHTML=`<button class="dku-chip ${st.kat?'':'on'}" data-k=""><i class="bi bi-grid"></i> Semua <small>${base.length}</small></button>`
+      +d.kategori.map(k=>`<button class="dku-chip ${st.kat===k.id?'on':''} ${cnt[k.id]?'':'zero'}" data-k="${E(k.id)}" title="${E(k.desk)}"><i class="bi ${E(k.ikon)}"></i> ${E(k.nama)} <small>${cnt[k.id]||0}</small></button>`).join('');
+    const sorter={new:(a,b)=>String(b.upd||b.pada).localeCompare(String(a.upd||a.pada)),az:(a,b)=>a.judul.localeCompare(b.judul,'id'),top:(a,b)=>b.unduh-a.unduh||a.judul.localeCompare(b.judul,'id')}[st.sort]||null;
+    const shown=(st.kat?base.filter(x=>this._katOf(x.kat).id===st.kat):base).slice().sort(sorter);
+    if(!shown.length){
+      const none=!d.items.length;
+      list.innerHTML=`<div class="empty-state"><i class="bi bi-folder2-open d-block"></i>${none?'Belum ada dokumen.':'Tidak ada dokumen yang cocok dengan pencarian.'}
+        <div class="mt-2">${none?(this._can.C?'<button class="btn btn-primary btn-sm" data-add="1"><i class="bi bi-plus-lg"></i> Tambah dokumen pertama</button>':'<span style="font-size:12px">Pengelola dokumen belum mengunggah apa pun.</span>'):'<button class="btn btn-outline-primary btn-sm" data-reset="1">Hapus pencarian &amp; filter</button>'}</div></div>`;
+      return;
+    }
+    const today=SRIT.Util.todayISO(),cut=this._addDay(today,-14),groups=[];
+    d.kategori.forEach(k=>{const it=shown.filter(x=>this._katOf(x.kat).id===k.id);if(it.length)groups.push({k,it});});
+    list.innerHTML=groups.map(g=>{const c=this._color(g.k.id);
+      return `<div class="dku-gh"><div class="dku-gi" style="background:${c}22;color:${c}"><i class="bi ${E(g.k.ikon)}"></i></div>
+        <div style="min-width:0"><b>${E(g.k.nama)}</b>${g.k.desk?`<span class="text-muted-2">${E(g.k.desk)}</span>`:''}</div><span class="n">${g.it.length} dokumen</span></div>
+        <div class="dku-list">${g.it.map(x=>this._row(x,cut)).join('')}</div>`;}).join('');
+  },
+  _row(x,cut){
+    const E=SRIT.Util.esc,f=this._FT(x),busy=!!this.state.busy[x.id],isLink=x.jenis==='TAUTAN',date=(x.upd||x.pada||'').slice(0,10);
+    const meta=[isLink?'<span><i class="bi bi-box-arrow-up-right"></i> '+E(this._host_(x.url))+'</span>':'<span>'+E(x.nama)+'</span>',
+      !isLink&&x.kb?'<span>'+this._size(x.kb)+'</span>':'',date?'<span>'+E(SRIT.Util.fmtDateShort(date))+'</span>':'',
+      '<span>'+x.unduh+(isLink?'\u00d7 dibuka':'\u00d7 diunduh')+'</span>'].filter(Boolean).join('');
+    return `<div class="dku-row"><div class="dku-fi" style="background:${f.c}1c;color:${f.c}"><i class="bi ${f.i}"></i><small>${E(f.l)}</small></div>
+      <div class="dku-bd"><div class="dku-t">${E(x.judul)}${date>=cut?'<span class="dku-new">BARU</span>':''}</div>${x.desk?`<div class="dku-d">${E(x.desk)}</div>`:''}<div class="dku-m">${meta}</div></div>
+      <div class="dku-ac"><button class="btn btn-primary btn-sm" data-dl="${E(x.id)}" ${busy?'disabled':''}>${busy?'<span class="spinner-border spinner-border-sm"></span> Menyiapkan\u2026':isLink?'<i class="bi bi-box-arrow-up-right"></i> Buka':'<i class="bi bi-download"></i> Unduh'}</button>
+        ${this._can.U?`<button class="btn btn-outline-secondary btn-sm" data-ed="${E(x.id)}" title="Ubah"><i class="bi bi-pencil"></i></button>`:''}
+        ${this._can.D?`<button class="btn btn-outline-danger btn-sm" data-rm="${E(x.id)}" title="Hapus"><i class="bi bi-trash"></i></button>`:''}</div></div>`;
+  },
+  _click(e){
+    const q=s=>e.target.closest(s);let b;
+    if((b=q('[data-dl]')))return this._download(b.dataset.dl);
+    if((b=q('[data-ed]')))return this._form(b.dataset.ed);
+    if((b=q('[data-rm]')))return this._remove(b.dataset.rm);
+    if(q('[data-add]'))return this._form();
+    if(q('[data-reset]')){this.state.q='';this.state.tipe='';this.state.kat='';$('#dkuQ').value='';$('#dkuT').value='';this._draw();}
+  },
+  // ---------- unduh ----------
+  async _download(id){
+    const x=this._by(id),st=this.state;if(!x||st.busy[id])return;
+    const link=x.jenis==='TAUTAN',w=link?window.open('about:blank','_blank'):null;
+    st.busy[id]=true;this._draw();
+    try{
+      const r=await SRIT.Server.call('apiDkuGet',id);
+      if(link){if(w){try{w.opener=null;}catch(e){}w.location.href=r.url;}else window.open(r.url,'_blank');}
+      else{
+        const bin=atob(r.base64),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+        const url=URL.createObjectURL(new Blob([u8],{type:r.mime||'application/octet-stream'})),a=document.createElement('a');
+        a.href=url;a.download=r.nama||x.nama||'dokumen';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+        SRIT.Notify('Mengunduh: '+(r.nama||x.judul),'ok');
+      }
+      x.unduh++;
+    }catch(e){if(w)try{w.close();}catch(_){}SRIT.Notify(e.message||'Gagal mengunduh','err');}
+    delete st.busy[id];if(SRIT.currentFeature==='dokumen')this._draw();
+  },
+  async _remove(id){
+    const x=this._by(id);if(!x)return;
+    if(!window.confirm('Hapus dokumen "'+x.judul+'"'+(x.jenis==='FILE'?' beserta berkasnya di Drive':'')+'? Tindakan ini tidak dapat dibatalkan.'))return;
+    SRIT.Loading.show();
+    try{await SRIT.Server.call('apiDkuDelete',id);SRIT.Loading.hide();this.state.data.items=this.state.data.items.filter(i=>i.id!==id);SRIT.Notify('Dokumen dihapus','ok');this._draw();}
+    catch(e){SRIT.Loading.hide();SRIT.Notify(e.message||'Gagal menghapus','err');}
+  },
+  // ---------- tambah / ubah ----------
+  _form(id){
+    const d=this.state.data;if(!d)return;const E=SRIT.Util.esc,x=id?this._by(id):null,edit=!!x;
+    const selK=x?this._katOf(x.kat).id:(this.state.kat||(d.kategori[0]||{}).id);
+    const m=SRIT.Modal.open({title:edit?'Ubah dokumen':'Tambah dokumen',size:'modal-lg',body:`
+      ${edit?'':`<div class="mb-3"><label class="form-label-sm">Jenis</label><div class="d-flex gap-2">
+        <input type="radio" class="btn-check" name="dkJ" id="dkJf" value="FILE" checked><label class="btn btn-outline-primary btn-sm" for="dkJf"><i class="bi bi-file-earmark-arrow-up"></i> Unggah berkas</label>
+        <input type="radio" class="btn-check" name="dkJ" id="dkJl" value="TAUTAN"><label class="btn btn-outline-primary btn-sm" for="dkJl"><i class="bi bi-link-45deg"></i> Tautan (Drive / YouTube / situs)</label></div></div>`}
+      <div class="row g-3"><div class="col-md-6"><label class="form-label-sm">Kategori (kegunaan) <span class="text-danger">*</span></label>
+          <select class="form-select" id="dkK">${d.kategori.map(k=>`<option value="${E(k.id)}" ${k.id===selK?'selected':''}>${E(k.nama)}</option>`).join('')}</select></div>
+        <div class="col-md-6"><label class="form-label-sm">Judul <span class="text-danger">*</span></label><input class="form-control" id="dkT" maxlength="120" value="${x?E(x.judul):''}" placeholder="mis. Formulir Izin Pulang Santri"></div>
+        <div class="col-12"><label class="form-label-sm">Keterangan (opsional)</label><textarea class="form-control" id="dkD" rows="2" maxlength="300" placeholder="Untuk apa dokumen ini dipakai?">${x?E(x.desk):''}</textarea></div>
+        <div class="col-12" id="dkFileBox" ${edit&&x.jenis==='TAUTAN'?'hidden':''}><label class="form-label-sm">${edit?'Ganti berkas (opsional)':'Berkas'} ${edit?'':'<span class="text-danger">*</span>'}</label>
+          <input type="file" class="form-control" id="dkF" accept="${this._ACCEPT}">
+          <div class="text-muted-2 mt-1" style="font-size:11px">${edit?'Berkas saat ini: <b>'+E(x.nama)+'</b>. Kosongkan bila tidak ingin mengganti. ':''}PDF, Word, Excel, PowerPoint, CSV, TXT, ZIP, gambar, MP3/MP4 \u00b7 maks 10 MB.</div></div>
+        <div class="col-12" id="dkUrlBox" ${edit?(x.jenis==='TAUTAN'?'':'hidden'):'hidden'}><label class="form-label-sm">Alamat tautan <span class="text-danger">*</span></label>
+          <input class="form-control" id="dkU" maxlength="500" placeholder="https://\u2026" value="${x&&x.url?E(x.url):''}"></div></div>`,
+      footer:'<button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="dkSave"><i class="bi bi-save"></i> Simpan</button>'});
+    const el=m.el,q=s=>el.querySelector(s),jenis=()=>edit?x.jenis:(el.querySelector('input[name=dkJ]:checked')||{}).value||'FILE';
+    el.querySelectorAll('input[name=dkJ]').forEach(r=>r.onchange=()=>{const t=jenis()==='TAUTAN';q('#dkFileBox').hidden=t;q('#dkUrlBox').hidden=!t;});
+    q('#dkF').onchange=e=>{const f=e.target.files[0];if(f&&!q('#dkT').value.trim())q('#dkT').value=f.name.replace(/\.[^.]+$/,'').replace(/[_]+/g,' ').trim().slice(0,120);};
+    q('#dkSave').onclick=async()=>{
+      const p={id:edit?x.id:'',kategori:q('#dkK').value,judul:q('#dkT').value.trim(),deskripsi:q('#dkD').value.trim(),jenis:jenis()};
+      if(!p.judul){SRIT.Notify('Judul wajib diisi','err');q('#dkT').focus();return;}
+      if(p.jenis==='TAUTAN'){p.url=q('#dkU').value.trim();if(!/^https?:\/\/\S+$/i.test(p.url)){SRIT.Notify('Alamat tautan harus diawali http:// atau https://','err');q('#dkU').focus();return;}}
+      else{
+        const f=q('#dkF').files[0];
+        if(!f&&!edit){SRIT.Notify('Pilih berkas yang akan diunggah','err');return;}
+        if(f){
+          if(f.size>this._MAXKB*1024){SRIT.Notify('Ukuran berkas maksimal 10 MB (berkas ini '+(f.size/1048576).toFixed(1)+' MB)','err');return;}
+          p.namaAsli=f.name;
+          try{p.base64=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]||'');r.onerror=()=>no(new Error('Berkas tidak terbaca'));r.readAsDataURL(f);});}
+          catch(e){SRIT.Notify(e.message,'err');return;}
+        }
+      }
+      q('#dkSave').disabled=true;SRIT.Loading.show();
+      try{
+        const r=await SRIT.Server.call('apiDkuSave',p);SRIT.Loading.hide();m.close();
+        const items=this.state.data.items,i=items.findIndex(z=>z.id===r.item.id);
+        if(i>=0)items[i]=Object.assign(items[i],r.item);else items.unshift(r.item);
+        SRIT.Notify(edit?'Dokumen diperbarui':'Dokumen ditambahkan','ok');this._draw();
+      }catch(e){SRIT.Loading.hide();q('#dkSave').disabled=false;SRIT.Notify(e.message||'Gagal menyimpan','err');}
+    };
+  },
+  // ---------- kelola kategori ----------
+  _kat(){
+    const d=this.state.data;if(!d)return;const E=SRIT.Util.esc;
+    const opt=ik=>this._IK.map(i=>`<option value="${i[0]}" ${i[0]===ik?'selected':''}>${i[1]}</option>`).join('');
+    const row=k=>`<div class="dkk-r" data-id="${E(k.id||'')}"><div class="dkk-o"><button class="btn btn-outline-secondary btn-sm" data-up title="Naik"><i class="bi bi-chevron-up"></i></button><button class="btn btn-outline-secondary btn-sm" data-dn title="Turun"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="dkk-p"><i class="bi ${E(k.ikon||'bi-folder2')}"></i></div>
+      <div style="flex:1;min-width:0"><input class="form-control form-control-sm dkk-n" maxlength="40" placeholder="Nama kategori" value="${E(k.nama||'')}"><input class="form-control form-control-sm dkk-d mt-1" maxlength="120" placeholder="Keterangan singkat (opsional)" value="${E(k.desk||'')}"></div>
+      <select class="form-select form-select-sm dkk-i">${opt(k.ikon||'bi-folder2')}</select>
+      <button class="btn btn-outline-danger btn-sm" data-del ${k.id==='lainnya'?'disabled title="Kategori bawaan tidak bisa dihapus"':'title="Hapus"'}><i class="bi bi-trash"></i></button></div>`;
+    const m=SRIT.Modal.open({title:'Kelola kategori dokumen',size:'modal-lg',body:`<div class="text-muted-2 mb-3" style="font-size:12px">Kategori adalah kelompok kegunaan dokumen. Urutan di sini = urutan tampil. Dokumen pada kategori yang dihapus dipindah ke <b>Lainnya</b>.</div>
+      <div id="dkkL">${d.kategori.map(row).join('')}</div><button class="btn btn-outline-primary btn-sm" id="dkkAdd"><i class="bi bi-plus-lg"></i> Tambah kategori</button>`,
+      footer:'<button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="dkkSave"><i class="bi bi-save"></i> Simpan kategori</button>'});
+    const el=m.el,L=el.querySelector('#dkkL');
+    el.querySelector('#dkkAdd').onclick=()=>{L.insertAdjacentHTML('beforeend',row({ikon:'bi-folder2'}));const n=L.lastElementChild.querySelector('.dkk-n');n.focus();};
+    L.onclick=e=>{const r=e.target.closest('.dkk-r');if(!r)return;
+      if(e.target.closest('[data-up]')&&r.previousElementSibling)L.insertBefore(r,r.previousElementSibling);
+      else if(e.target.closest('[data-dn]')&&r.nextElementSibling)L.insertBefore(r.nextElementSibling,r);
+      else if(e.target.closest('[data-del]')&&!e.target.closest('[disabled]')){
+        const n=d.items.filter(i=>i.kat===r.dataset.id).length;
+        if(!n||window.confirm(n+' dokumen di kategori ini akan dipindah ke "Lainnya". Lanjutkan?'))r.remove();}};
+    L.onchange=e=>{const s=e.target.closest('.dkk-i');if(s)s.closest('.dkk-r').querySelector('.dkk-p i').className='bi '+s.value;};
+    el.querySelector('#dkkSave').onclick=async()=>{
+      const list=[...L.querySelectorAll('.dkk-r')].map(r=>({id:r.dataset.id||'',nama:r.querySelector('.dkk-n').value.trim(),desk:r.querySelector('.dkk-d').value.trim(),ikon:r.querySelector('.dkk-i').value})).filter(k=>k.nama);
+      if(!list.length){SRIT.Notify('Minimal satu kategori dengan nama','err');return;}
+      SRIT.Loading.show();
+      try{const r=await SRIT.Server.call('apiDkuKatSave',list);SRIT.Loading.hide();m.close();
+        this.state.data.kategori=r.kategori;if(r.moved)this.state.data.items.forEach(i=>{if(!r.kategori.some(k=>k.id===i.kat))i.kat='lainnya';});
+        SRIT.Notify('Kategori disimpan'+(r.moved?' \u00b7 '+r.moved+' dokumen dipindah ke Lainnya':''),'ok');this._draw();}
+      catch(e){SRIT.Loading.hide();SRIT.Notify(e.message||'Gagal menyimpan kategori','err');}
+    };
   }
 };
 </script>
@@ -9572,7 +9841,7 @@ SRIT.Features.settings={
    ROUTER + FEATURE LOADER (lazy, with lifecycle)
    ========================================================================= */
 SRIT.Router={
-  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','dokumentasi','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','tamu','tatatertib','pelanggaran','pembinaan','insiden','inspeksi','sarpras','refleksi','penilaian','gamifikasi','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
+  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','dokumentasi','dokumen','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','tamu','tatatertib','pelanggaran','pembinaan','insiden','inspeksi','sarpras','refleksi','penilaian','gamifikasi','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
   go(){
     const _nav=(this._nav=(this._nav||0)+1);
     let hash=location.hash.replace('#/','')||'live';
