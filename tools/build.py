@@ -18,7 +18,8 @@ if '<?' in html: print('PERINGATAN: masih ada tag <? ?> yang tidak diganti')
 bridge = ('<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1c6ef2">'
           '<link rel="icon" type="image/png" href="favicon.png"><link rel="apple-touch-icon" href="apple-touch-icon.png">'
           '<meta name="mobile-web-app-capable" content="yes">'
-          '<script src="config.js"></script><script src="gas-bridge.js"></script>')
+          '<script src="config.js"></script><script src="gas-bridge.js"></script>'
+          '<script>if("serviceWorker" in navigator&&location.protocol==="https:")addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});</script>')
 html = html.replace('<meta charset="UTF-8">', '<meta charset="UTF-8">' + bridge, 1)
 if 'gas-bridge.js' not in html: raise SystemExit('Gagal menyisipkan jembatan (tag <meta charset> tidak ditemukan)')
 (out / 'index.html').write_text(html, encoding='utf-8')
