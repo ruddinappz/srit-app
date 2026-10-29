@@ -1012,6 +1012,10 @@ SRIT.Api = {
       );}
     Object.entries(filters).forEach(([k,v])=>{if(v)rows=rows.filter(r=>String(r[k])===String(v));});
     if(typeof where==='function')rows=rows.filter(where);   // filter bebas (mis. kelengkapan data)
+    // urutan: data TERBARU di paling atas (tabel yang punya kolom TANGGAL); tanggal sama -> yang diinput belakangan dulu; tanpa tanggal di paling bawah
+    if(rows.length>1&&Object.prototype.hasOwnProperty.call(rows[0],'TANGGAL')){
+      rows=rows.map((r,i)=>[r,i,String(r.TANGGAL||'').slice(0,10)]).sort((a,b)=>a[2]<b[2]?1:a[2]>b[2]?-1:b[1]-a[1]).map(x=>x[0]);
+    }
     const total=rows.length;const start=(page-1)*size;
     return {rows:rows.slice(start,start+size),total,page,size,pages:Math.ceil(total/size)||1};
   },
@@ -1170,7 +1174,8 @@ SRIT.Api = {
   // ---- Laporan: agregat absensi rentang tanggal / per hari ----
   getReportAttAgg(from,to){return SRIT.Server.call('apiReportAtt',from,to);},
   getReportAttDay(iso){return SRIT.Server.call('apiReportAttDay',iso);},
-  getRekapBulanan(ym,keg){return SRIT.Server.call('apiRekapBulanan',ym,keg||'');}
+  getRekapBulanan(ym,keg){return SRIT.Server.call('apiRekapBulanan',ym,keg||'');},
+  getRekapSakit(from,to){return SRIT.Server.call('apiRekapSakit',from,to);}
 };
 </script>
 
@@ -1730,6 +1735,63 @@ SRIT.Ketua={
     return row.KETUA?'<span class="badge-soft st-SAKIT" title="Ketua sebelumnya sudah pindah atau nonaktif">Pilih ulang</span>':'-';
   }
 };
+
+/* ===== Kejadian per siswa — satu pintu untuk Profiling & semua laporan =====
+   Sumber: INSIDEN (Insiden & Manajemen Kasus), JURNAL_PIKET → CATATAN_KEJADIAN (kejadian di jurnal piket) dan → PERHATIAN (anak yang sedang dipantau).
+   Kejadian jurnal yang sudah dijadikan kasus (x.insiden) tidak dihitung dua kali: siswanya ikut ke baris Insiden bila di Insiden belum diisi.
+   Siswa dikenali dari ID anak; bila kosong (jurnal lama) dari nama bila namanya unik.
+   Bentuk baris: {src,srcLabel,id,anak,tgl,tglAkhir,jam,kat,pilar,judul,uraian,tindak,tingkat,status,aktif,petugas}  (tingkat: RINGAN|SEDANG|BERAT|'') */
+SRIT.Kejadian=(function(){
+  const rd=t=>{try{return SRIT.Store.read(t)||[];}catch(e){return [];}};
+  const d10=x=>String(x||'').slice(0,10),js=x=>{try{const a=JSON.parse(x||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}};
+  const PILAR={KESEHATAN:'Kesehatan',KESELAMATAN:'Keselamatan',PERLINDUNGAN:'Perlindungan'};
+  const TINGKAT={RINGAN:'Ringan',SEDANG:'Sedang',BERAT:'Berat'};
+  const PILAR_OF={KESEHATAN:'KESEHATAN','KESEHATAN MENTAL':'KESEHATAN',NAPZA:'KESEHATAN',GIZI:'KESEHATAN','PENYAKIT MENULAR':'KESEHATAN',DARURAT:'KESEHATAN',
+    KECELAKAAN:'KESELAMATAN',KEAMANAN:'KESELAMATAN',KONFLIK:'KESELAMATAN',PERUNDUNGAN:'KESELAMATAN',INTOLERANSI:'KESELAMATAN',KEHILANGAN:'KESELAMATAN',KERUSAKAN:'KESELAMATAN',KETIDAKHADIRAN:'KESELAMATAN',
+    KEKERASAN:'PERLINDUNGAN',PELECEHAN:'PERLINDUNGAN','KEAMANAN DIGITAL':'PERLINDUNGAN',PENELANTARAN:'PERLINDUNGAN','MASALAH KELUARGA':'PERLINDUNGAN'};
+  const TAHAP_OF={LAPORAN:1,VERIFIKASI:2,KOORDINASI:3,PENANGANAN:4,'TINDAK LANJUT':4,MONITORING:5,PENYELESAIAN:6,SELESAI:6};
+  const tingkatOf=r=>TINGKAT[r.TINGKAT]?r.TINGKAT:({LOW:'RINGAN',MEDIUM:'RINGAN',HIGH:'SEDANG',CRITICAL:'BERAT'}[r.PRIORITAS]||'RINGAN');
+  const tahapOf=r=>(+r.TAHAP>=1&&+r.TAHAP<=6)?+r.TAHAP:(TAHAP_OF[r.STATUS]||1);
+  const titleCase=t=>{t=String(t||'');return t.charAt(0)+t.slice(1).toLowerCase();};
+  function all(from,to){
+    const ANAK=rd('ANAK'),byName={},cnt={};
+    ANAK.forEach(a=>{const n=String(a.NAMA||'').trim().toLowerCase();if(!n)return;cnt[n]=(cnt[n]||0)+1;byName[n]=String(a.ID);});
+    const idOf=x=>{if(x.anakId)return String(x.anakId);const n=String(x.anak||'').replace(/\s*\([^)]*\)\s*$/,'').trim().toLowerCase();return n&&cnt[n]===1?byName[n]:'';};
+    const inR=d=>d&&(!from||d>=from)&&(!to||d<=to);
+    const ins={};rd('INSIDEN').forEach(r=>{ins[String(r.ID)]=r;});
+    const jur=rd('JURNAL_PIKET'),viaJurnal={},out=[];
+    // 1) kejadian di jurnal piket yang sudah menjadi kasus: catat siswanya untuk dipakai baris Insiden
+    jur.forEach(j=>js(j.CATATAN_KEJADIAN).forEach(x=>{if(x&&x.insiden&&ins[String(x.insiden)]){const id=idOf(x);if(id)viaJurnal[String(x.insiden)]=id;}}));
+    // 2) Insiden & Kasus
+    Object.keys(ins).forEach(k=>{
+      const r=ins[k],tgl=d10(r.WAKTU_TEMU||r.TANGGAL);if(!inR(tgl))return;
+      const th=tahapOf(r),pil=r.PILAR||PILAR_OF[r.KATEGORI]||'';
+      out.push({src:'INSIDEN',srcLabel:'Insiden & Kasus',id:r.ID,anak:String(r.ANAK||viaJurnal[k]||''),tgl,tglAkhir:tgl,jam:String(r.WAKTU_TEMU||'').slice(11,16),kat:r.KATEGORI||'LAINNYA',pilar:pil,
+        judul:titleCase(r.KATEGORI||'Lainnya'),uraian:r.KEJADIAN||'',tindak:r.TINDAKAN||'',tingkat:tingkatOf(r),status:titleCase(r.STATUS||'LAPORAN'),aktif:th<6,petugas:r.PELAPOR||r.PETUGAS||''});
+    });
+    // 3) Jurnal piket: kejadian (yang belum jadi kasus) + anak yang perlu perhatian (diulang antar-shift → satu baris per hal)
+    const ph={};
+    jur.forEach(j=>{
+      const tj=d10(j.TANGGAL);
+      js(j.CATATAN_KEJADIAN).forEach((x,i)=>{
+        if(!x||!x.uraian||(x.insiden&&ins[String(x.insiden)])||!inR(tj))return;
+        out.push({src:'JURNAL',srcLabel:'Jurnal piket · kejadian',id:j.ID+'#'+i,anak:idOf(x),tgl:tj,tglAkhir:tj,jam:x.jam||'',kat:'JURNAL',pilar:x.pilar||'',
+          judul:PILAR[x.pilar]||'Kejadian',uraian:x.uraian,tindak:x.tindakan||'',tingkat:TINGKAT[x.tingkat]?x.tingkat:'RINGAN',status:'Dicatat di jurnal',aktif:false,petugas:j.NAMA_PETUGAS||''});
+      });
+      js(j.PERHATIAN).forEach(x=>{
+        if(!x||!x.hal)return;
+        const id=idOf(x),sj=d10(x.sejak)||tj,key=(id||String(x.anak||'').toLowerCase())+'|'+String(x.hal).trim().toLowerCase()+'|'+sj;
+        const o=ph[key]||(ph[key]={src:'PERHATIAN',srcLabel:'Jurnal piket · perlu perhatian',id:'ph:'+key,anak:id,tgl:sj,tglAkhir:tj,jam:'',kat:'PERHATIAN',pilar:'',judul:'Dipantau',uraian:x.hal,tindak:x.tindak||'',tingkat:'',status:'Dipantau',aktif:false,petugas:x.pihak||''});
+        if(tj>o.tglAkhir)o.tglAkhir=tj;if(x.tindak)o.tindak=x.tindak;if(x.pihak)o.petugas=x.pihak;
+      });
+    });
+    Object.keys(ph).forEach(k=>{const o=ph[k];if((!to||o.tgl<=to)&&(!from||o.tglAkhir>=from))out.push(o);});
+    return out.sort((a,b)=>String(b.tgl).localeCompare(String(a.tgl))||String(b.jam).localeCompare(String(a.jam)));
+  }
+  function untuk(anakId,from,to){const id=String(anakId);return all(from,to).filter(k=>k.anak===id);}
+  function ringkas(list){return {n:list.length,berat:list.filter(k=>k.tingkat==='BERAT').length,sedang:list.filter(k=>k.tingkat==='SEDANG').length,aktif:list.filter(k=>k.aktif).length};}
+  return {all,untuk,ringkas,PILAR,TINGKAT};
+})();
 
 SRIT.Asuh={
   aktif(a){return !a.STATUS||a.STATUS==='AKTIF';},
@@ -5768,6 +5830,7 @@ SRIT.Features.laporan={
   /* ===== Filter bertingkat laporan rekap absensi: Kegiatan · Jenjang → Kelas · JK · Asrama → Gedung → Kamar =====
      Filter anak (jenjang…kamar) dihitung di browser; filter kegiatan diminta ke server (data per sesi). Anak-filter muncul setelah induknya dipilih. */
   _fl:{},
+  _FLREPS:['wr-rekap-absen','wr-sakit','wr-sakit-riwayat','wr-kejadian-siswa'],   // laporan yang memakai filter bertingkat
   _kegOpts(){
     const ok=r=>SRIT.Api.absensiYa(r.ABSENSI)&&(r.STATUS||'AKTIF')!=='NONAKTIF';
     return [...new Set(SRIT.Store.read('JADWAL').filter(ok).concat(SRIT.Store.read('KEGIATAN').filter(r=>ok(r)&&['DIBATALKAN','USULAN','DITOLAK'].indexOf(r.STATUS||'TERJADWAL')<0)).map(r=>r.NAMA).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id',{numeric:true}));
@@ -5786,7 +5849,7 @@ SRIT.Features.laporan={
   _FLKIDS:{jenjang:['kelas'],asrama:['gedung','kamar'],gedung:['kamar']},
   _flLabel(){
     const f=this._fl,nm=(k,v)=>((this._flOpts(k).find(o=>o[0]===v))||[v,v])[1],out=[];
-    if(f.keg)out.push('Kegiatan: '+f.keg);
+    if(f.keg&&this.active==='wr-rekap-absen')out.push('Kegiatan: '+f.keg);
     if(f.jenjang)out.push('Jenjang '+f.jenjang);if(f.kelas)out.push('Kelas '+f.kelas);
     if(f.jk)out.push(f.jk==='L'?'Putra':'Putri');
     if(f.asrama)out.push(nm('asrama',f.asrama));if(f.gedung)out.push(nm('gedung',f.gedung));if(f.kamar)out.push('Kamar '+nm('kamar',f.kamar));
@@ -5796,12 +5859,12 @@ SRIT.Features.laporan={
     const f=this._fl,E=SRIT.Util.esc;
     const sel=(k,lbl,opts,all)=>`<div class="lp-fi"><label class="form-label-sm">${lbl}</label><select class="form-select form-select-sm" data-fl="${k}"><option value="">${all}</option>${opts.map(o=>`<option value="${E(o[0])}" ${f[k]===o[0]?'selected':''}>${E(o[1])}</option>`).join('')}</select></div>`;
     const kegs=this._kegOpts().map(n=>[n,n]);
-    const cells=[sel('keg','Kegiatan',kegs,'Semua kegiatan'),sel('jenjang','Jenjang',this._flOpts('jenjang'),'Semua jenjang')];
+    const cells=(this.active==='wr-rekap-absen'?[sel('keg','Kegiatan',kegs,'Semua kegiatan')]:[]).concat([sel('jenjang','Jenjang',this._flOpts('jenjang'),'Semua jenjang')]);
     if(f.jenjang)cells.push(sel('kelas','Kelas',this._flOpts('kelas'),'Semua kelas'));
     cells.push(sel('jk','Putra / Putri',this._flOpts('jk'),'Semua'),sel('asrama','Asrama',this._flOpts('asrama'),'Semua asrama'));
     if(f.asrama)cells.push(sel('gedung','Gedung',this._flOpts('gedung'),'Semua gedung'));
     if(f.gedung)cells.push(sel('kamar','Kamar',this._flOpts('kamar'),'Semua kamar'));
-    const n=Object.keys(f).filter(k=>f[k]).length;
+    const n=Object.keys(f).filter(k=>f[k]&&(k!=='keg'||this.active==='wr-rekap-absen')).length;
     return `<div class="lp-pl"><span class="lp-lbl"><i class="bi bi-funnel"></i> Filter</span>${n?`<button type="button" class="lp-chip on" id="lpFlReset"><i class="bi bi-x-lg"></i> Hapus ${n} filter</button>`:''}</div>
       <div class="lp-fg">${cells.join('')}</div>
       <div class="lp-ptxt">Filter lanjutan (kelas, gedung, kamar) muncul setelah jenjang / asrama / gedung dipilih.</div>`;
@@ -5835,8 +5898,51 @@ SRIT.Features.laporan={
     const ym=rk.ym,label=this._BLN[+ym.slice(5,7)-1]+' '+ym.slice(0,4);
     return {rk,rows,label};
   },
+  /* ===== Rekap Kesehatan Siswa: catatan absensi berstatus SAKIT pada rentang tanggal (server: apiRekapSakit) ===== */
+  async _prefetchSakit(){
+    const {from,to}=this._range();
+    if(this._sk&&this._sk.from===from&&this._sk.to===to&&this._sk.d&&Date.now()-this._sk.t<300000)return;
+    SRIT.Loading.show();let d=null;
+    try{d=await SRIT.Api.getRekapSakit(from,to);}catch(e){SRIT.Notify(e.message||'Gagal memuat data kesehatan siswa','err');}
+    SRIT.Loading.hide();this._sk={from,to,t:Date.now(),d};
+  },
+  // Episode = hari sakit berurutan pada hari-berdata (hari tanpa absensi tidak memutus). Penanda: Berulang = >=3 episode; Berkepanjangan = episode >=3 hari.
+  _sakitModel(){
+    const sk=this._sk&&this._sk.d;if(!sk)return null;
+    const f=this._fl||{},ord={SRD:1,SRMP:2,SRMA:3},cmp=(a,b)=>String(a||'').localeCompare(String(b||''),'id',{numeric:true});
+    const hd=sk.hariData||[],last=hd.length?hd[hd.length-1]:'',idx={};hd.forEach((d,i)=>{idx[d]=i;});
+    const ins={};SRIT.Store.read('INSIDEN').forEach(r=>{if(r.KATEGORI==='KESEHATAN'&&r.ANAK&&this._inRange(r.TANGGAL))ins[String(r.ANAK)]=(ins[String(r.ANAK)]||0)+1;});
+    const anak=SRIT.Store.read('ANAK').filter(a=>a.STATUS==='AKTIF'&&(!f.jenjang||a.JENJANG===f.jenjang)&&(!f.kelas||a.KELAS===f.kelas)&&(!f.jk||a.JK===f.jk)&&(!f.asrama||a.ASRAMA===f.asrama)&&(!f.gedung||a.GEDUNG===f.gedung)&&(!f.kamar||a.KAMAR===f.kamar));
+    const per=[],eps=[];
+    anak.forEach(a=>{
+      const days=sk.rows[String(a.ID)];if(!days||!days.length)return;
+      const mine=[];let cur=null;
+      days.forEach(x=>{
+        const i=idx[x[0]];if(i===undefined)return;
+        if(!(cur&&i===cur.i2+1)){cur={a,from:x[0],to:x[0],i2:i,hari:0,sesi:0,keg:{}};mine.push(cur);}
+        cur.to=x[0];cur.i2=i;cur.hari++;cur.sesi+=x[1];
+        String(x[3]||'').split(',').filter(Boolean).forEach(id=>{const nm=sk.nama[id]||'Kegiatan';cur.keg[nm]=(cur.keg[nm]||0)+1;});
+      });
+      if(!mine.length)return;
+      mine.forEach((e,k)=>{e.ke=k+1;e.dari=mine.length;e.aktif=e.to===last;const ks=Object.keys(e.keg).sort((p,q)=>e.keg[q]-e.keg[p]);e.kegTxt=ks.slice(0,3).join(', ')+(ks.length>3?' +'+(ks.length-3)+' lainnya':'');eps.push(e);});
+      const hari=mine.reduce((t,e)=>t+e.hari,0),sesi=mine.reduce((t,e)=>t+e.sesi,0),mx=Math.max(...mine.map(e=>e.hari));
+      per.push({a,ep:mine.length,hari,sesi,mx,ins:ins[String(a.ID)]||0,terakhir:mine[mine.length-1].to,aktif:mine[mine.length-1].aktif,
+        tanda:[mine.length>=3?'Berulang':'',mx>=3?'Berkepanjangan':''].filter(Boolean).join(' · ')});
+    });
+    per.sort((x,y)=>String(y.terakhir).localeCompare(String(x.terakhir))||y.hari-x.hari||cmp(x.a.NAMA,y.a.NAMA));
+    eps.sort((x,y)=>y.from<x.from?-1:y.from>x.from?1:cmp(x.a.NAMA,y.a.NAMA));
+    return {sk,per,eps,last,total:anak.length};
+  },
+  _sakitMeta(m){
+    const U=SRIT.Util,aktif=m.per.filter(p=>p.aktif).length;
+    const meta=[['Siswa pernah sakit',m.per.length+' dari '+m.total],['Total episode sakit',m.eps.length],['Total hari sakit',m.per.reduce((t,p)=>t+p.hari,0)],
+      ['Masih sakit'+(m.last?' (absensi '+U.fmtDateShort(m.last)+')':''),aktif],['Sakit berulang (≥3 episode)',m.per.filter(p=>p.ep>=3).length]];
+    meta.push(['Catatan','Sumber: absensi berstatus Sakit pada sesi kegiatan. Hari sakit = hari ketika siswa tercatat Sakit pada minimal satu sesi. Satu episode = hari sakit berurutan (hari tanpa data absensi tidak memutus). Berkepanjangan = episode ≥3 hari.'+(m.sk.partial?' Data dimuat sebagian sampai '+m.sk.sampai+' — tekan Terapkan lagi.':'')]);
+    return meta;
+  },
   async _prefetch(id){
     if(id==='wr-rekap-absen')return this._prefetchRekap();
+    if(id==='wr-sakit'||id==='wr-sakit-riwayat')return this._prefetchSakit();
     const needAgg=['wr-bulanan','wa-kehadiran','wa-refleksi'].includes(id),needDay=id==='wr-harian';
     if(!needAgg&&!needDay)return;
     const {from,to}=this._range();const iso=this.to||SRIT.Util.todayISO();
@@ -5851,6 +5957,14 @@ SRIT.Features.laporan={
     SRIT.Loading.hide();this._pf=pf;
   },
   _anak(id){const a=SRIT.Repo.getById('ANAK',id)||{};return a;},
+  // kejadian siswa (insiden/kasus, jurnal piket, anak dipantau) pada periode laporan — SRIT.Kejadian (View_Shared.html)
+  _kej(){const {from,to}=this._range();return SRIT.Kejadian?SRIT.Kejadian.all(from,to):[];},
+  _kejNama(k){if(!k.anak)return '-';const a=this._anak(k.anak);return a.NAMA?a.NAMA+(a.KELAS?' ('+a.KELAS+')':''):'-';},
+  _TKL:{RINGAN:'Ringan',SEDANG:'Sedang',BERAT:'Berat'},
+  // urutan data: yang TERBARU di paling atas (semua daftar laporan)
+  _byDate:(a,b)=>String(b.TANGGAL||'').localeCompare(String(a.TANGGAL||'')),
+  _tag(row,d){row._d=String(d||'');return row;},
+  _newest(rows){return rows.sort((a,b)=>String(b._d||'').localeCompare(String(a._d||'')));},
   _kamar(id){return (SRIT.Repo.getById('KAMAR',id)||{}).NAME||'-';},
   // ===== Registry laporan =====
   reports(){
@@ -5887,7 +6001,7 @@ SRIT.Features.laporan={
         return {cols:['No','Nama',...days,'H','S','I','A'],rows,meta:[['Bulan',m.label],['Hari berdata',m.rk.hariData.length],['Peserta aktif',m.rows.length]].concat(T._flLabel()?[['Filter',T._flLabel()]]:[]).concat(m.rk.partial?[['Catatan','Data dimuat sebagian sampai '+m.rk.sampai+' — tekan Terapkan lagi']]:[])};
      }},
      {id:'wr-refleksi',grp:'WALI ASRAMA',name:'Laporan Refleksi Mingguan',periode:'Mingguan',icon:'bi-arrow-repeat',build(){
-        const rows=SRIT.Store.read('REFLEKSI').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.PERIODE,r.PJ,r.CAPAIAN,r.MASALAH,r.TINDAK_LANJUT]);
+        const rows=SRIT.Store.read('REFLEKSI').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.PERIODE,r.PJ,r.CAPAIAN,r.MASALAH,r.TINDAK_LANJUT]);
         return {cols:['Tanggal','Periode','PJ','Capaian','Masalah','Tindak Lanjut'],rows};
      }},
      {id:'wr-bulanan',grp:'WALI ASRAMA',name:'Laporan Pengelolaan Asrama Bulanan',periode:'Bulanan',icon:'bi-calendar-month',build(){
@@ -5909,7 +6023,7 @@ SRIT.Features.laporan={
      }},
      {id:'wr-perkembangan',grp:'WALI ASRAMA',name:'Laporan Perkembangan Peserta Didik',periode:'Bulanan/Semester',icon:'bi-graph-up-arrow',build(){
         const asp=['KARAKTER','DISIPLIN','KEMANDIRIAN','KEBERSIHAN','KEAGAMAAN','LEADERSHIP','SOSIAL','KEBAHASAAN'];
-        const rows=SRIT.Store.read('PENILAIAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>{
+        const rows=SRIT.Store.read('PENILAIAN').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>{
           const vals=asp.map(a=>+r[a]||0);const avg=(vals.reduce((x,y)=>x+y,0)/asp.length).toFixed(1);
           return [T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.PERIODE,...asp.map(a=>r[a]||'-'),avg];
         });
@@ -5920,31 +6034,55 @@ SRIT.Features.laporan={
         return {cols:['Program','Kategori','Target','Periode','Status'],rows};
      }},
      {id:'wr-disiplin',grp:'WALI ASRAMA',name:'Laporan Kedisiplinan & Tata Tertib',periode:'Bulanan/Insidentil',icon:'bi-exclamation-diamond',build(){
-        const rows=SRIT.Store.read('PELANGGARAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,(SRIT.Repo.getById('TATA_TERTIB',r.ATURAN)||{}).JUDUL||'-',r.TINGKAT,r.TINDAKAN,r.STATUS]);
+        const rows=SRIT.Store.read('PELANGGARAN').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,(SRIT.Repo.getById('TATA_TERTIB',r.ATURAN)||{}).JUDUL||'-',r.TINGKAT,r.TINDAKAN,r.STATUS]);
         return {cols:['Tanggal','Anak','Aturan','Tingkat','Tindakan','Status'],rows};
      }},
      {id:'wr-kesehatan',grp:'WALI ASRAMA',name:'Laporan Kesehatan & Keamanan',periode:'Bulanan/Insidentil',icon:'bi-heart-pulse',build(){
-        const rows=SRIT.Store.read('INSIDEN').filter(r=>T._inRange(r.TANGGAL)&&['KESEHATAN','KEAMANAN','KECELAKAAN','DARURAT'].includes(r.KATEGORI)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.KATEGORI,r.PRIORITAS,r.KEJADIAN,r.TINDAKAN,r.STATUS]);
-        return {cols:['Tanggal','Kategori','Prioritas','Kejadian','Tindakan','Status'],rows};
+        const KT=['KESEHATAN','KEAMANAN','KECELAKAAN','DARURAT'],U=SRIT.Util;
+        const rows=T._kej().filter(k=>(k.src==='INSIDEN'&&KT.includes(k.kat))||(k.src==='JURNAL'&&['KESEHATAN','KESELAMATAN'].includes(k.pilar))).map(k=>[U.fmtDateShort(k.tgl),T._kejNama(k),k.src==='INSIDEN'?k.kat:'Jurnal piket · '+k.judul,T._TKL[k.tingkat]||'-',k.uraian,k.tindak||'-',k.status||'-']);
+        return {cols:['Tanggal','Anak','Kategori','Tingkat','Kejadian','Tindakan','Status'],rows};
+     }},
+     {id:'wr-kejadian-siswa',grp:'WALI ASRAMA',name:'Rekap Kejadian & Kasus Siswa',periode:'Bulanan/Insidentil',icon:'bi-person-exclamation',build(){
+        const U=SRIT.Util,f=T._fl||{},cols=['Tanggal','Nama','Jenjang','Kelas','Kamar','Sumber','Jenis','Uraian','Tindakan','Tingkat','Status'];
+        const ok=a=>a.STATUS==='AKTIF'&&(!f.jenjang||a.JENJANG===f.jenjang)&&(!f.kelas||a.KELAS===f.kelas)&&(!f.jk||a.JK===f.jk)&&(!f.asrama||a.ASRAMA===f.asrama)&&(!f.gedung||a.GEDUNG===f.gedung)&&(!f.kamar||a.KAMAR===f.kamar);
+        const all=T._kej(),list=all.filter(k=>k.anak&&ok(T._anak(k.anak))),tanpa=all.length-all.filter(k=>k.anak).length,ord={SRD:1,SRMP:2,SRMA:3};
+        const rows=list.map(k=>{const a=T._anak(k.anak);return [U.fmtDateShort(k.tgl)+(k.tglAkhir&&k.tglAkhir!==k.tgl?' s/d '+U.fmtDateShort(k.tglAkhir):''),a.NAMA,a.JENJANG||'-',a.KELAS||'-',T._kamar(a.KAMAR),k.srcLabel,k.judul,k.uraian,k.tindak||'-',T._TKL[k.tingkat]||'-',k.status||'-'];});
+        const ids=new Set(list.map(k=>k.anak)),R=SRIT.Kejadian?SRIT.Kejadian.ringkas(list):{berat:0,sedang:0,aktif:0};
+        const meta=[['Siswa tercatat',ids.size],['Total catatan',list.length],['Tingkat berat',R.berat],['Tingkat sedang',R.sedang],['Kasus masih ditangani',R.aktif]];
+        meta.push(['Catatan','Sumber: Insiden & Manajemen Kasus, kejadian dan anak dipantau di Jurnal & Serah Terima Piket. Kejadian jurnal yang sudah menjadi kasus tidak dihitung dua kali.'+(tanpa?' '+tanpa+' catatan tidak terkait satu siswa (tanpa data anak) tidak ditampilkan di sini; lihat Laporan Permasalahan / Mitigasi.':'')+(T._flLabel()?'':'')]);
+        return {cols,rows,meta};
+     }},
+     {id:'wr-sakit',grp:'WALI ASRAMA',name:'Rekap Kesehatan Siswa (dari Absensi Sakit)',periode:'Mingguan/Bulanan',icon:'bi-heart-pulse',build(){
+        const m=T._sakitModel(),U=SRIT.Util,cols=['No','Nama','Jenjang','Kelas','Kamar','Episode','Hari Sakit','Sesi Sakit','Insiden Kesehatan','Terakhir Sakit','Status','Penanda'];
+        if(!m)return {cols,rows:[],meta:[]};
+        const rows=m.per.map((p,i)=>[i+1,p.a.NAMA,p.a.JENJANG||'-',p.a.KELAS||'-',T._kamar(p.a.KAMAR),p.ep,p.hari,p.sesi,p.ins,U.fmtDateShort(p.terakhir),p.aktif?'Sakit':'Pulih',p.tanda||'-']);
+        return {cols,rows,meta:T._sakitMeta(m)};
+     }},
+     {id:'wr-sakit-riwayat',grp:'WALI ASRAMA',name:'Riwayat Sakit Siswa (Catatan per Kejadian)',periode:'Mingguan/Bulanan',icon:'bi-clipboard2-pulse',build(){
+        const m=T._sakitModel(),U=SRIT.Util,cols=['No','Nama','Jenjang','Kelas','Kamar','Mulai Sakit','Sampai','Hari','Sesi Sakit','Tercatat pada Kegiatan','Sakit ke-','Status'];
+        if(!m)return {cols,rows:[],meta:[]};
+        const rows=m.eps.map((e,i)=>[i+1,e.a.NAMA,e.a.JENJANG||'-',e.a.KELAS||'-',T._kamar(e.a.KAMAR),U.fmtDateShort(e.from),U.fmtDateShort(e.to),e.hari,e.sesi,e.kegTxt||'-',e.ke+'/'+e.dari,e.aktif?'Sakit':'Pulih']);
+        return {cols,rows,meta:T._sakitMeta(m)};
      }},
      {id:'wr-kunjungan',grp:'WALI ASRAMA',name:'Laporan Kunjungan Orang Tua/Wali',periode:'Per Kunjungan/Bulanan',icon:'bi-people',build(){
         const rows=[].concat(
-          SRIT.Store.read('OPS_KUNJUNGAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA,r.PENGUNJUNG,r.HUBUNGAN||'-',r.JAM||'-','Kunjungan']),
-          SRIT.Store.read('BUKU_TAMU').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.ANAK||'-',r.NAMA,r.KEPERLUAN||'-',(r.MASUK||'')+'-'+(r.KELUAR||''),'Tamu']));
-        return {cols:['Tanggal','Anak','Pengunjung','Keperluan/Hub','Jam','Jenis'],rows};
+          SRIT.Store.read('OPS_KUNJUNGAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>T._tag([SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA,r.PENGUNJUNG,r.HUBUNGAN||'-',r.JAM||'-','Kunjungan'],r.TANGGAL)),
+          SRIT.Store.read('BUKU_TAMU').filter(r=>T._inRange(r.TANGGAL)).map(r=>T._tag([SRIT.Util.fmtDateShort(r.TANGGAL),r.ANAK||'-',r.NAMA,r.KEPERLUAN||'-',(r.MASUK||'')+'-'+(r.KELUAR||''),'Tamu'],r.TANGGAL)));
+        return {cols:['Tanggal','Anak','Pengunjung','Keperluan/Hub','Jam','Jenis'],rows:T._newest(rows)};
      }},
      {id:'wr-mitigasi',grp:'WALI ASRAMA',name:'Laporan Permasalahan / Mitigasi',periode:'Insidentil',icon:'bi-shield-exclamation',build(){
-        const rows=SRIT.Store.read('INSIDEN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.KATEGORI,r.PRIORITAS,r.KEJADIAN,r.PELAPOR||'-',r.TINDAKAN,r.STATUS])
-          .concat(SRIT.Store.read('OPS_PERLINDUNGAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),'Perlindungan',r.TINGKAT,r.KATEGORI,'-',r.TINDAKAN,r.STATUS]));
-        return {cols:['Tanggal','Kategori','Tingkat','Kejadian','Pelapor','Tindakan','Status'],rows};
+        const U=SRIT.Util;
+        const rows=T._kej().filter(k=>k.src!=='PERHATIAN').map(k=>T._tag([U.fmtDateShort(k.tgl),k.src==='INSIDEN'?k.kat:'Jurnal piket · '+k.judul,T._TKL[k.tingkat]||'-',T._kejNama(k),k.uraian,k.petugas||'-',k.tindak||'-',k.status||'-'],k.tgl))
+          .concat(SRIT.Store.read('OPS_PERLINDUNGAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>T._tag([U.fmtDateShort(r.TANGGAL),'Perlindungan',r.TINGKAT,'-',r.KATEGORI,'-',r.TINDAKAN,r.STATUS],r.TANGGAL)));
+        return {cols:['Tanggal','Kategori','Tingkat','Anak','Kejadian','Pelapor','Tindakan','Status'],rows:T._newest(rows)};
      }},
      {id:'wr-sarpras',grp:'WALI ASRAMA',name:'Laporan Sarana Prasarana Asrama',periode:'Bulanan',icon:'bi-tools',build(){
         const inv=SRIT.Store.read('OPS_SARPRAS').map(r=>[r.NAMA,r.KATEGORI||'-',r.LOKASI,r.JUMLAH,r.KONDISI]);
-        const mon=SRIT.Store.read('SARPRAS_MONITORING').filter(r=>T._inRange(r.TANGGAL)).map(r=>[(SRIT.Repo.getById('OPS_SARPRAS',r.ASET)||{}).NAMA||r.ASET,'Monitoring',r.LOKASI,'-',r.KONDISI+' / '+r.STATUS]);
+        const mon=SRIT.Store.read('SARPRAS_MONITORING').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>[(SRIT.Repo.getById('OPS_SARPRAS',r.ASET)||{}).NAMA||r.ASET,'Monitoring',r.LOKASI,'-',r.KONDISI+' / '+r.STATUS]);
         return {cols:['Aset','Kategori','Lokasi','Jumlah','Kondisi/Status'],rows:inv.concat(mon)};
      }},
      {id:'wr-evaluasi',grp:'WALI ASRAMA',name:'Laporan Evaluasi Program Asrama',periode:'Bulanan/Semester',icon:'bi-clipboard-data',build(){
-        const rows=SRIT.Store.read('OPS_INDIKATOR').filter(r=>T._inRange(r.TANGGAL)).map(r=>{const p=SRIT.Util.pct(+r.CAPAIAN||0,+r.TARGET||100);return [SRIT.Util.fmtDateShort(r.TANGGAL),r.NAMA,r.TARGET,r.CAPAIAN,p+'%',(+r.CAPAIAN>=+r.TARGET?'Tercapai':'Belum')];});
+        const rows=SRIT.Store.read('OPS_INDIKATOR').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>{const p=SRIT.Util.pct(+r.CAPAIAN||0,+r.TARGET||100);return [SRIT.Util.fmtDateShort(r.TANGGAL),r.NAMA,r.TARGET,r.CAPAIAN,p+'%',(+r.CAPAIAN>=+r.TARGET?'Tercapai':'Belum')];});
         return {cols:['Tanggal','Indikator','Target','Realisasi','%','Status'],rows};
      }},
      {id:'wr-tahunan',grp:'WALI ASRAMA',name:'Laporan Tahunan Keasramaan',periode:'Tahunan',icon:'bi-calendar-range',build(){
@@ -5963,16 +6101,20 @@ SRIT.Features.laporan={
      }},
      // ================= WALI ASUH =================
      {id:'wa-jurnal',grp:'WALI ASUH',name:'Jurnal Pengasuhan Harian',periode:'Harian',icon:'bi-journal-text',build(){
-        const rows=SRIT.Store.read('OPS_LOGKEJADIAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.JAM||'-',r.KEJADIAN,r.PETUGAS,r.TINDAK||'-'])
-          .concat(SRIT.Store.read('OPS_PEMBIASAAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),'-','Pembiasaan: '+r.NAMA,'Partisipasi '+r.PARTISIPASI+'%',r.CATATAN||'-']));
-        return {cols:['Tanggal','Jam','Kegiatan/Kejadian','Petugas/Ket','Tindak Lanjut'],rows};
+        const U=SRIT.Util,L=[];
+        SRIT.Store.read('CATATAN_PERKEMBANGAN').filter(r=>T._inRange(r.TANGGAL)).forEach(r=>L.push([r.TANGGAL,'-',(T._anak(r.ANAK).NAMA||r.NAMA_ANAK||'-'),'Catatan '+(r.KATEGORI||'')+': '+(r.JUDUL?r.JUDUL+' — ':'')+(r.CATATAN||''),r.PENCATAT||'-',r.TINDAK_LANJUT||'-']));
+        T._kej().forEach(k=>L.push([k.tgl,k.jam||'-',T._kejNama(k),(k.src==='PERHATIAN'?'Dipantau: ':k.src==='INSIDEN'?'Kasus '+k.judul+': ':'Kejadian '+k.judul+': ')+k.uraian,k.petugas||'-',k.tindak||'-']));
+        SRIT.Store.read('OPS_LOGKEJADIAN').filter(r=>T._inRange(r.TANGGAL)).forEach(r=>L.push([r.TANGGAL,r.JAM||'-','-',r.KEJADIAN,r.PETUGAS,r.TINDAK||'-']));
+        SRIT.Store.read('OPS_PEMBIASAAN').filter(r=>T._inRange(r.TANGGAL)).forEach(r=>L.push([r.TANGGAL,'-','-','Pembiasaan: '+r.NAMA,'Partisipasi '+r.PARTISIPASI+'%',r.CATATAN||'-']));
+        L.sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
+        return {cols:['Tanggal','Jam','Anak','Kegiatan/Kejadian/Catatan','Petugas/Ket','Tindak Lanjut'],rows:L.map(r=>[U.fmtDateShort(r[0])].concat(r.slice(1)))};
      }},
      {id:'wa-refleksi',grp:'WALI ASUH',name:'Laporan Refleksi Mingguan',periode:'Mingguan',icon:'bi-arrow-repeat',build(){
-        const rows=SRIT.Store.read('REFLEKSI').filter(r=>T._inRange(r.TANGGAL)&&(r.PERIODE==='MINGGUAN'||r.PERIODE==='HARIAN')).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.PJ,r.CAPAIAN,r.MASALAH,r.SOLUSI]);
+        const rows=SRIT.Store.read('REFLEKSI').filter(r=>T._inRange(r.TANGGAL)&&(r.PERIODE==='MINGGUAN'||r.PERIODE==='HARIAN')).sort(SRIT.Features.laporan._byDate).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.PJ,r.CAPAIAN,r.MASALAH,r.SOLUSI]);
         return {cols:['Tanggal','PJ','Capaian','Masalah','Solusi'],rows};
      }},
      {id:'wa-perkembangan',grp:'WALI ASUH',name:'Laporan Perkembangan Peserta Didik Asuh',periode:'Bulanan',icon:'bi-graph-up',build(){
-        const rows=SRIT.Store.read('PENILAIAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[T._anak(r.ANAK).NAMA||r.NAMA_ANAK,SRIT.Asuh.namaPada(r.ANAK,r.TANGGAL),r.PERIODE,r.KARAKTER,r.KEMANDIRIAN,r.PENILAI]);
+        const rows=SRIT.Store.read('PENILAIAN').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>[T._anak(r.ANAK).NAMA||r.NAMA_ANAK,SRIT.Asuh.namaPada(r.ANAK,r.TANGGAL),r.PERIODE,r.KARAKTER,r.KEMANDIRIAN,r.PENILAI]);
         return {cols:['Anak','Wali Asuh','Periode','Karakter','Kemandirian','Penilai'],rows};
      }},
      {id:'wa-kehadiran',grp:'WALI ASUH',name:'Laporan Kehadiran & Partisipasi',periode:'Mingguan/Bulanan',icon:'bi-calendar-check',build(){
@@ -5981,31 +6123,32 @@ SRIT.Features.laporan={
         return {cols:['Anak','Kelas','Kamar','Hadir/Total','% Hadir'],rows};
      }},
      {id:'wa-disiplin',grp:'WALI ASUH',name:'Laporan Kedisiplinan Peserta Didik',periode:'Mingguan/Bulanan',icon:'bi-exclamation-triangle',build(){
-        const rows=SRIT.Store.read('PELANGGARAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.TINGKAT,r.KEJADIAN,r.STATUS]);
+        const rows=SRIT.Store.read('PELANGGARAN').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.TINGKAT,r.KEJADIAN,r.STATUS]);
         return {cols:['Tanggal','Anak','Tingkat','Kejadian','Status'],rows};
      }},
      {id:'wa-belajar',grp:'WALI ASUH',name:'Laporan Pendampingan Belajar',periode:'Mingguan',icon:'bi-book',build(){
-        const rows=SRIT.Store.read('PEMBINAAN').filter(r=>T._inRange(r.TANGGAL)&&['MENTORING','PENDAMPINGAN','TUGAS'].includes(r.JENIS)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.JENIS,r.MATERI,r.HASIL]);
+        const rows=SRIT.Store.read('PEMBINAAN').filter(r=>T._inRange(r.TANGGAL)&&['MENTORING','PENDAMPINGAN','TUGAS'].includes(r.JENIS)).sort(SRIT.Features.laporan._byDate).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.JENIS,r.MATERI,r.HASIL]);
         return {cols:['Tanggal','Anak','Jenis','Materi','Hasil'],rows};
      }},
      {id:'wa-kesehatan',grp:'WALI ASUH',name:'Laporan Kesehatan Peserta Didik',periode:'Insidentil/Bulanan',icon:'bi-heart-pulse',build(){
-        const rows=SRIT.Store.read('INSIDEN').filter(r=>T._inRange(r.TANGGAL)&&r.KATEGORI==='KESEHATAN').map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),r.KEJADIAN,r.PRIORITAS,r.TINDAKAN,r.STATUS]);
-        return {cols:['Tanggal','Kejadian','Prioritas','Tindakan','Status'],rows};
+        const U=SRIT.Util;
+        const rows=T._kej().filter(k=>k.pilar==='KESEHATAN').map(k=>[U.fmtDateShort(k.tgl),T._kejNama(k),k.src==='INSIDEN'?k.judul:'Jurnal piket · '+k.judul,k.uraian,T._TKL[k.tingkat]||'-',k.tindak||'-',k.status||'-']);
+        return {cols:['Tanggal','Anak','Jenis','Kejadian','Tingkat','Tindakan','Status'],rows};
      }},
      {id:'wa-konseling',grp:'WALI ASUH',name:'Laporan Konseling / Pendampingan',periode:'Insidentil',icon:'bi-chat-heart',build(){
-        const rows=SRIT.Store.read('PEMBINAAN').filter(r=>T._inRange(r.TANGGAL)&&['KONSELING','NASIHAT','REFLEKSI'].includes(r.JENIS)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.JENIS,r.MATERI,r.HASIL,r.PEMBINA]);
+        const rows=SRIT.Store.read('PEMBINAAN').filter(r=>T._inRange(r.TANGGAL)&&['KONSELING','NASIHAT','REFLEKSI'].includes(r.JENIS)).sort(SRIT.Features.laporan._byDate).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.JENIS,r.MATERI,r.HASIL,r.PEMBINA]);
         return {cols:['Tanggal','Anak','Jenis','Materi','Hasil','Pembina'],rows};
      }},
      {id:'wa-izin',grp:'WALI ASUH',name:'Laporan Perizinan / Kepulangan',periode:'Per Kejadian',icon:'bi-box-arrow-right',build(){
-        const rows=SRIT.Store.read('IZIN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.JENIS,r.TUJUAN,(r.PENJEMPUT||'-')+(r.HUBUNGAN?' ('+r.HUBUNGAN+')':''),r.STATUS]);
+        const rows=SRIT.Store.read('IZIN').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>[SRIT.Util.fmtDateShort(r.TANGGAL),T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.JENIS,r.TUJUAN,(r.PENJEMPUT||'-')+(r.HUBUNGAN?' ('+r.HUBUNGAN+')':''),r.STATUS]);
         return {cols:['Tanggal','Anak','Jenis','Tujuan','Penjemput','Status'],rows};
      }},
      {id:'wa-prestasi',grp:'WALI ASUH',name:'Laporan Prestasi / Minat / Bakat',periode:'Bulanan',icon:'bi-trophy',build(){
-        const rows=SRIT.Store.read('PENILAIAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>{const a=T._anak(r.ANAK);return [a.NAMA||r.NAMA_ANAK,a.KELAS||'-',r.LEADERSHIP||'-',r.KEBAHASAAN||'-',r.SOSIAL||'-'];});
+        const rows=SRIT.Store.read('PENILAIAN').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>{const a=T._anak(r.ANAK);return [a.NAMA||r.NAMA_ANAK,a.KELAS||'-',r.LEADERSHIP||'-',r.KEBAHASAAN||'-',r.SOSIAL||'-'];});
         return {cols:['Anak','Kelas','Leadership','Kebahasaan','Sosial'],rows};
      }},
      {id:'wa-karakter',grp:'WALI ASUH',name:'Laporan Perkembangan Karakter & Kemandirian',periode:'Bulanan',icon:'bi-award',build(){
-        const rows=SRIT.Store.read('PENILAIAN').filter(r=>T._inRange(r.TANGGAL)).map(r=>[T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.KARAKTER||'-',r.DISIPLIN||'-',r.KEMANDIRIAN||'-',r.KEBERSIHAN||'-']);
+        const rows=SRIT.Store.read('PENILAIAN').filter(r=>T._inRange(r.TANGGAL)).sort(SRIT.Features.laporan._byDate).map(r=>[T._anak(r.ANAK).NAMA||r.NAMA_ANAK,r.KARAKTER||'-',r.DISIPLIN||'-',r.KEMANDIRIAN||'-',r.KEBERSIHAN||'-']);
         return {cols:['Anak','Karakter','Disiplin','Kemandirian','Kebersihan'],rows};
      }},
      {id:'wa-rekap',grp:'WALI ASUH',name:'Rekapitulasi Peserta Didik Asuh',periode:'Bulanan',icon:'bi-list-columns',build(){
@@ -6039,6 +6182,9 @@ SRIT.Features.laporan={
     'wr-pembinaan':{mode:'none',d:'Daftar program pembinaan beserta kategori, target, dan statusnya.'},
     'wr-disiplin':{mode:'range',d:'Pelanggaran tata tertib: aturan, tingkat, tindakan, dan status penanganan.'},
     'wr-kesehatan':{mode:'range',d:'Insiden kesehatan, keamanan, kecelakaan, dan keadaan darurat.'},
+    'wr-kejadian-siswa':{mode:'range',formal:1,d:'Semua insiden, kasus, kejadian jurnal piket, dan anak yang dipantau, dikelompokkan per siswa. Bisa difilter jenjang, kelas, asrama, dan kamar.'},
+    'wr-sakit':{mode:'range',agg:1,formal:1,d:'Rekap tiap siswa yang tercatat Sakit di absensi: jumlah episode, hari sakit, terakhir sakit, dan statusnya.'},
+    'wr-sakit-riwayat':{mode:'range',agg:1,formal:1,d:'Catatan sakit per kejadian dari absensi: tanggal mulai–sampai, lama, dan kegiatan tempat tercatat sakit.'},
     'wr-kunjungan':{mode:'range',d:'Kunjungan orang tua/wali dan buku tamu lengkap dengan jam masuk–keluar.'},
     'wr-mitigasi':{mode:'range',formal:1,pick:'kejadian',d:'Insiden dan kasus perlindungan beserta tindakannya. Cetak formulir per kejadian.'},
     'wr-sarpras':{mode:'range',d:'Inventaris sarana prasarana dan hasil monitoring kondisinya.'},
@@ -6060,7 +6206,7 @@ SRIT.Features.laporan={
   },
   _meta(id){return this.META[id]||{mode:'range',d:''};},
   // warna lencana otomatis untuk sel yang isinya persis salah satu status ini
-  _TONE:{SELESAI:'ok',TERCAPAI:'ok',BAIK:'ok',AKTIF:'ok',DISETUJUI:'ok',HADIR:'ok',TUNTAS:'ok',AMAN:'ok',
+  _TONE:{SELESAI:'ok',TERCAPAI:'ok',BAIK:'ok',AKTIF:'ok',PULIH:'ok',DISETUJUI:'ok',HADIR:'ok',TUNTAS:'ok',AMAN:'ok',
     PROSES:'warn',DIPROSES:'warn',MONITORING:'warn',SEDANG:'warn',MENUNGGU:'warn',PENDING:'warn',DRAFT:'warn',CUKUP:'warn',SAKIT:'warn',BELUM:'warn',
     BERAT:'bad',TINGGI:'bad',RUSAK:'bad',DITOLAK:'bad',ALPA:'bad',DARURAT:'bad',KRITIS:'bad',
     RINGAN:'info',RENDAH:'info',IZIN:'info'},
@@ -6104,7 +6250,7 @@ SRIT.Features.laporan={
     'wr-rekap-absen':'hadir','wa-kehadiran':'hadir',
     'wr-perkembangan':'kembang','wr-pembinaan':'kembang','wr-refleksi':'kembang','wa-jurnal':'kembang','wa-refleksi':'kembang','wa-perkembangan':'kembang','wa-belajar':'kembang','wa-konseling':'kembang','wa-prestasi':'kembang','wa-karakter':'kembang',
     'wr-disiplin':'disip','wa-disiplin':'disip',
-    'wr-kesehatan':'sehat','wr-mitigasi':'sehat','wa-kesehatan':'sehat',
+    'wr-kesehatan':'sehat','wr-mitigasi':'sehat','wa-kesehatan':'sehat','wr-sakit':'sehat','wr-sakit-riwayat':'sehat','wr-kejadian-siswa':'sehat',
     'wr-kunjungan':'izin','wa-izin':'izin',
     'wr-sarpras':'sarana','wr-evaluasi':'sarana'},
   _cat(id){const k=this.CATMAP[id]||'ring';return this.CATS.find(c=>c[0]===k)||this.CATS[0];},
@@ -6399,7 +6545,7 @@ SRIT.Features.laporan={
         </div>
       </div>
       <div class="card-srit lp-period" id="lpPeriod">${this._periodHTML(rep.id)}</div>
-      ${rep.id==='wr-rekap-absen'?`<div class="card-srit lp-period" id="lpFilter">${this._filterHTML()}</div>`:''}
+      ${this._FLREPS.includes(rep.id)?`<div class="card-srit lp-period" id="lpFilter">${this._filterHTML()}</div>`:''}
       <div id="lpBody"><div class="lp-stats">${[1,2,3].map(()=>'<div class="skeleton" style="height:62px;border-radius:12px"></div>').join('')}</div>
         <div class="card-srit p-3">${[1,2,3,4,5,6].map(()=>'<div class="skeleton mb-2" style="height:30px"></div>').join('')}</div></div>`;
   },
@@ -6542,8 +6688,25 @@ SRIT.Features.laporan={
       this._signBlock(rep.grp==='WALI ASUH'?'Wali Asuh':'Wali Asrama');
     this._printDoc(rep.name,inner);
   },
+  // cetak resmi laporan kesehatan siswa: A4 landscape, memuat data kesehatan -> ditandai rahasia
+  _printSakit(rep){
+    const res=rep.build();
+    if(!res.rows.length){SRIT.Notify('Tidak ada data pada periode ini','err');return;}
+    const E=SRIT.Util.esc,set=SRIT.Store.readObj('SETTINGS'),{from,to}=this._range(),U=SRIT.Util;
+    const css=`@page{size:A4 landscape;margin:10mm}body{padding:0;font-size:11px}table{font-size:10px}th,td{padding:3px 5px}thead{display:table-header-group}tr{page-break-inside:avoid}.sign{page-break-inside:avoid}`;
+    const note=(res.meta.find(x=>x[0]==='Catatan')||[0,''])[1];
+    const inner=this._kop(set,rep.name.toUpperCase().replace(' (DARI ABSENSI SAKIT)','').replace(' & KASUS SISWA',' DAN KASUS SISWA').replace(' (CATATAN PER KEJADIAN)',''),'Periode '+U.fmtDateShort(from)+' s/d '+U.fmtDateShort(to)+(this._flLabel()?' · '+this._flLabel():''))+
+      '<table><thead><tr>'+res.cols.map(c=>'<th>'+E(c)+'</th>').join('')+'</tr></thead><tbody>'+res.rows.map(r=>'<tr>'+r.map(c=>'<td>'+E(String(c==null?'-':c))+'</td>').join('')+'</tr>').join('')+'</tbody></table>'+
+      '<div class="muted" style="margin-top:6px;font-size:10px"><b>Keterangan:</b> '+E(note)+'</div>'+
+      '<div class="muted" style="font-size:10px">Dokumen ini memuat data pribadi, kesehatan, dan kejadian peserta didik dan bersifat rahasia; hanya untuk keperluan pengasuhan dan pelaporan resmi.</div>'+
+      this._signBlock('Wali Asrama');
+    this._printDoc(rep.name,inner,{css});
+  },
   // ===== Template dokumen formal per jenis laporan =====
   _formal:{
+    'wr-sakit'(rep){this._printSakit(rep);},
+    'wr-sakit-riwayat'(rep){this._printSakit(rep);},
+    'wr-kejadian-siswa'(rep){this._printSakit(rep);},
     // Rekap absensi bulanan — tabel nama × tanggal, ✓ = hadir; S/I/A = keterangan; A4 landscape
     'wr-rekap-absen'(rep){
       const m=this._rekapModel();
@@ -6705,11 +6868,19 @@ SRIT.Features.laporan={
     const wa=SRIT.Asuh.namaPada(anakId,this._range().to);
     const map=[['Akademik',pen.KARAKTER],['Kemandirian Belajar',pen.KEMANDIRIAN],['Disiplin',pen.DISIPLIN],['Tanggung Jawab',pen.KARAKTER],['Kejujuran',pen.KARAKTER],['Kerja Sama',pen.SOSIAL],['Empati',pen.SOSIAL],['Kebersihan Diri',pen.KEBERSIHAN],['Kebersihan Kamar',pen.KEBERSIHAN],['Keagamaan',pen.KEAGAMAAN],['Kepemimpinan',pen.LEADERSHIP],['Kegiatan Sosial',pen.SOSIAL]];
     const rows=map.map(x=>`<tr><td>${x[0]}</td><td style="text-align:center;width:110px">${pr(+x[1]||0)}</td><td>...............................</td></tr>`).join('');
+    // catatan jurnal pengasuhan + kejadian/kasus siswa pada periode laporan
+    const E=SRIT.Util.esc,U=SRIT.Util,{from:pf,to:pt}=this._range();
+    const jp=SRIT.Store.read('CATATAN_PERKEMBANGAN').filter(r=>r.ANAK===anakId&&r.TANGGAL>=pf&&r.TANGGAL<=pt).sort((x,y)=>String(y.TANGGAL).localeCompare(String(x.TANGGAL)));
+    const kj=SRIT.Kejadian?SRIT.Kejadian.untuk(anakId,pf,pt):[];
+    const tdc='style="border:1px solid #000;padding:3px 5px;vertical-align:top"';
+    const _kjHtml=`<h4>Catatan Jurnal Pengasuhan (${U.fmtDateShort(pf)} s/d ${U.fmtDateShort(pt)})</h4>`+(jp.length?`<table><thead><tr><th style="width:80px">Tanggal</th><th style="width:90px">Kategori</th><th>Catatan</th><th>Tindak lanjut</th></tr></thead><tbody>${jp.map(r=>`<tr><td ${tdc}>${U.fmtDateShort(r.TANGGAL)}</td><td ${tdc}>${E(r.KATEGORI||'-')}</td><td ${tdc}>${r.JUDUL?'<b>'+E(r.JUDUL)+'</b> ':''}${E(r.CATATAN||'')}</td><td ${tdc}>${E(r.TINDAK_LANJUT||'-')}</td></tr>`).join('')}</tbody></table>`:'<div>Tidak ada catatan jurnal pengasuhan pada periode ini.</div>')+
+      `<h4>Kejadian, Kasus &amp; Anak Dipantau pada Periode</h4>`+(kj.length?`<table><thead><tr><th style="width:80px">Tanggal</th><th style="width:110px">Sumber</th><th>Uraian</th><th>Tindakan</th><th style="width:55px">Tingkat</th><th style="width:70px">Status</th></tr></thead><tbody>${kj.map(k=>`<tr><td ${tdc}>${U.fmtDateShort(k.tgl)}</td><td ${tdc}>${E(k.srcLabel)}</td><td ${tdc}><b>${E(k.judul||'')}</b> ${E(k.uraian||'')}</td><td ${tdc}>${E(k.tindak||'-')}</td><td ${tdc}>${E(this._TKL[k.tingkat]||'-')}</td><td ${tdc}>${E(k.status||'-')}</td></tr>`).join('')}</tbody></table>`:'<div>Tidak ada kejadian atau kasus yang melibatkan siswa pada periode ini.</div>');
     const inner=this._kop(set,'LAPORAN PERKEMBANGAN PESERTA DIDIK ASRAMA')+
       `<table class="info"><tr><td style="width:130px">Nama</td><td>: ${SRIT.Util.esc(a.NAMA||'-')}</td><td style="width:90px">NIS</td><td>: ${a.NIS||'-'}</td></tr>
         <tr><td>Jenjang/Kelas</td><td>: ${a.JENJANG||'-'} ${a.KELAS||''}</td><td>Kamar</td><td>: ${this._kamar(a.KAMAR)}</td></tr>
-        <tr><td>Wali Asuh</td><td>: ${SRIT.Util.esc(wa)}</td><td>Periode</td><td>: ${SRIT.Util.fmtDateShort(this._range().to)}</td></tr></table>
+        <tr><td>Wali Asuh</td><td>: ${SRIT.Util.esc(wa)}</td><td>Periode</td><td>: ${SRIT.Util.fmtDateShort(pf)} s/d ${SRIT.Util.fmtDateShort(pt)}</td></tr></table>
       <table><thead><tr><th>Aspek</th><th style="width:120px">Nilai/Predikat</th><th>Catatan Perkembangan</th></tr></thead><tbody>${rows}</tbody></table>
+      ${_kjHtml}
       <h4>Catatan Wali Asuh</h4><div style="min-height:26px">.......................................................................................................</div>
       <h4>Potensi yang Perlu Dikembangkan</h4><div style="min-height:26px">.......................................................................................................</div>
       <h4>Tindak Lanjut</h4><div style="min-height:26px">.......................................................................................................</div>`+
@@ -8576,13 +8747,23 @@ function penMatch(r,P){
   return inR(P,r.TANGGAL);
 }
 
+/* ---------- kejadian: insiden/kasus + jurnal piket (SRIT.Kejadian) + episode sakit dari absensi ---------- */
+const TKL={RINGAN:'Ringan',SEDANG:'Sedang',BERAT:'Berat'};
+function sakitEps(anak,hari,TA){
+  const ds=Object.keys(hari).filter(d=>inR(TA,d)).sort(),eps=[];let cur=null,prev=false;
+  ds.forEach(d=>{const x=hari[d],sk=x[2]>0;
+    if(sk){if(cur&&prev){cur.to=d;cur.hari++;cur.sesi+=x[2];}else{cur={from:d,to:d,hari:1,sesi:x[2]};eps.push(cur);}}
+    prev=sk;});
+  return eps.map(e=>({src:'ABSENSI',srcLabel:'Absensi (Sakit)',id:'sk'+e.from,anak:anak.ID,tgl:e.from,tglAkhir:e.to,jam:'',kat:'KESEHATAN',pilar:'KESEHATAN',judul:'Sakit',
+    uraian:'Tercatat sakit '+e.hari+' hari ('+e.sesi+' sesi)'+(e.to!==e.from?', '+U.fmtDateShort(e.from)+' s/d '+U.fmtDateShort(e.to):''),tindak:'',tingkat:'',status:'',aktif:false,petugas:''}));
+}
 /* ---------- data ---------- */
 function build(anak,ta,absen){
   const TA=mk('ta',ta,0,11),mine=(t,f)=>rd(t).filter(r=>r[f||'ANAK']===anak.ID);
   const inTA=r=>inR(TA,r.TANGGAL);
   const D={anak,ta,hari:absen.hari||{},sekolah:absen.sekolah||{},partial:!!absen.partial,sampai:absen.sampai||'',
     pel:mine('PELANGGARAN').filter(inTA),pbn:mine('PEMBINAAN').filter(inTA),izn:mine('IZIN').filter(inTA),
-    pen:mine('PENILAIAN').filter(r=>penMatch(r,TA)),tamu:mine('BUKU_TAMU').filter(inTA),
+    pen:mine('PENILAIAN').filter(r=>penMatch(r,TA)),tamu:mine('BUKU_TAMU').filter(inTA).sort((x,y)=>String(y.TANGGAL).localeCompare(String(x.TANGGAL))),
     ops:[].concat(
       mine('OPS_PENILAIAN').filter(inTA).map(r=>({t:'Penilaian',d:r.TANGGAL,x:(r.ASPEK||'-')+': '+(r.NILAI||'-')+(r.CATATAN?' — '+r.CATATAN:'')})),
       mine('OPS_KOMUNIKASI').filter(inTA).map(r=>({t:'Komunikasi',d:r.TANGGAL,x:(r.KANAL||'-')+': '+(r.ISI||'')})),
@@ -8590,6 +8771,7 @@ function build(anak,ta,absen){
       mine('OPS_KUNJUNGAN').filter(inTA).map(r=>({t:'Kunjungan',d:r.TANGGAL,x:(r.PENGUNJUNG||'-')+' ('+(r.HUBUNGAN||'-')+') '+(r.JAM||'')}))
     ).sort((a,b)=>String(b.d).localeCompare(String(a.d))),
     cat:mine('CATATAN_PERKEMBANGAN').filter(inTA),
+    kej:(SRIT.Kejadian?SRIT.Kejadian.untuk(anak.ID,TA.from,TA.to):[]).concat(sakitEps(anak,absen.hari||{},TA)).sort((x,y)=>String(y.tgl).localeCompare(String(x.tgl))),
     kamarSkor:rd('INSPEKSI').filter(r=>inTA(r)&&anak.KAMAR&&r.KAMAR===anak.KAMAR)
   };
   D.tt={};rd('TATA_TERTIB').forEach(t=>D.tt[t.ID]=t);
@@ -8599,10 +8781,10 @@ function attSum(hari,P){let h=0,i=0,s=0,a=0,days=0;Object.keys(hari).forEach(d=>
 function izinDays(r){if(!r.TANGGAL)return 0;const e=r.KEMBALI&&r.KEMBALI>=r.TANGGAL?r.KEMBALI:r.TANGGAL;return Math.round((new Date(e.slice(0,10)+'T00:00:00')-new Date(r.TANGGAL.slice(0,10)+'T00:00:00'))/864e5)+1;}
 function stats(D,P,full){
   const att=attSum(D.hari,P),pel=D.pel.filter(r=>inR(P,r.TANGGAL)),pbn=D.pbn.filter(r=>inR(P,r.TANGGAL)),izn=D.izn.filter(r=>inR(P,r.TANGGAL));
-  const pen=D.pen.filter(r=>penMatch(r,P)),tamu=D.tamu.filter(r=>inR(P,r.TANGGAL)),ops=D.ops.filter(r=>inR(P,r.d)),cat=D.cat.filter(r=>inR(P,r.TANGGAL)),insp=D.kamarSkor.filter(r=>inR(P,r.TANGGAL));
+  const pen=D.pen.filter(r=>penMatch(r,P)),tamu=D.tamu.filter(r=>inR(P,r.TANGGAL)),ops=D.ops.filter(r=>inR(P,r.d)),cat=D.cat.filter(r=>inR(P,r.TANGGAL)),kej=D.kej.filter(k=>inR(P,k.tgl)),insp=D.kamarSkor.filter(r=>inR(P,r.TANGGAL));
   const asp={};ASPEK.forEach(a=>{const v=pen.map(r=>+r[a]).filter(x=>x>0);asp[a]=v.length?r2(avg(v)):null;});
   const av=ASPEK.map(a=>asp[a]).filter(x=>x!=null),tk={RINGAN:0,SEDANG:0,BERAT:0};pel.forEach(r=>{tk[r.TINGKAT]=(tk[r.TINGKAT]||0)+1;});
-  const S={P,att,pel,pbn,izn,pen,tamu,ops,cat,insp,asp,nilai:av.length?r2(avg(av)):null,tk,izinHari:izn.reduce((s,r)=>s+(['DITOLAK','MENUNGGU'].includes(r.STATUS)?0:izinDays(r)),0),
+  const S={P,att,pel,pbn,izn,pen,tamu,ops,cat,kej,kejB:kej.filter(k=>k.tingkat==='BERAT').length,kejS:kej.filter(k=>k.tingkat==='SEDANG').length,kejAktif:kej.filter(k=>k.aktif).length,insp,asp,nilai:av.length?r2(avg(av)):null,tk,izinHari:izn.reduce((s,r)=>s+(['DITOLAK','MENUNGGU'].includes(r.STATUS)?0:izinDays(r)),0),
     terlambat:izn.filter(r=>r.STATUS==='TERLAMBAT').length,pbnAktif:pbn.filter(r=>r.STATUS!=='SELESAI').length};
   if(full&&P.prev)S.prev=stats(D,P.prev,false);
   return S;
@@ -8615,9 +8797,9 @@ function bench(D,P){
 }
 function kategori(S){
   const p=S.att.pct,n=S.nilai,b=S.tk.BERAT||0,t=S.pel.length;
-  if((p!=null&&p<80)||b>0||(n!=null&&n<2.5))return {k:'Perlu Perhatian Khusus',c:'#ef4444',i:'bi-exclamation-octagon'};
-  if((p!=null&&p<90)||t>=3||(n!=null&&n<3)||S.att.a>0)return {k:'Perlu Pendampingan',c:'#f59e0b',i:'bi-exclamation-triangle'};
-  if(p==null&&n==null&&!t)return {k:'Belum Cukup Data',c:'#64748b',i:'bi-hourglass-split'};
+  if((p!=null&&p<80)||b>0||S.kejB>0||(n!=null&&n<2.5))return {k:'Perlu Perhatian Khusus',c:'#ef4444',i:'bi-exclamation-octagon'};
+  if((p!=null&&p<90)||t>=3||S.kejS>0||(n!=null&&n<3)||S.att.a>0)return {k:'Perlu Pendampingan',c:'#f59e0b',i:'bi-exclamation-triangle'};
+  if(p==null&&n==null&&!t&&!S.kej.length)return {k:'Belum Cukup Data',c:'#64748b',i:'bi-hourglass-split'};
   return {k:'Berkembang Baik',c:'#16a34a',i:'bi-emoji-smile'};
 }
 function insights(D,S,B,sens){
@@ -8636,6 +8818,9 @@ function insights(D,S,B,sens){
     add(S.tk.BERAT?'bad':S.pel.length>=3?'wr':'mut','bi-exclamation-diamond',S.pel.length+' pelanggaran ('+['RINGAN','SEDANG','BERAT'].map(k=>S.tk[k]?S.tk[k]+' '+k.toLowerCase():'').filter(Boolean).join(', ')+').');
     if(pv&&pv.pel.length!==S.pel.length)add(S.pel.length<pv.pel.length?'ok':'wr','bi-arrow-left-right','Pelanggaran '+(S.pel.length<pv.pel.length?'berkurang':'bertambah')+' dari '+pv.pel.length+' menjadi '+S.pel.length+' dibanding periode sebelumnya.');
   }
+  const kj=S.kej.filter(k=>k.src!=='ABSENSI');
+  if(kj.length)add(S.kejB?'bad':(S.kejS||S.kejAktif)?'wr':'mut','bi-exclamation-octagon',kj.length+' kejadian/kasus tercatat ('+[S.kejB?S.kejB+' berat':'',S.kejS?S.kejS+' sedang':''].filter(Boolean).join(', ')+(S.kejB||S.kejS?'; ':'')+'sumber: insiden & kasus, jurnal piket)'+(S.kejAktif?', '+S.kejAktif+' kasus masih ditangani.':'.'));
+  else add('ok','bi-shield-check','Tidak ada insiden, kasus, maupun kejadian jurnal piket yang melibatkan siswa pada periode ini.');
   if(S.pbn.length)add(S.pbnAktif?'wr':'ok','bi-heart-pulse',S.pbn.length+' kegiatan pembinaan'+(S.pbnAktif?', '+S.pbnAktif+' masih berlangsung.':', seluruhnya selesai.'));
   if(S.nilai!=null){
     const ks=ASPEK.filter(x=>S.asp[x]!=null).sort((x,y)=>S.asp[y]-S.asp[x]),top=ks.slice(0,2),low=ks.slice(-2).reverse();
@@ -8818,19 +9003,21 @@ const F={
       S.pbn.forEach(r=>tl.push({d:r.TANGGAL,c:'#8b5cf6',i:'bi-heart-pulse',t:'Pembinaan '+(r.JENIS||''),x:(r.MATERI||'')+(r.HASIL?' — hasil: '+r.HASIL:'')+' ('+(r.STATUS||'-')+')'}));
       S.pen.forEach(r=>tl.push({d:r.TANGGAL,c:TEAL,i:'bi-award',t:'Penilaian '+(r.PERIODE||''),x:'Rata-rata '+r2(avg(ASPEK.map(k=>+r[k]).filter(v=>v>0))||0)+' ('+(r.PENILAI||'-')+')'}));
       S.izn.forEach(r=>tl.push({d:r.TANGGAL,c:'#0ea5e9',i:'bi-box-arrow-right',t:'Izin '+(r.JENIS||''),x:(r.TUJUAN||'-')+(r.ALASAN?' — '+r.ALASAN:'')+' ('+(r.STATUS||'-')+')'}));
+      S.kej.forEach(k=>tl.push({d:k.tgl,c:k.tingkat==='BERAT'?'#dc2626':k.tingkat==='SEDANG'?'#f59e0b':k.src==='ABSENSI'?COL.S:'#e11d48',i:k.src==='ABSENSI'?'bi-thermometer-half':'bi-exclamation-octagon',t:(k.src==='ABSENSI'?'Sakit':k.src==='PERHATIAN'?'Dipantau (jurnal piket)':'Kejadian '+(k.judul||''))+(k.tingkat?' · '+TKL[k.tingkat]:''),x:(k.src==='PERHATIAN'?k.uraian+(k.tindak?' → '+k.tindak:''):k.uraian+(k.tindak?' → '+k.tindak:''))+(k.status&&k.src==='INSIDEN'?' ('+k.status+')':'')}));
       S.cat.forEach(r=>tl.push({d:r.TANGGAL,c:KAT_C[r.KATEGORI]||'#64748b',i:'bi-journal-text',t:'Catatan '+(KAT[r.KATEGORI]||r.KATEGORI||''),x:(r.JUDUL?r.JUDUL+': ':'')+(r.CATATAN||'')+(r.TINDAK_LANJUT?' → '+r.TINDAK_LANJUT:'')}));
       S.tamu.forEach(r=>tl.push({d:r.TANGGAL,c:'#64748b',i:'bi-person-badge',t:'Tamu: '+(r.NAMA||'-'),x:(r.KEPERLUAN||'')}));
       S.ops.forEach(r=>tl.push({d:r.d,c:'#64748b',i:'bi-chat-dots',t:r.t,x:r.x}));
     }
     tl.sort((x,y)=>String(y.d).localeCompare(String(x.d)));
     const tabs=[['timeline','Linimasa',tl.length],['absen','Kehadiran',Object.keys(D.hari).filter(d=>inR(P,d)&&(D.hari[d][1]+D.hari[d][2]+D.hari[d][3])>0).length]];
-    if(sens)tabs.push(['cat','Catatan Perkembangan',S.cat.length],['pel','Pelanggaran',S.pel.length],['pbn','Pembinaan',S.pbn.length],['pen','Penilaian',S.pen.length],['izn','Izin & Pulang',S.izn.length],['tamu','Tamu & Kunjungan',S.tamu.length],['ops','Catatan Lain',S.ops.length],['insp','Inspeksi Kamar',S.insp.length]);
+    if(sens)tabs.push(['cat','Catatan Perkembangan',S.cat.length],['kej','Kejadian & Kasus',S.kej.length],['pel','Pelanggaran',S.pel.length],['pbn','Pembinaan',S.pbn.length],['pen','Penilaian',S.pen.length],['izn','Izin & Pulang',S.izn.length],['tamu','Tamu & Kunjungan',S.tamu.length],['ops','Catatan Lain',S.ops.length],['insp','Inspeksi Kamar',S.insp.length]);
     tabs.push(['induk','Data Induk','']);
     if(!tabs.some(t=>t[0]===this.st.tab))this.st.tab='timeline';
     const iv=indukView(a);
     const detail={
       timeline:tl.length?`<div class="pf-tl">${tl.slice(0,300).map(e=>`<div class="pf-ti" style="--c:${e.c}"><div style="font-size:11px" class="text-muted-2">${U.fmtDateShort(String(e.d).slice(0,10))}</div><div style="font-size:13px"><i class="bi ${e.i} me-1" style="color:${e.c}"></i><b>${esc(e.t)}</b> <span class="text-muted-2">${esc(e.x)}</span></div></div>`).join('')}</div>${tl.length>300?'<div class="text-muted-2 mt-2" style="font-size:12px">Menampilkan 300 catatan terbaru dari '+tl.length+'.</div>':''}`:'<div class="text-center text-muted-2 py-3">Tidak ada catatan pada periode ini</div>',
       absen:tbl(['Tanggal','Hadir','Izin','Sakit','Alpa'],Object.keys(D.hari).filter(d=>inR(P,d)&&(D.hari[d][1]+D.hari[d][2]+D.hari[d][3])>0).sort().reverse().map(d=>{const x=D.hari[d];return [U.fmtDateShort(d),x[0],x[1]||'-',x[2]||'-',x[3]?`<b style="color:#ef4444">${x[3]}</b>`:'-'];}),'Tidak ada ketidakhadiran pada periode ini \ud83c\udf89'),
+      kej:tbl(['Tanggal','Sumber','Jenis','Uraian','Tindakan','Tingkat','Status'],S.kej.map(k=>[U.fmtDateShort(k.tgl)+(k.tglAkhir&&k.tglAkhir!==k.tgl?'<div class="text-muted-2" style="font-size:11px">s/d '+U.fmtDateShort(k.tglAkhir)+'</div>':''),esc(k.srcLabel),esc(k.judul||'-'),esc(k.uraian||'-'),esc(k.tindak||'-'),k.tingkat?badge(TKL[k.tingkat],tkCls[k.tingkat]):'-',k.status?badge(k.status,k.aktif?'SAKIT':'HADIR'):'-']),'Tidak ada kejadian, kasus, atau catatan jurnal piket pada periode ini'),
       pel:tbl(['Tanggal','Aturan','Tingkat','Kejadian','Tindakan','Status'],S.pel.slice().sort((x,y)=>String(y.TANGGAL).localeCompare(String(x.TANGGAL))).map(r=>[U.fmtDateShort(r.TANGGAL),esc((tt(r).KODE?tt(r).KODE+' — ':'')+(tt(r).JUDUL||'-')),badge(r.TINGKAT||'-',tkCls[r.TINGKAT]),esc(r.KEJADIAN||'-'),esc(r.TINDAKAN||'-'),badge(r.STATUS||'-',r.STATUS==='SELESAI'?'HADIR':'SAKIT')])),
       pbn:tbl(['Tanggal','Jenis','Materi','Hasil','Pembina','Status'],S.pbn.slice().sort((x,y)=>String(y.TANGGAL).localeCompare(String(x.TANGGAL))).map(r=>[U.fmtDateShort(r.TANGGAL),esc(r.JENIS||'-'),esc(r.MATERI||'-'),esc(r.HASIL||'-'),esc(r.PEMBINA||'-'),badge(r.STATUS||'-',r.STATUS==='SELESAI'?'HADIR':'SAKIT')])),
       pen:tbl(['Periode','Tanggal'].concat(ASPEK.map(k=>ASPEK_L[k].slice(0,6)+'.'),['Rata²','Penilai']),S.pen.slice().sort((x,y)=>String(y.TANGGAL).localeCompare(String(x.TANGGAL))).map(r=>{const v=ASPEK.map(k=>+r[k]).filter(z=>z>0);return [esc(r.PERIODE||'-'),U.fmtDateShort(r.TANGGAL)].concat(ASPEK.map(k=>r[k]||'-'),['<b>'+(v.length?r2(avg(v)):'-')+'</b>',esc(r.PENILAI||'-')]);})),
@@ -8853,12 +9040,12 @@ const F={
       <div class="row g-2 mb-3">
         ${kpi('Kehadiran',att.pct==null?'-':att.pct+'%',dl(att.pct,pv&&pv.att.pct,' poin'),att.pct==null?'inherit':att.pct>=90?COL.H:att.pct>=80?COL.S:COL.A)}
         ${kpi('Hadir / Sesi',att.t?att.h+' / '+att.t:'-',att.t?'Izin '+att.i+' · Sakit '+att.s+' · Alpa '+att.a:'')}
-        ${sens?kpi('Pelanggaran',S.pel.length,dl(S.pel.length,pv&&pv.pel.length,'',true),S.pel.length?(S.tk.BERAT?COL.A:COL.S):COL.H):''}
+        ${sens?kpi('Pelanggaran',S.pel.length,dl(S.pel.length,pv&&pv.pel.length,'',true),S.pel.length?(S.tk.BERAT?COL.A:COL.S):COL.H)+kpi('Kejadian / Kasus',S.kej.filter(k=>k.src!=='ABSENSI').length,S.kejAktif?S.kejAktif+' masih ditangani':(S.kejB?S.kejB+' berat':''),S.kejB?COL.A:S.kejS||S.kejAktif?COL.S:COL.H):''}
         ${sens?kpi('Pembinaan',S.pbn.length,S.pbnAktif?S.pbnAktif+' berlangsung':'')+kpi('Penilaian (1–4)',S.nilai==null?'-':S.nilai,dl(S.nilai,pv&&pv.nilai),S.nilai==null?'inherit':S.nilai>=3?COL.H:S.nilai>=2.5?COL.S:COL.A)+kpi('Izin / Pulang',S.izn.length,S.izn.length?S.izinHari+' hari di luar':''):''}
       </div>
       <div class="card-srit p-3 mb-3"><h6 class="section-title mb-1"><i class="bi bi-lightbulb me-1"></i>Ringkasan & Catatan Otomatis</h6>
         ${ins.map(x=>`<div class="pf-ins"><i class="bi ${x.i}" style="color:${x.c==='ok'?COL.H:x.c==='wr'?COL.S:x.c==='bad'?COL.A:'#64748b'}"></i><div>${esc(x.t)}</div></div>`).join('')}
-        <div class="text-muted-2 mt-1" style="font-size:11px">Kategori dihitung otomatis: <b>Perlu Perhatian Khusus</b> bila kehadiran &lt;80%, ada pelanggaran berat, atau penilaian &lt;2,5; <b>Perlu Pendampingan</b> bila kehadiran &lt;90%, ≥3 pelanggaran, ada alpa, atau penilaian &lt;3. Ini alat bantu, bukan penilaian akhir.</div></div>
+        <div class="text-muted-2 mt-1" style="font-size:11px">Kategori dihitung otomatis: <b>Perlu Perhatian Khusus</b> bila kehadiran &lt;80%, ada pelanggaran atau kasus berat, atau penilaian &lt;2,5; <b>Perlu Pendampingan</b> bila kehadiran &lt;90%, ≥3 pelanggaran, ada kasus tingkat sedang, ada alpa, atau penilaian &lt;3. Ini alat bantu, bukan penilaian akhir.</div></div>
       <div class="row g-3 mb-3">
         <div class="col-lg-8"><div class="card-srit p-3"><h6 class="section-title mb-2">Tren Kehadiran Tahun Ajaran ${ta}/${ta+1} <span class="text-muted-2" style="font-size:11px">(periode terpilih disorot)</span></h6><div class="chart-box" style="height:240px"><canvas id="pfC1"></canvas></div></div></div>
         <div class="col-lg-4"><div class="card-srit p-3"><h6 class="section-title mb-2">Komposisi Kehadiran Periode</h6><div class="chart-box" style="height:240px"><canvas id="pfC2"></canvas></div></div></div>
@@ -8930,7 +9117,7 @@ const F={
   /* ---------- laporan resmi ---------- */
   _report(){
     const c=this.cur;if(!c)return;const {D,P,sens}=c,a=D.anak,set=(()=>{try{return SRIT.Store.readObj('SETTINGS')||{};}catch(e){return {};}})();
-    const secs=[['kehadiran','Kehadiran (rekap bulanan, peta harian & rincian tidak hadir)'],['karakter','Penilaian karakter'],['catatan','Catatan perkembangan'],['pelanggaran','Pelanggaran & pembinaan'],['izin','Izin, kepulangan & kunjungan'],['komunikasi','Komunikasi dengan wali'],['inspeksi','Inspeksi kamar'],['grafik','Grafik']].filter(x=>sens||['kehadiran','grafik'].includes(x[0]));
+    const secs=[['kehadiran','Kehadiran (rekap bulanan, peta harian & rincian tidak hadir)'],['karakter','Penilaian karakter'],['catatan','Catatan perkembangan'],['pelanggaran','Pelanggaran & pembinaan'],['kejadian','Kejadian, kasus & catatan jurnal piket'],['izin','Izin, kepulangan & kunjungan'],['komunikasi','Komunikasi dengan wali'],['inspeksi','Inspeksi kamar'],['grafik','Grafik']].filter(x=>sens||['kehadiran','grafik'].includes(x[0]));
     const DEF={ortu:['kehadiran','karakter','catatan','pelanggaran','izin','grafik'],lembaga:secs.map(x=>x[0])};
     const m=SRIT.Modal.open({title:'Laporan Resmi — '+esc(a.NAMA),size:'modal-lg',
       body:`<div class="text-muted-2 mb-2" style="font-size:12px">Periode: <b>${esc(P.label)}</b> (ubah di halaman sebelum membuat laporan)</div>
@@ -8947,7 +9134,7 @@ const F={
         <div class="col-md-6"><label class="form-label-sm">Jabatan pimpinan</label><input class="form-control form-control-sm" id="rpJab" value="${esc(SRIT.Kepsek.jabatan())}"></div>
         <div class="col-12"><label class="form-label-sm">Catatan / rekomendasi petugas (ditambahkan pada bagian kesimpulan)</label><textarea class="form-control form-control-sm" id="rpCat" rows="2"></textarea></div></div>
       <div class="mt-2"><label class="form-label-sm">Bagian yang disertakan</label><div id="rpSec" class="d-flex flex-wrap gap-3" style="font-size:13px">${secs.map(x=>`<label><input type="checkbox" value="${x[0]}" ${DEF.ortu.includes(x[0])?'checked':''}> ${x[1]}</label>`).join('')}</div></div>
-      <div class="text-muted-2 mt-2" style="font-size:11px">Laporan orang tua hanya memuat catatan perkembangan yang bertanda "tampil di laporan orang tua". Laporan lembaga memuat seluruh catatan. Format ini umum, bukan formulir resmi instansi tertentu. Laporan dicetak ringkas <b>maksimal 2 lembar A4</b> (lembar 1: ringkasan, analisis &amp; grafik; lembar 2: rincian). Bila catatan terlalu banyak, yang tampil adalah yang terbaru dan ada keterangan "Menampilkan X dari Y".</div>`,
+      <div class="text-muted-2 mt-2" style="font-size:11px">Bagian <b>Kejadian, kasus &amp; catatan jurnal piket</b> (insiden &amp; kasus, kejadian dan anak dipantau di jurnal piket, episode sakit) otomatis dicentang untuk laporan lembaga; untuk orang tua centang sendiri bila perlu. Laporan orang tua hanya memuat catatan perkembangan yang bertanda "tampil di laporan orang tua". Laporan lembaga memuat seluruh catatan. Format ini umum, bukan formulir resmi instansi tertentu. Laporan dicetak ringkas <b>maksimal 2 lembar A4</b> (lembar 1: ringkasan, analisis &amp; grafik; lembar 2: rincian). Bila catatan terlalu banyak, yang tampil adalah yang terbaru dan ada keterangan "Menampilkan X dari Y".</div>`,
       footer:'<button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="rpGo"><i class="bi bi-printer"></i> Buat laporan</button>'});
     $$('input[name=rpJ]').forEach(r=>r.onchange=()=>$$('#rpSec input').forEach(x=>x.checked=DEF[r.value].includes(x.value)));
     $('#rpGo').onclick=()=>{
@@ -8963,6 +9150,8 @@ const F={
       if(S.tk.BERAT)o.push('Konseling dan pembinaan lanjutan atas pelanggaran berat, disertai pemantauan berkala dan pelaporan kepada orang tua.');
       else if(S.pel.length>=3)o.push('Penguatan pembinaan kedisiplinan karena terdapat '+S.pel.length+' pelanggaran pada periode ini.');
       const lw=ASPEK.filter(x=>S.asp[x]!=null&&S.asp[x]<3).map(x=>ASPEK_L[x]);if(lw.length)o.push('Fokus pengembangan pada aspek: '+lw.join(', ')+'.');
+      if(S.kejB)o.push('Penanganan lanjutan atas '+S.kejB+' kasus tingkat berat: koordinasi dengan Satgas SR/Satgas Pusat sesuai alur dan pemantauan berkala.');
+      else if(S.kejAktif)o.push('Memantau '+S.kejAktif+' kasus yang masih ditangani sampai tahap pengakhiran.');
       if(S.pbnAktif)o.push('Menuntaskan '+S.pbnAktif+' kegiatan pembinaan yang masih berlangsung.');
     }
     if(!o.length)o.push('Pertahankan capaian yang baik dan lanjutkan pembinaan rutin.');
@@ -9064,8 +9253,9 @@ const F={
     const idt='<table class="idt"><colgroup><col style="width:13%"><col style="width:37%"><col style="width:11%"><col style="width:39%"></colgroup>'+idr.map(r=>'<tr><td class="lb">'+r[0]+'</td><td>'+r[1]+'</td><td class="lb">'+r[2]+'</td><td>'+r[3]+'</td></tr>').join('')+'</table>';
     const attC=att.pct==null?'#111':att.pct>=90?'#15803d':att.pct>=80?'#b45309':'#dc2626';
     const kc=(l,val,sub,col)=>`<div class="kc"><div class="kl">${l}</div><div class="kv" style="color:${col||'#111'}">${val}</div><div class="ks">${sub||'&nbsp;'}</div></div>`;
+    const kjN=S.kej.filter(k=>k.src!=='ABSENSI').length;
     const kcs=[kc('Kehadiran',att.pct==null?'-':att.pct+'%',dl2(att.pct,pv&&pv.att.pct,' poin'),attC),kc('Hadir / Sesi',att.t?att.h+' / '+att.t:'-',att.t?'Izin '+att.i+' · Sakit '+att.s+' · Alpa '+att.a:'')];
-    if(sens)kcs.push(kc('Pelanggaran',S.pel.length,dl2(S.pel.length,pv&&pv.pel.length,'',true),S.pel.length?(S.tk.BERAT?'#dc2626':'#b45309'):'#15803d'),kc('Pembinaan',S.pbn.length,S.pbnAktif?S.pbnAktif+' berlangsung':''),kc('Penilaian (1–4)',S.nilai==null?'-':S.nilai,dl2(S.nilai,pv&&pv.nilai),S.nilai==null?'#111':S.nilai>=3?'#15803d':S.nilai>=2.5?'#b45309':'#dc2626'),kc('Izin / Pulang',S.izn.length,S.izn.length?S.izinHari+' hari di luar':''));
+    if(sens)kcs.push(kc('Pelanggaran',S.pel.length,dl2(S.pel.length,pv&&pv.pel.length,'',true),S.pel.length?(S.tk.BERAT?'#dc2626':'#b45309'):'#15803d'),kc('Pembinaan',S.pbn.length,S.pbnAktif?S.pbnAktif+' berlangsung':''),kc('Kejadian/Kasus',kjN,S.kejAktif?S.kejAktif+' ditangani':(S.kejB?S.kejB+' berat':'&nbsp;'),S.kejB?'#dc2626':(S.kejS||S.kejAktif)?'#b45309':'#15803d'),kc('Penilaian (1–4)',S.nilai==null?'-':S.nilai,dl2(S.nilai,pv&&pv.nilai),S.nilai==null?'#111':S.nilai>=3?'#15803d':S.nilai>=2.5?'#b45309':'#dc2626'),kc('Izin / Pulang',S.izn.length,S.izn.length?S.izinHari+' hari di luar':''));
     const kp=`<div class="kp" style="grid-template-columns:1.5fr repeat(${kcs.length},1fr)"><div class="kc cat" style="border-left-color:${cat.c}"><div class="kl">Kategori perkembangan</div><div class="kv" style="color:${cat.c};font-size:1.2em;line-height:1.2;margin-top:2px">${e(cat.k)}</div><div class="ks">${e(P.label)}</div></div>${kcs.join('')}</div>`;
     const dot=x=>x==='ok'?COL.H:x==='wr'?COL.S:x==='bad'?COL.A:'#94a3b8';
     const insH='<ul class="ins" data-tg data-total="'+ins.length+'" data-min="4" data-noun="butir analisis">'+ins.map(x=>`<li class="dr"><i style="background:${dot(x.c)}"></i><span>${e(x.t)}</span></li>`).join('')+'</ul><div class="more"></div>';
@@ -9092,7 +9282,7 @@ const F={
       rkH=BX('Rekap Bulanan & Peta Kehadiran Harian','Tahun Ajaran '+D.ta+'/'+(D.ta+1),t+lg);
     }
     const title=`<div class="ttl"><div class="t1">LAPORAN PERKEMBANGAN DAN PERTANGGUNGJAWABAN PEMBINAAN SISWA</div><div class="t2">${lem?'(Untuk Lembaga / Pembina)':'(Untuk Orang Tua / Wali)'} · Nomor: ${e(docNo)} · Periode: ${e(P.label)}</div></div>`;
-    const fn1='<div class="fn">Kategori dihitung otomatis: <b>Perlu Perhatian Khusus</b> bila kehadiran &lt;80%, ada pelanggaran berat, atau penilaian &lt;2,5; <b>Perlu Pendampingan</b> bila kehadiran &lt;90%, ≥3 pelanggaran, ada alpa, atau penilaian &lt;3. Satu sesi = satu catatan kehadiran pada satu kegiatan; % hadir = hadir ÷ seluruh sesi tercatat. Ini alat bantu, bukan penilaian akhir.</div>';
+    const fn1='<div class="fn">Kategori dihitung otomatis: <b>Perlu Perhatian Khusus</b> bila kehadiran &lt;80%, ada pelanggaran atau kasus berat, atau penilaian &lt;2,5; <b>Perlu Pendampingan</b> bila kehadiran &lt;90%, ≥3 pelanggaran, ada kasus tingkat sedang, ada alpa, atau penilaian &lt;3. Satu sesi = satu catatan kehadiran pada satu kegiatan; % hadir = hadir ÷ seluruh sesi tercatat. Ini alat bantu, bukan penilaian akhir.</div>';
     const p1=`<div class="pg"><div class="in">${SRIT.Kop.html()}${title}${idt}${kp}${rowA}${rowB}${rkH}${fn1}</div><div class="pn">Halaman 1 dari 2 · ${e(docNo)}</div></div>`;
 
     /* ---- HALAMAN 2 ---- */
@@ -9125,6 +9315,12 @@ const F={
       const pel=TB(['Tanggal','Aturan','Tkt.','Kronologi → tindakan','Status'],S.pel.slice().sort(byDesc).map(r=>[fs(r.TANGGAL),e(cut((tt(r).KODE?tt(r).KODE+' — ':'')+(tt(r).JUDUL||'-'),60)),'<b style="color:'+(tkC[r.TINGKAT]||'#111')+'">'+e((r.TINGKAT||'-').slice(0,3))+'</b>',e(cut(r.KEJADIAN,150)||'-')+(r.TINDAKAN?'<br><i>→ '+e(cut(r.TINDAKAN,100))+'</i>':''),e(r.STATUS||'-')]),{w:[13,24,8,42,13],noun:'pelanggaran'});
       const pbn=TB(['Tanggal','Jenis · materi','Hasil','Status'],S.pbn.slice().sort(byDesc).map(r=>[fs(r.TANGGAL),'<b>'+e(r.JENIS||'-')+'</b>'+(r.MATERI?' · '+e(cut(r.MATERI,80)):'')+(r.PEMBINA?'<br><small>oleh '+e(cut(r.PEMBINA,30))+'</small>':''),e(cut(r.HASIL,90)||'-'),e(r.STATUS||'-')]),{w:[16,42,28,14],noun:'pembinaan'});
       blocks.push(FX([BX('Pelanggaran',S.pel.length+' (ringan '+(S.tk.RINGAN||0)+', sedang '+(S.tk.SEDANG||0)+', berat '+(S.tk.BERAT||0)+')',pel),BX('Pembinaan',S.pbn.length+' kegiatan'+(S.pbnAktif?', '+S.pbnAktif+' berlangsung':''),pbn)],[1.25,1]));
+    }
+    // kejadian, kasus & catatan jurnal piket (+ episode sakit dari absensi)
+    if(sens&&inc('kejadian')){
+      const kj=S.kej.slice().sort((x,y)=>String(y.tgl).localeCompare(String(x.tgl))),tkS={RINGAN:'Rgn',SEDANG:'Sdg',BERAT:'Brt'};
+      blocks.push(BX('Kejadian, Kasus & Catatan Jurnal Piket',kj.length+' catatan'+(S.kejAktif?' · '+S.kejAktif+' masih ditangani':'')+(S.kejB?' · '+S.kejB+' berat':''),
+        TB(['Tanggal','Sumber','Uraian → tindakan','Tkt.','Status'],kj.map(k=>[fs(k.tgl)+(k.tglAkhir&&k.tglAkhir!==k.tgl?'<br><small>s/d '+fs(k.tglAkhir)+'</small>':''),e(cut(k.srcLabel,26)),'<b>'+e(cut(k.judul,40))+'</b> '+e(cut(k.uraian,170))+(k.tindak?'<br><i>→ '+e(cut(k.tindak,110))+'</i>':''),k.tingkat?'<b style="color:'+(tkC[k.tingkat]||'#111')+'">'+tkS[k.tingkat]+'</b>':'-',e(cut(k.status,18)||'-')]),{w:[12,17,52,7,12],noun:'kejadian'})));
     }
     // izin + kunjungan
     if(sens&&inc('izin')){
