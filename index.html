@@ -5598,6 +5598,83 @@ SRIT.Features.role={
 
 
 <script>__srit.n('View_Analytics')</script>
+<style>
+/* ===== Analisis Data — tampilan baru (HP dulu): tab geser, filter ringkas, KPI berwarna, grafik & tabel menyesuaikan layar ===== */
+.an-wrap{max-width:100%;overflow-x:clip;padding-bottom:24px}
+.an-wrap .row>*{min-width:0}
+.an-wrap canvas{max-width:100%}
+.an-hero{display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:12px;border-radius:16px;color:#fff;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#1c6ef2 0%,#4f8dff 55%,#00b8a9 130%);box-shadow:0 8px 22px rgba(28,110,242,.25)}
+.an-hero::after{content:"";position:absolute;right:-34px;top:-46px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.13)}
+.an-hero::before{content:"";position:absolute;right:46px;bottom:-60px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.08)}
+.an-hero-ic{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;z-index:1}
+.an-hero-x{min-width:0;z-index:1}
+.an-hero-t{font-size:16px;font-weight:800;line-height:1.15}
+.an-hero-s{font-size:12px;opacity:.92;margin-top:2px;line-height:1.3}
+/* tab: satu baris yang bisa digeser (tidak membungkus jadi banyak baris) */
+.an-wrap .an-tabs{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  padding:6px 2px;margin:0 0 10px;position:sticky;top:var(--topbar-h,60px);z-index:20;background:var(--srit-body)}
+.an-wrap .an-tabs::-webkit-scrollbar{display:none}
+.an-wrap .an-tabs .nav-item{flex:none}
+.an-wrap .an-tabs .nav-link{display:flex;align-items:center;gap:6px;white-space:nowrap;border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;
+  color:var(--srit-text-2);background:var(--srit-card);border:1px solid var(--srit-border);transition:.15s}
+.an-wrap .an-tabs .nav-link i{margin:0!important}
+.an-wrap .an-tabs .nav-link.active{color:#fff;background:linear-gradient(135deg,#1c6ef2,#4f8dff);border-color:transparent;box-shadow:0 4px 12px rgba(var(--srit-primary-rgb),.32)}
+/* filter */
+.an-wrap .an-filter{border-radius:16px}
+.an-ftop{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.an-ftitle{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.an-seg{display:inline-flex;background:var(--srit-hover);border:1px solid var(--srit-border);border-radius:999px;padding:3px;gap:2px}
+.an-seg button{border:0;background:transparent;color:var(--srit-text-2);font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px;transition:.15s}
+.an-seg button.on{background:var(--srit-card);color:var(--srit-primary);box-shadow:0 1px 4px rgba(0,0,0,.14)}
+.an-ftog{display:none;align-items:center;gap:6px;border:1px solid var(--srit-border);background:var(--srit-card);color:var(--srit-text);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700}
+.an-fbadge{background:var(--srit-primary);color:#fff;border-radius:999px;min-width:18px;height:18px;padding:0 5px;font-size:11px;display:inline-flex;align-items:center;justify-content:center}
+.an-fchev{transition:transform .2s}
+.an-filter.open .an-fchev{transform:rotate(180deg)}
+.an-filters{margin-top:12px}
+/* kartu angka */
+.an-wrap .kpi{--kc:var(--srit-primary);padding:12px 14px;border-radius:16px;display:flex;flex-direction:column;gap:7px;justify-content:flex-start;
+  box-shadow:0 1px 2px rgba(15,27,51,.04),0 6px 16px rgba(15,27,51,.05)}
+.an-wrap .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--kc)}
+.an-wrap .kpi::after{content:"";position:absolute;right:-20px;top:-20px;width:70px;height:70px;border-radius:50%;background:var(--kc);opacity:.1}
+.an-wrap .kpi .kpi-lbl{font-size:10.5px;letter-spacing:.3px;line-height:1.25;padding-right:10px;position:relative;z-index:1}
+.an-wrap .kpi .kpi-val{font-size:clamp(20px,6.4vw,26px);line-height:1.1;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;position:relative;z-index:1}
+/* kartu & judul */
+.an-wrap .card-srit{border-radius:16px;box-shadow:0 1px 2px rgba(15,27,51,.04),0 6px 16px rgba(15,27,51,.04)}
+.an-wrap h6.section-title{display:flex;align-items:center;gap:8px;font-size:13.5px;line-height:1.25}
+.an-wrap h6.section-title::before{content:"";flex:none;width:4px;height:15px;border-radius:2px;background:linear-gradient(var(--srit-primary),var(--srit-accent))}
+.an-wrap .table-srit tbody tr:nth-child(even){background:rgba(127,140,165,.05)}
+/* daftar peringkat: alat saring rapi */
+.an-rk-tools{display:flex;flex-wrap:wrap;gap:6px}
+@media(max-width:767px){
+  .an-hero{padding:12px 14px;border-radius:14px}
+  .an-hero-t{font-size:15px}
+  .an-ftitle{display:none}
+  .an-seg{flex:1}.an-seg button{flex:1;padding:7px 4px}
+  .an-ftog{display:inline-flex}
+  .an-filter .an-filters{display:none}
+  .an-filter.open .an-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .an-filters>div{min-width:0!important}
+  .an-filters>div:has(#anKeg),.an-filters>div:has(#anAsrama){grid-column:1/-1}
+  .an-filters label.d-block{display:none}
+  .an-filters .btn{width:100%}
+  .an-wrap .filter-bar:not(.an-filters){display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .an-wrap .filter-bar:not(.an-filters)>div{min-width:0!important}
+  .an-wrap .filter-bar:not(.an-filters) label.d-block{display:none}
+  .an-wrap .filter-bar:not(.an-filters) .btn{width:100%}
+  .an-wrap .row.g-3{--bs-gutter-x:.65rem;--bs-gutter-y:.65rem}
+  .an-wrap .card-srit.p-3{padding:12px!important}
+  .an-wrap .kpi{padding:10px 12px}
+  .an-wrap .chart-box{height:clamp(190px,56vw,260px)}
+  .an-wrap .chart-box.sm{height:clamp(170px,50vw,220px)}
+  .an-wrap .table-srit{font-size:12.5px}
+  .an-wrap .table-srit td,.an-wrap .table-srit th{padding:.4rem .5rem}
+  .an-rk-tools{display:grid;grid-template-columns:1fr 1fr}
+  .an-rk-tools>*{width:100%!important;max-width:none!important;min-width:0}
+  .an-rk-tools>input,.an-rk-tools>button{grid-column:1/-1}
+}
+@media(max-width:360px){.an-wrap .kpi .kpi-val{font-size:19px}.an-wrap .an-tabs .nav-link{padding:6px 11px;font-size:12.5px}}
+</style>
 <script>
 //# sourceURL=View_Analytics.html
 // ---------- ANALISIS DATA — Ringkasan, Absensi, Izin & Kepulangan, Sakit, Pelanggaran, Insiden, Pembinaan, Penilaian, Keasramaan, Kunjungan & Tamu, Profil Data ----------
@@ -5628,26 +5705,54 @@ SRIT.Features.analytics={
   },
   async load(){
     const host=this._host;this.destroy();
-    host.innerHTML=`<ul class="nav nav-pills mb-3" id="anTabs">
+    host.innerHTML=`<div class="an-wrap">${this.heroHTML()}<ul class="nav nav-pills an-tabs" id="anTabs">
       ${[['ringkasan'],['absensi','Absensi','bi-calendar-check'],['izin','Izin & Kepulangan','bi-door-open'],['sakit','Sakit','bi-thermometer-half'],['pelanggaran','Pelanggaran','bi-exclamation-triangle'],['insiden'],['pembinaan'],['penilaian'],['keasramaan'],['tamu'],['profil','Profil Data','bi-bar-chart-steps']]
         .map(t=>{const m=this.MODUL[t[0]],lbl=t[1]||m[0],ic=t[2]||m[1];return `<li class="nav-item"><a class="nav-link ${this.tab===t[0]?'active':''} pointer" data-tab="${t[0]}"><i class="bi ${ic} me-1"></i>${lbl}</a></li>`;}).join('')}
     </ul>
-    <div id="anBody"><div class="skeleton" style="height:320px"></div></div>`;
+    <div id="anBody"><div class="skeleton" style="height:320px"></div></div></div>`;
+    this._chartInit();this._centerTab();
     $$('#anTabs a').forEach(a=>a.onclick=()=>{if(this.tab===a.dataset.tab)return;this.tab=a.dataset.tab;this.load();});
     const fn=this.MODUL[this.tab]?this.loadModul:{absensi:this.loadAbsensi,izin:this.loadIzin,sakit:this.loadSakit,pelanggaran:this.loadPelanggaran,profil:this.loadProfil}[this.tab];
     try{ await fn.call(this); }
     catch(e){ const b=$('#anBody'); if(b&&SRIT.currentFeature==='analytics') b.innerHTML='<div class="empty-state"><i class="bi bi-exclamation-triangle d-block text-danger"></i>'+SRIT.Util.esc(e.message||'Gagal memuat analitik')+' <button class="btn btn-sm btn-primary mt-2" onclick="SRIT.Features.analytics.load()">Coba Lagi</button></div>'; }
   },
+  // ---------------------------------------------------------------- tampilan: hero, tab, grafik ----
+  _TABMETA:{ringkasan:['Ringkasan','bi-grid-1x2','Gambaran umum seluruh modul'],absensi:['Absensi','bi-calendar-check','Kehadiran, tren, per gedung & jenjang'],izin:['Izin & Kepulangan','bi-door-open','Pengajuan izin dan kepulangan'],sakit:['Sakit','bi-thermometer-half','Kejadian sakit per jenjang & asrama'],pelanggaran:['Pelanggaran','bi-exclamation-triangle','Pelanggaran, tingkat, dan aturan'],insiden:['Insiden','bi-shield-exclamation','Insiden & kasus'],pembinaan:['Pembinaan','bi-person-heart','Pembinaan siswa'],penilaian:['Penilaian','bi-star-half','Penilaian perkembangan'],keasramaan:['Keasramaan','bi-building','Hunian & operasional asrama'],tamu:['Kunjungan & Tamu','bi-people','Kunjungan dan buku tamu'],profil:['Profil Data','bi-bar-chart-steps','Profil siswa & tenaga kependidikan']},
+  heroHTML(){const m=this._TABMETA[this.tab]||['Analisis Data','bi-graph-up',''];return `<div class="an-hero"><div class="an-hero-ic"><i class="bi ${m[1]}"></i></div><div class="an-hero-x"><div class="an-hero-t">Analisis Data · ${m[0]}</div><div class="an-hero-s">${m[2]}</div></div></div>`;},
+  _centerTab(){const ul=document.getElementById('anTabs'),a=ul&&ul.querySelector('a.active');if(!a)return;ul.scrollLeft=Math.max(0,a.parentElement.offsetLeft-(ul.clientWidth-a.parentElement.offsetWidth)/2);},
+  _fOpen:false,
+  _fCount(st){return ['from','to','jenjang','jk','asrama','kegName'].filter(k=>st[k]).length;},
+  /* gaya dasar Chart.js: font kecil di HP, legenda bulat, warna ikut tema, label kategori panjang dipotong di HP */
+  _chartInit(){
+    if(typeof Chart==='undefined')return;
+    try{
+      const D=Chart.defaults,nr=window.innerWidth<768,cs=getComputedStyle(document.body);
+      D.font.family="'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif";D.font.size=nr?10.5:12;
+      const tc=cs.getPropertyValue('--srit-text-2').trim(),bc=cs.getPropertyValue('--srit-border').trim();
+      if(tc)D.color=tc;if(bc)D.borderColor=bc;
+      const L=D.plugins.legend.labels;L.usePointStyle=true;L.boxWidth=8;L.boxHeight=8;L.padding=nr?10:14;
+      const T=D.plugins.tooltip;T.padding=10;T.cornerRadius=8;T.boxPadding=4;
+      D.elements.line.borderWidth=2.5;D.elements.point.radius=nr?2:3;D.elements.point.hitRadius=14;
+      D.interaction.intersect=false;
+    }catch(e){}
+    try{
+      const cat=Chart.defaults.scales&&Chart.defaults.scales.category;
+      if(cat&&window.innerWidth<768){cat.ticks=cat.ticks||{};cat.ticks.callback=function(v){
+        const l=this.getLabelForValue(v);if(Array.isArray(l))return l;const t=String(l==null?'':l),mx=this.isHorizontal()?9:16;
+        return t.length>mx?t.slice(0,mx-1)+'\u2026':t;};}
+    }catch(e){}
+  },
   // ---------------------------------------------------------------- komponen bersama ----
-  kpi(v,l,c){return `<div class="col-6 col-lg-3"><div class="kpi"><div class="kpi-lbl">${l}</div><div class="kpi-val" style="color:${c}">${v}</div></div></div>`;},
+  kpi(v,l,c){return `<div class="col-6 col-lg-3"><div class="kpi an-kpi" style="--kc:${c}"><div class="kpi-lbl">${l}</div><div class="kpi-val" style="color:${c}">${v}</div></div></div>`;},
   filterBarHTML(st,asramaList,extraHtml){
     this._lastAsramaList=asramaList||[];
-    return `<div class="card-srit p-3 mb-3">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-        <h6 class="section-title mb-0">Filter</h6>
-        <div style="min-width:180px"><select class="form-select form-select-sm" id="anPeriod">${[['harian','Harian'],['mingguan','Mingguan'],['bulanan','Bulanan']].map(p=>`<option value="${p[0]}" ${st.period===p[0]?'selected':''}>Periode: ${p[1]}</option>`).join('')}</select></div>
+    return `<div class="card-srit an-filter p-3 mb-3 ${this._fOpen?'open':''}" id="anFilter">
+      <div class="an-ftop">
+        <div class="an-ftitle"><i class="bi bi-funnel"></i> Periode &amp; filter</div>
+        <div class="an-seg" id="anPeriodSeg">${[['harian','Harian'],['mingguan','Mingguan'],['bulanan','Bulanan']].map(p=>`<button type="button" data-p="${p[0]}" class="${st.period===p[0]?'on':''}">${p[1]}</button>`).join('')}</div>
+        <button type="button" class="an-ftog" id="anFToggle"><i class="bi bi-sliders"></i> Filter${this._fCount(st)?` <span class="an-fbadge">${this._fCount(st)}</span>`:''}<i class="bi bi-chevron-down an-fchev"></i></button>
       </div>
-      <div class="filter-bar">
+      <div class="filter-bar an-filters">
         <div><label class="form-label-sm">Dari Tanggal</label><input type="date" class="form-control form-control-sm" id="anFrom" value="${st.from||''}" max="${SRIT.Util.todayISO()}"></div>
         <div><label class="form-label-sm">Sampai Tanggal</label><input type="date" class="form-control form-control-sm" id="anTo" value="${st.to||''}" max="${SRIT.Util.todayISO()}"></div>
         <div><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm" id="anJenjang"><option value="">Semua</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${st.jenjang===j?'selected':''}>${j}</option>`).join('')}</select></div>
@@ -5661,8 +5766,10 @@ SRIT.Features.analytics={
     </div>`;
   },
   wireFilterBar(st,afterApply){
-    $('#anPeriod').onchange=e=>{st.period=e.target.value;afterApply();};
+    $$('#anPeriodSeg button').forEach(b=>b.onclick=()=>{if(st.period===b.dataset.p)return;st.period=b.dataset.p;afterApply();});
+    const ft=$('#anFToggle');if(ft)ft.onclick=()=>{this._fOpen=!this._fOpen;const f=$('#anFilter');if(f)f.classList.toggle('open',this._fOpen);};
     $('#anApply').onclick=()=>{
+      if(window.innerWidth<768)this._fOpen=false;   // HP: tutup panel filter agar hasil langsung terlihat
       st.from=$('#anFrom').value;st.to=$('#anTo').value;
       st.jenjang=$('#anJenjang').value;st.jk=$('#anJk').value;st.asrama=$('#anAsrama').value;
       const kegEl=$('#anKeg');if(kegEl)st.kegName=kegEl.value;
@@ -5698,7 +5805,7 @@ SRIT.Features.analytics={
     const d=await SRIT.Api.getAnalyticsModul(tab,st.period,{from:st.from,to:st.to,jenjang:st.jenjang,jk:st.jk,asrama:st.asrama});
     if(SRIT.currentFeature!=='analytics'||this.tab!==tab)return;
     const E=SRIT.Util.esc;this._blk=d.blocks||[];
-    const kpis=(d.kpis||[]).map(k=>`<div class="col-6 col-lg-3"><div class="kpi"><div class="kpi-lbl">${E(k.label)}</div><div class="kpi-val" style="color:${k.color};${String(k.value).length>9?'font-size:18px':''}">${E(k.value)}</div></div></div>`).join('');
+    const kpis=(d.kpis||[]).map(k=>`<div class="col-6 col-lg-3"><div class="kpi an-kpi" style="--kc:${k.color}"><div class="kpi-lbl">${E(k.label)}</div><div class="kpi-val" style="color:${k.color};${String(k.value).length>9?'font-size:18px':''}">${E(k.value)}</div></div></div>`).join('');
     const card=(b,i)=>{
       const w=b.w===12?'col-12':'col-lg-6',head=`<h6 class="section-title mb-2">${E(b.title)}</h6>`;
       if(b.type==='rank')return `<div class="${w}">${this.rankTable(b.title,b.rows,b.icon,b.key)}</div>`;
@@ -5711,7 +5818,7 @@ SRIT.Features.analytics={
       }
       const has=b.type==='line'?(b.labels||[]).length:b.type==='doughnut'?(b.data||[]).some(v=>v>0):(b.series||[]).some(s=>s.data.some(v=>v>0));
       const h=b.horizontal?Math.max(200,(b.labels||[]).length*26+50):(b.type==='doughnut'?220:280);
-      return `<div class="${w}"><div class="card-srit p-3 h-100">${head}${has?`<div class="chart-box" style="height:${h}px"><canvas id="anx${i}"></canvas></div>`:'<div class="text-center text-muted-2 py-4" style="font-size:12px">Belum ada data pada filter ini.</div>'}</div></div>`;
+      return `<div class="${w}"><div class="card-srit p-3 h-100">${head}${has?`<div class="chart-box${b.horizontal?'':(b.type==='doughnut'?' sm':'')}"${b.horizontal?` style="height:${h}px"`:''}><canvas id="anx${i}"></canvas></div>`:'<div class="text-center text-muted-2 py-4" style="font-size:12px">Belum ada data pada filter ini.</div>'}</div></div>`;
     };
     $('#anBody').innerHTML=`${this.filterBarHTML(st,d.asramaList)}
       ${d.note?`<div class="text-muted-2 mb-2" style="font-size:11px"><i class="bi bi-info-circle"></i> ${E(d.note)}</div>`:''}
@@ -5743,7 +5850,7 @@ SRIT.Features.analytics={
     if(!S.rows.length)return `<div class="card-srit p-3"><h6 class="section-title mb-2"><i class="bi ${icon} me-1"></i>${title}</h6><div class="text-center text-muted-2 py-3" style="font-size:12px">Tidak ada data pada periode ini.</div></div>`;
     const fn="SRIT.Features.analytics.rkSet('"+key+"',",opt=(v,cur,t)=>`<option value="${v}" ${String(cur)===String(v)?'selected':''}>${t}</option>`;
     return `<div class="card-srit p-3"><h6 class="section-title mb-2"><i class="bi ${icon} me-1"></i>${title} <span class="text-muted-2" style="font-size:11px;font-weight:400" id="rk-${key}-n"></span></h6>
-      <div class="d-flex flex-wrap gap-1 mb-2">
+      <div class="an-rk-tools mb-2">
         <input class="form-control form-control-sm" style="max-width:170px" placeholder="Cari nama&hellip;" value="${E(S.q)}" oninput="${fn}'q',this.value)">
         <select class="form-select form-select-sm" style="width:auto" onchange="${fn}'urut',this.value)">${opt('desc',S.urut,'Paling sering')}${opt('asc',S.urut,'Paling jarang')}${opt('nama',S.urut,'Nama A–Z')}</select>
         <select class="form-select form-select-sm" style="width:auto" onchange="${fn}'top',this.value)">${opt('0',S.top,'Semua')}${opt('10',S.top,'10 teratas')}${opt('25',S.top,'25 teratas')}${opt('50',S.top,'50 teratas')}</select>
@@ -5966,7 +6073,7 @@ SRIT.Features.analytics={
 
     const taOpts=[...new Set(semua.map(a=>String(a.TAHUN_AJARAN||'').trim()).filter(Boolean))].sort(natural);
     const sel=(id,label,opts,cur)=>`<div style="min-width:150px"><label class="form-label-sm">${label}</label><select class="form-select form-select-sm" id="${id}">${opts.map(([v,t])=>`<option value="${esc(v)}" ${cur===v?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`;
-    const kpi=(v,l,c,sub)=>`<div class="col-6 col-lg-3"><div class="kpi"><div class="kpi-lbl">${l}</div><div class="kpi-val" style="color:${c}">${v}</div>${sub?`<div class="text-muted-2" style="font-size:11px">${sub}</div>`:''}</div></div>`;
+    const kpi=(v,l,c,sub)=>`<div class="col-6 col-lg-3"><div class="kpi an-kpi" style="--kc:${c}"><div class="kpi-lbl">${l}</div><div class="kpi-val" style="color:${c}">${v}</div>${sub?`<div class="text-muted-2" style="font-size:11px">${sub}</div>`:''}</div></div>`;
 
     $('#anBody').innerHTML=`
       <div class="card-srit p-3 mb-3">
