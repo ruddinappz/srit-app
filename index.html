@@ -787,6 +787,13 @@ SRIT.Sync={
   },
   pending(){return this.q.length+this.audits.length+(this.busy?1:0)+((SRIT.Api&&SRIT.Api.scansPending)?SRIT.Api.scansPending():0);},
   _sched(){clearTimeout(this.timer);this.timer=setTimeout(()=>this.flush(),150);},
+  /** apiSync dengan ulang otomatis bila server sibuk (antrean kunci penuh, kode BUSY). Aman diulang: sisip dengan ID sama dianggap ubah. */
+  async _syncRetry(chunk,aud){
+    for(let a=1;;a++){
+      try{return await SRIT.Server.call('apiSync',chunk,aud);}
+      catch(e){if(e&&e.code==='BUSY'&&a<4){await new Promise(r=>setTimeout(r,a*2500+Math.random()*1000));continue;}throw e;}
+    }
+  },
   async flush(){
     clearTimeout(this.timer);
     if(this.busy){this.again=true;return this._busyP;}
@@ -797,7 +804,7 @@ SRIT.Sync={
     this._busyP=(async()=>{
       try{
         for(let i=0;i<Math.max(1,Math.ceil(ops.length/1500));i++){
-          const r=await SRIT.Server.call('apiSync',ops.slice(i*1500,(i+1)*1500),i===0?aud:[]);
+          const r=await this._syncRetry(ops.slice(i*1500,(i+1)*1500),i===0?aud:[]);
           Object.entries(r.vers||{}).forEach(([t,v])=>{if(this.vers[t]===v.from)this.vers[t]=v.to;});
         }
         SRIT.Persist.schedule();
@@ -2821,13 +2828,13 @@ SRIT.Features.absensi={
     const sv=$('#abSave');if(sv)sv.onclick=()=>this.save();
     const ah=$('#abAllHadir');if(ah)ah.onclick=()=>this.hadirSemua();
     const t=$('#abTable');
-    t.innerHTML=`<thead><tr><th>NIS</th><th>Nama</th><th>Jenjang</th><th>Kelas</th><th>JK</th><th>Status</th></tr></thead><tbody>
+    t.innerHTML=`<thead><tr><th>Nama</th><th>Jenjang</th><th>Kelas</th><th>JK</th><th>Status</th></tr></thead><tbody>
     ${r.rows.length?r.rows.map(a=>{const cur=this.state.dirty[a.ID]||a.STATUS;return `<tr>
-      <td>${a.NIS}</td><td class="fw-semibold">${SRIT.Util.esc(a.NAMA)}</td><td>${a.JENJANG}</td><td>${a.KELAS||'-'}</td><td>${a.JK}</td>
+      <td class="fw-semibold">${SRIT.Util.esc(a.NAMA)}</td><td>${a.JENJANG}</td><td>${a.KELAS||'-'}</td><td>${a.JK}</td>
       <td>${canEdit?`<div class="d-flex flex-wrap gap-1" role="group" style="min-width:180px">
         ${['HADIR','IZIN','SAKIT','ALPA','BELUM'].map(st=>`<button type="button" class="btn btn-sm ${cur===st?this._btnCls(st):'btn-outline-secondary'} py-0 px-2" style="font-size:12px;font-weight:700;min-width:32px;border-radius:6px" title="${st==='BELUM'?'Belum Absen':st}" onclick="SRIT.Features.absensi.mark('${a.ID}','${st}',this)">${st==='BELUM'?'-':st[0]}</button>`).join('')}
       </div>`:`<span class="badge-soft st-${cur}">${cur}</span>`}</td>
-    </tr>`;}).join(''):'<tr><td colspan="6"><div class="empty-state"><i class="bi bi-people d-block"></i>Tidak ada peserta sesuai filter</div></td></tr>'}
+    </tr>`;}).join(''):'<tr><td colspan="5"><div class="empty-state"><i class="bi bi-people d-block"></i>Tidak ada peserta sesuai filter</div></td></tr>'}
     </tbody>`;
     $('#abPag').innerHTML=SRIT.UI.pagination(r);
     $$('#abPag [data-pg]').forEach(a=>a.onclick=()=>{this.state.page=+a.dataset.pg;this.load();});
@@ -3037,7 +3044,11 @@ SRIT.Features.absensi={
         </div>
         <canvas id="abCanvas" class="d-none"></canvas>
         <div id="abCamErr" class="mt-2 d-none"></div>
-        <button class="btn btn-outline-secondary btn-sm w-100 mt-2" id="abQrToggle"><i class="bi bi-pause-circle"></i> Jeda kamera</button>`
+        <div class="d-flex gap-2 mt-2">
+          <button class="btn btn-outline-primary btn-sm flex-fill" id="abCamFlip" title="Ganti antara kamera belakang dan depan"><i class="bi bi-arrow-repeat"></i> <span id="abCamFlipTx">Putar kamera</span></button>
+          <button class="btn btn-outline-secondary btn-sm flex-fill" id="abQrToggle"><i class="bi bi-pause-circle"></i> Jeda kamera</button>
+        </div>
+        <select class="form-select form-select-sm mt-2 d-none" id="abCamSel" title="Pilih kamera"></select>`
         :`<div class="alert alert-warning py-2 mb-2" style="font-size:12.5px"><i class="bi bi-exclamation-triangle"></i> Kamera langsung tidak tersedia di halaman ini. Pakai foto QR atau input manual.</div>
         <div id="abCamErr" class="mb-2"></div>
         <button class="btn btn-primary btn-sm w-100" id="abQrPhotoBtn"><i class="bi bi-camera"></i> Ambil Foto QR</button>
@@ -3056,6 +3067,8 @@ SRIT.Features.absensi={
     if(pb&&pi){pb.onclick=()=>pi.click();pi.onchange=async()=>{const fs=Array.from(pi.files||[]);pi.value='';if(fs.length)await this._decodeFiles(fs);};}
     const tg=$('#abQrToggle');
     if(tg)tg.onclick=()=>{if(this._qr.stream){this.stopQR();tg.innerHTML='<i class="bi bi-camera-video"></i> Lanjutkan kamera';}else{this.startQR();tg.innerHTML='<i class="bi bi-pause-circle"></i> Jeda kamera';}};
+    const fl=$('#abCamFlip');if(fl)fl.onclick=()=>this.flipCam();
+    const cs=$('#abCamSel');if(cs)cs.onchange=()=>this.pickCam(cs.value);
     const sb=$('#abSoundBtn');
     if(sb){const paint=()=>{const [ic,tx]=this._soundLabel(this._soundMode());sb.innerHTML='<i class="bi '+ic+'"></i> '+tx;};paint();
       sb.onclick=()=>{const o=['suara','nada','senyap'],n=o[(o.indexOf(this._soundMode())+1)%3];this._soundSet(n);paint();if(n==='suara')this._speak('Suara aktif');else if(n==='nada')this._beep('ok');};}
@@ -3071,11 +3084,18 @@ SRIT.Features.absensi={
     if(stat){stat.textContent='Meminta izin kamera\u2026';stat.style.background='rgba(0,0,0,.6)';}
     this._qr.starting=true;
     const md=navigator.mediaDevices;
-    const tries=[{video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false},{video:{facingMode:{ideal:'environment'}},audio:false},{video:true,audio:false}];
+    const pref=this._camPref(),fm={ideal:pref.facing};
+    const tries=[];
+    if(pref.deviceId){tries.push({dev:1,c:{video:{deviceId:{exact:pref.deviceId},width:{ideal:1280},height:{ideal:720}},audio:false}});tries.push({dev:1,c:{video:{deviceId:{exact:pref.deviceId}},audio:false}});}
+    tries.push({c:{video:{facingMode:fm,width:{ideal:1280},height:{ideal:720}},audio:false}});
+    tries.push({c:{video:{facingMode:fm},audio:false}});
+    tries.push({c:{video:true,audio:false}});
     let stream=null,lastErr=null;
-    for(const c of tries){
-      try{stream=await md.getUserMedia(c);break;}
+    for(const t of tries){
+      try{stream=await md.getUserMedia(t.c);break;}
       catch(e){lastErr=e;
+        // kamera pilihan tidak ada lagi / tak cocok: lanjut ke mode depan-belakang biasa
+        if(t.dev&&e&&(e.name==='OverconstrainedError'||e.name==='NotFoundError'||e.name==='NotReadableError'))continue;
         // izin ditolak / diblokir kebijakan: percobaan berikutnya tidak akan berhasil
         if(e&&(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'||e.name==='SecurityError'||e.name==='NotFoundError'||e.name==='NotReadableError'))break;}
     }
@@ -3083,11 +3103,58 @@ SRIT.Features.absensi={
     if(!stream){if(stat)stat.textContent='Gagal akses kamera';this._showCamError(lastErr);return;}
     if(!$('#abVideo')){stream.getTracks().forEach(t=>t.stop());return;}   // pengguna sudah pindah tab
     this._qr.stream=stream;video.srcObject=stream;
+    this._camAfterStart(stream,video);
     try{await video.play();}catch(e){/* autoplay+muted+playsinline biasanya cukup; lanjut */}
     this._qr.det=null;
     if(window.BarcodeDetector){try{this._qr.det=new BarcodeDetector({formats:['qr_code']});}catch(e){this._qr.det=null;}}
     if(stat){stat.textContent='Arahkan QR ke dalam kotak\u2026';stat.style.background='rgba(0,0,0,.6)';}
     this._qrLoop();
+  },
+  // ---------- pilih / putar kamera (belakang <-> depan, atau kamera tertentu) ----------
+  // Pilihan tersimpan per perangkat (localStorage 'srit_qr_cam'), jadi HP yang dipakai kamera depan tetap begitu saat dibuka lagi.
+  _camPref(){
+    let o={};try{o=JSON.parse(localStorage.getItem('srit_qr_cam')||'{}')||{};}catch(e){}
+    return {facing:o.facing==='user'?'user':'environment',deviceId:typeof o.deviceId==='string'?o.deviceId:''};
+  },
+  _camPrefSet(o){try{localStorage.setItem('srit_qr_cam',JSON.stringify(o));}catch(e){}},
+  _camAfterStart(stream,video){
+    let st={};try{st=(stream.getVideoTracks()[0]||{getSettings(){return{};}}).getSettings()||{};}catch(e){}
+    const pref=this._camPref();
+    // kamera depan: tampilan dicerminkan seperti selfie (pembacaan QR memakai bingkai asli, tidak terpengaruh)
+    const front=st.facingMode?st.facingMode==='user':(!pref.deviceId&&pref.facing==='user');
+    this._qr.front=front;this._qr.curId=st.deviceId||pref.deviceId||'';
+    video.style.transform=front?'scaleX(-1)':'';
+    const tx=$('#abCamFlipTx');if(tx)tx.textContent='Putar kamera ('+(front?'depan':'belakang')+')';
+    const tg=$('#abQrToggle');if(tg)tg.innerHTML='<i class="bi bi-pause-circle"></i> Jeda kamera';
+    this._camFillList();
+  },
+  async _camFillList(){ // label kamera baru tersedia setelah izin diberikan, jadi diisi sesudah kamera menyala
+    const sel=$('#abCamSel');if(!sel)return;
+    let cams=[];try{cams=(await navigator.mediaDevices.enumerateDevices()).filter(function(d){return d.kind==='videoinput';});}catch(e){}
+    if(cams.length<2){sel.classList.add('d-none');sel.innerHTML='';return;}
+    sel.innerHTML=cams.map(function(d,i){return '<option value="'+esc(d.deviceId)+'">'+esc(d.label||('Kamera '+(i+1)))+'</option>';}).join('');
+    if(this._qr.curId&&cams.some(function(d){return d.deviceId===this._qr.curId;},this))sel.value=this._qr.curId;
+    sel.classList.remove('d-none');
+  },
+  async _camRestart(){
+    this.stopQR();
+    await new Promise(function(r){setTimeout(r,150);});   // beri waktu perangkat melepas kamera sebelumnya
+    await this.startQR();
+    if(!this._qr.stream&&$('#abVideo')){   // sebagian HP butuh jeda lebih lama saat berpindah kamera
+      await new Promise(function(r){setTimeout(r,600);});
+      if(!this._qr.stream)await this.startQR();
+    }
+  },
+  flipCam(){ // belakang <-> depan (mengabaikan kamera tertentu yang dipilih)
+    const cur=this._qr.stream?(this._qr.front?'user':'environment'):this._camPref().facing;
+    this._camPrefSet({facing:cur==='user'?'environment':'user',deviceId:''});
+    return this._camRestart();
+  },
+  pickCam(id){
+    if(!id)return;
+    const sel=$('#abCamSel'),opt=sel&&sel.options[sel.selectedIndex],lb=(opt?opt.textContent:'').toLowerCase();
+    this._camPrefSet({facing:/depan|front|user|selfie/.test(lb)?'user':'environment',deviceId:id});
+    return this._camRestart();
   },
   async _showDiag(err){
     const box=$('#abDiag')||$('#abCamErr');if(!box)return;
