@@ -11428,26 +11428,36 @@ SRIT.LiveTV={
       +this.pnl('Laporan kerusakan terbaru','Yang belum selesai di atas',lapT,'c7',true);
   },
   /* =====================  HALAMAN 7 — OPERASIONAL  ===================== */
+  /* v1.9.39: tab OPERASIONAL HARI INI hanya memuat hal yang berlangsung/tercatat PADA HARI ITU:
+     jadwal kegiatan, petugas piket, kunjungan/tamu, izin berangkat/kembali hari ini, pelanggaran/inspeksi/insiden kesehatan yang dicatat hari ini,
+     dan indikator operasional harian. (Hunian asrama, program pembinaan, dan insiden aktif menurut prioritas BUKAN data harian -> dipindah/dihapus dari tab ini.) */
+  opsDaily(v){
+    const {d,p}=v,iso=d.iso||d.date,hist=this.isHist();
+    const jd=d.jadwal||[],pk=d.piket||[],L=d.layanan||{},K=d.kedisiplinan||{},ind=d.indikator||[],Z=d.izin;
+    const inS=x=>(!this.fJJ||x.jj===this.fJJ)&&(!this.fJK||x.jk===this.fJK);
+    const zl=(Z&&!Z.error&&Z.list)?Z.list.filter(inS):null;
+    const brk=zl?zl.filter(x=>x.tg===iso).length:null,kmb=zl?zl.filter(x=>x.kb===iso).length:null;
+    const selesai=jd.filter(k=>k.done&&!k.now).length,cur=jd.find(k=>k.now);
+    const kes=(p&&p.insiden&&p.insiden.kesehatan&&p.insiden.kesehatan.hari)||0;
+    return {d,iso,hist,jd,pk,ind,brk,kmb,selesai,cur,kunj:L.kunjungan||0,pel:K.pelanggaran||0,insp:K.inspeksiHari||0,kes};
+  },
   pg7(v){
-    const {d,p,all,cs}=v,C=this.COL,E=SRIT.Util.esc,L=d.layanan||{};
-    const jd=d.jadwal||[];
-    const tlH=jd.length?jd.map(k=>`<div class="sb" style="grid-template-columns:130px 1fr 100px;padding:13px 0;border-bottom:1px dashed rgba(255,255,255,.07)"><span class="lb" style="color:${k.now?'var(--acc)':k.done?'var(--mu2)':'var(--mu)'}">${E(k.jamMulai)}–${E(k.jamSelesai||'')}</span><span style="font-size:20px;font-weight:${k.now?700:500};color:${k.done&&!k.now?'var(--mu)':'var(--tx)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${k.now?'● ':''}${E(k.nama)}</span><span class="rt">${k.now?'<span class="lv-b b-ok">Sekarang</span>':k.done?'<span class="lv-b">Selesai</span>':'<span class="lv-b b-in">Menyusul</span>'}</span></div>`).join(''):this.emp('Tidak ada kegiatan terjadwal');
-    const bedRows=all.filter(c=>c.bed.total>0).map(c=>({label:this.segName(c),dim:!this.inSel(c),parts:[{v:c.bed.terisi,c:C[c.jk]},{v:c.bed.total-c.bed.terisi,c:'#2a3a5c'}],right:this.f1(this.pc(c.bed.terisi,c.bed.total))+'%',sub:c.bed.terisi+'/'+c.bed.total}));
-    const bMax=Math.max(1,...all.map(c=>c.bed.total));
-    const ins=p.insiden||{pri:{},list:[]};const priOrder=[['CRITICAL','Kritis',C.alpa],['HIGH','Tinggi',C.alpa],['MEDIUM','Sedang',C.sakit],['LOW','Rendah',C.hadir]];
-    const insH=priOrder.map(x=>`<div class="sb" style="grid-template-columns:100px 1fr 50px"><span class="lb">${x[1]}</span><div class="tr"><i style="width:${(ins.pri[x[0]]||0)/Math.max(1,...Object.values(ins.pri))*100}%;background:${x[2]}"></i></div><span class="rt">${ins.pri[x[0]]||0}</span></div>`).join('');
-    const pk=d.piket||[];
+    const C=this.COL,E=SRIT.Util.esc,o=this.opsDaily(v),{d,jd,pk,ind}=o;
+    const stat=(x,y)=>x==null?'–':this.fn(x);
+    const tlH=jd.length?jd.map(k=>`<div class="sb" style="grid-template-columns:130px 1fr 100px;padding:13px 0;border-bottom:1px dashed rgba(255,255,255,.07)"><span class="lb" style="color:${!o.hist&&k.now?'var(--acc)':!o.hist&&k.done?'var(--mu2)':'var(--mu)'}">${E(k.jamMulai)}–${E(k.jamSelesai||'')}</span><span style="font-size:20px;font-weight:${!o.hist&&k.now?700:500};color:${!o.hist&&k.done&&!k.now?'var(--mu)':'var(--tx)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${!o.hist&&k.now?'● ':''}${E(k.nama)}</span><span class="rt">${o.hist?'':k.now?'<span class="lv-b b-ok">Sekarang</span>':k.done?'<span class="lv-b">Selesai</span>':'<span class="lv-b b-in">Menyusul</span>'}</span></div>`).join(''):this.emp('Tidak ada kegiatan terjadwal');
     const pkH=pk.length?pk.map(x=>`<div class="in" style="align-items:center"><span style="flex:1"><b>${E(x.nama)}</b><br><span style="color:var(--mu);font-size:14px">${E(x.shift||'')} · ${E(x.lokasi||'')}</span></span><span class="lv-b b-ok">${E(x.status||'')}</span></div>`).join(''):this.emp('Tidak ada piket terjadwal');
-    const prog=d.program||[];
-    return this.kpi('Izin & kepulangan',this.fn(L.izinAktif||0),'sedang berlangsung / menunggu',C.izin,null,'c3')
-      +this.kpi('Belum kembali',this.fn(L.belumKembali||0),'melewati tanggal kembali',(L.belumKembali||0)?C.alpa:C.hadir,null,'c3')
-      +this.kpi('Kunjungan & tamu',this.fn(L.kunjungan||0),'tercatat hari ini','#5eead4',null,'c3')
-      +this.kpi('Insiden aktif',this.fn((d.insiden||{}).aktif||0),'sedang ditangani',((d.insiden||{}).aktif)?C.sakit:C.hadir,null,'c3')
+    const row=(l,n,c)=>`<div class="in" style="align-items:center"><span style="flex:1;font-size:17px">${l}</span><b style="font-size:30px;color:${n?c:'var(--hadir)'}">${this.fn(n)}</b></div>`;
+    const cat=row('Pelanggaran dicatat',o.pel,C.sakit)+row('Inspeksi dilakukan',o.insp,'#5eead4')+row('Insiden kesehatan baru',o.kes,C.alpa);
+    const iMax=1,indH=ind.length?ind.map(x=>{const pc=x.target>0?Math.min(100,x.capaian/x.target*100):0,col=pc>=90?C.hadir:pc>=60?C.sakit:C.alpa;
+      return `<div class="sb" style="grid-template-columns:230px 1fr 110px"><span class="lb">${E(x.nama)}</span><div class="tr"><i style="width:${pc}%;background:${col}"></i></div><span class="rt">${this.fn(x.capaian)}/${this.fn(x.target)}</span></div>`;}).join(''):this.emp('Belum ada indikator harian tercatat');
+    return this.kpi('Kegiatan hari ini',o.hist?this.fn(jd.length):`${o.selesai} <small>/ ${jd.length}</small>`,o.hist?'kegiatan terjadwal':(o.cur?'Sekarang: '+E(o.cur.nama):'selesai · berikutnya: '+E(d.next||'-')),C.hadir,null,'c3')
+      +this.kpi('Petugas piket',this.fn(pk.length),'terjadwal hari ini',C.SRMP,null,'c3')
+      +this.kpi('Kunjungan & tamu',this.fn(o.kunj),'tercatat hari ini','#5eead4',null,'c3')
+      +this.kpi('Izin hari ini',o.brk==null?'–':`${o.brk} <small>/ ${o.kmb}</small>`,'berangkat / kembali · '+this.filterLabel(),C.izin,null,'c3')
       +this.pnl('Jadwal kegiatan hari ini',`Berikutnya: ${E(d.next||'-')}`,tlH,'c5 r2',true)
-      +this.pnl('Hunian asrama','Tempat tidur terisi per segmen',this.stack(bedRows,bMax)+this.legend([[C.L,'Putra terisi'],[C.P,'Putri terisi'],['#2a3a5c','Kosong']]),'c4')
-      +this.pnl('Insiden aktif menurut prioritas','',insH,'c3')
       +this.pnl('Petugas piket hari ini','',pkH,'c4',true)
-      +this.pnl('Program pembinaan aktif','',prog.length?prog.map(x=>`<div class="in" style="align-items:center"><span style="flex:1">${E(x.nama)}</span><span class="lv-b b-in">${E(x.kategori||'')}</span></div>`).join(''):this.emp('Belum ada program aktif'),'c3',true);
+      +this.pnl('Dicatat hari ini','seluruh sekolah',cat,'c3')
+      +this.pnl('Indikator operasional harian','capaian / target',indH,'c7',true);
   },
   /* =====================  HALAMAN 9 - IZIN & KEPULANGAN  =====================
      Nama yang sedang izin keluar/belum kembali, izin terbanyak per jenjang x jenis kelamin, dan paling sering izin (jendela 30 hari/90 hari/1 tahun). */
@@ -11725,14 +11735,16 @@ Object.assign(SRIT.LiveTV,{
   },
   /* ---------- 7 OPERASIONAL ---------- */
   mp7(v){
-    const {d,p,all}=v,C=this.COL,E=SRIT.Util.esc,L=d.layanan||{},jd=d.jadwal||[],pk=d.piket||[];
-    const jH=jd.length?jd.map(k=>`<div class="mi ${k.now?'now':k.done?'dn':''}"><span class="t">${E(k.jamMulai)}</span><span class="x">${k.now?'● ':''}${E(k.nama)}</span>${k.now?'<span class="lv-b b-ok">Sekarang</span>':k.done?'<span class="lv-b">Selesai</span>':'<span class="lv-b b-in">Menyusul</span>'}</div>`).join(''):this.emp('Tidak ada kegiatan terjadwal');
-    const bedRows=all.filter(c=>c.bed.total>0).map(c=>({label:this.segName(c),dim:!this.inSel(c),parts:[{v:c.bed.terisi,c:C[c.jk]},{v:c.bed.total-c.bed.terisi,c:'#2a3a5c'}],right:this.f1(this.pc(c.bed.terisi,c.bed.total))+'%',sub:c.bed.terisi+'/'+c.bed.total}));
+    const C=this.COL,E=SRIT.Util.esc,o=this.opsDaily(v),{d,jd,pk,ind}=o;
+    const jH=jd.length?jd.map(k=>`<div class="mi ${!o.hist&&k.now?'now':!o.hist&&k.done?'dn':''}"><span class="t">${E(k.jamMulai)}</span><span class="x">${!o.hist&&k.now?'● ':''}${E(k.nama)}</span>${o.hist?'':k.now?'<span class="lv-b b-ok">Sekarang</span>':k.done?'<span class="lv-b">Selesai</span>':'<span class="lv-b b-in">Menyusul</span>'}</div>`).join(''):this.emp('Tidak ada kegiatan terjadwal');
     const pH=pk.length?pk.map(x=>`<div class="mi"><span class="x"><b>${E(x.nama)}</b><small>${E(x.shift||'')} · ${E(x.lokasi||'')}</small></span><span class="lv-b b-ok">${E(x.status||'')}</span></div>`).join(''):this.emp('Tidak ada piket terjadwal');
-    return this.mRow([this.mT('Izin aktif',this.fn(L.izinAktif||0),'berlangsung',C.izin),this.mT('Telat',this.fn(L.belumKembali||0),'belum kembali',(L.belumKembali||0)?C.alpa:C.hadir),this.mT('Tamu',this.fn(L.kunjungan||0),'hari ini','#5eead4'),this.mT('Insiden',this.fn((d.insiden||{}).aktif||0),'aktif',((d.insiden||{}).aktif)?C.sakit:C.hadir)],4)
+    const iH=ind.length?ind.map(x=>{const pc=x.target>0?Math.min(100,x.capaian/x.target*100):0,col=pc>=90?C.hadir:pc>=60?C.sakit:C.alpa;
+      return `<div class="sb"><span class="lb">${E(x.nama)}</span><div class="tr"><i style="width:${pc}%;background:${col}"></i></div><span class="rt">${this.fn(x.capaian)}/${this.fn(x.target)}</span></div>`;}).join(''):this.emp('Belum ada indikator harian');
+    return this.mRow([this.mT('Kegiatan',o.hist?this.fn(jd.length):`${o.selesai}/${jd.length}`,o.hist?'terjadwal':'selesai',C.hadir),this.mT('Piket',this.fn(pk.length),'petugas',C.SRMP),this.mT('Tamu',this.fn(o.kunj),'hari ini','#5eead4'),this.mT('Izin',o.brk==null?'–':`${o.brk}/${o.kmb}`,'berangkat/kembali',C.izin)],4)
+      +this.mRow([this.mT('Pelanggaran',this.fn(o.pel),'dicatat',o.pel?C.sakit:C.hadir),this.mT('Inspeksi',this.fn(o.insp),'dilakukan','#5eead4'),this.mT('Insiden kes.',this.fn(o.kes),'baru',o.kes?C.alpa:C.hadir)],3)
       +this.mC('Jadwal kegiatan hari ini','berikutnya: '+E(d.next||'-'),jH,'tr g2')
-      +this.mC('Hunian asrama','tempat tidur terisi',this.stack(bedRows,Math.max(1,...all.map(c=>c.bed.total))),'tr')
-      +this.mC('Petugas piket','',pH,'tr');
+      +this.mC('Petugas piket','',pH,'tr')
+      +this.mC('Indikator harian','capaian / target',iH,'tr');
   },
   /* ---------- 8 IZIN ---------- */
   cycleIzinWin(){this.izinWin=this.izinWin===30?90:this.izinWin===90?365:30;this.render();},
