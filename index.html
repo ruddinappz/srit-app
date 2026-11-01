@@ -10603,6 +10603,10 @@ SRIT.Router={
 /* v1.9.37: tombol Masuk permanen di kop (HP) + penyaring nama di tab Izin */
 .lv-mob .lv-lgn{display:flex;flex:none;width:36px;height:36px;padding:0;align-items:center;justify-content:center;border-radius:12px;cursor:pointer;color:var(--sa);border:1px solid color-mix(in srgb,var(--sa) 55%,transparent);background:color-mix(in srgb,var(--sa) 16%,transparent)}
 .lv-mob .lv-lgn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.mjt{font-size:12.5px}
+.lv-mob .lv-t.mjt th{position:static;background:none;font-size:10.5px;padding:3px 6px}
+.lv-mob .lv-t.mjt td{padding:4px 6px;font-size:12.5px}
+.lv-mob .lv-t.mjt tfoot td{padding-top:5px}
 .iz-tools{flex:none;display:flex;flex-wrap:wrap;gap:6px;margin:0 0 7px}
 .iz-tools input,.iz-tools select{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:var(--tx);border-radius:8px;padding:5px 8px;font-size:13px;min-width:0;outline:0;font-family:inherit}
 .iz-tools input:focus,.iz-tools select:focus{border-color:var(--acc)}
@@ -11153,7 +11157,7 @@ SRIT.LiveTV={
   pyramid(umur){
     const ages=Object.keys(umur).map(Number);if(!ages.length)return this.emp('Tanggal lahir belum terisi');
     const lo=Math.min(...ages),hi=Math.max(...ages),rows=[];for(let a=hi;a>=lo;a--)rows.push(a);
-    const mx=Math.max(1,...ages.map(a=>Math.max(umur[a].L||0,umur[a].P||0))),rh=Math.min(46,640/rows.length),H=rows.length*rh+8,half=225,cx=300;
+    const mx=Math.max(1,...ages.map(a=>Math.max(umur[a].L||0,umur[a].P||0))),rh=Math.min(46,300/rows.length),H=rows.length*rh+8,half=225,cx=300;
     let s='';rows.forEach((a,i)=>{const y=4+i*rh,u=umur[a]||{},l=(u.L||0)/mx*half,p=(u.P||0)/mx*half,bh=rh*.68;
       s+=`<rect x="${cx-24-l}" y="${y}" width="${l}" height="${bh}" rx="3" fill="${this.COL.L}"/><rect x="${cx+24}" y="${y}" width="${p}" height="${bh}" rx="3" fill="${this.COL.P}"/>
         <text x="${cx}" y="${y+bh-1}" text-anchor="middle" style="fill:#c5d1ea;font-size:14px;font-weight:600">${a}</text>
@@ -11313,11 +11317,12 @@ SRIT.LiveTV={
       +this.kpi('Putra / Putri',`${L} <small>/ ${P}</small>`,`${this.f1(this.pc(L,t.n))}% putra · ${this.f1(this.pc(P,t.n))}% putri`,C.L,null,'c3')
       +this.kpi('Usia rata-rata',na?this.f1(avgAge):'–',na?`${this.fn(na)} peserta punya tanggal lahir`:'Tanggal lahir belum terisi',C.SRMP,null,'c3',na?'tahun':'')
       +this.kpi('Kelengkapan data profil',lt?this.f1(this.pc(lg,lt)):'–','NIK, NISN, KK, TTL, alamat, orang tua, HP',this.pc(lg,lt)>=90?C.hadir:C.sakit,null,'c3',lt?'%':'')
-      +this.pnl('Piramida usia','Putra di kiri, putri di kanan',this.pyramid(umur)+this.legend([[C.L,'Putra'],[C.P,'Putri']]),'c4 r2')
+      +this.pnl('Piramida usia','Putra di kiri, putri di kanan',this.pyramid(umur)+this.legend([[C.L,'Putra'],[C.P,'Putri']]),'c4')
       +this.pnl('Peserta per kelas','Putra (biru) dan putri (merah muda) bertumpuk',kHtml,'c4',true)
       +this.pnl('Komposisi seluruh peserta','Jenjang × jenis kelamin',komp,'c4')
       +this.pnl('Asal wilayah',`${this.filterLabel()} · kecamatan`,wHtml,'c4',true)
-      +this.pnl('Rincian segmen','Redup = di luar filter',tbl,'c4',true);
+      +this.pnl('Rincian segmen','Redup = di luar filter',tbl,'c4',true)
+      +this.pnl('Jumlah per jenjang &amp; jenis kelamin','Redup = di luar filter',this.jjJkTbl(all,false),'c4',true);
   },
   /* =====================  HALAMAN 3 — ABSENSI  ===================== */
   pg3(v){
@@ -11451,6 +11456,16 @@ SRIT.LiveTV={
   izinAll:false,   // false = 10 teratas, true = semua anak (termasuk yang belum pernah izin)
   setIzinAll(b){this.izinAll=!!b;this.render();},
   /* v1.9.37: penyaring daftar "Paling sering izin" (seperti Analisis Data): cari nama, urutan, batas teratas, minimal jumlah izin */
+  /* v1.9.37: tabel jumlah peserta per jenjang x jenis kelamin (tab Profil). Sel di luar filter diredupkan; total mengikuti filter. */
+  jjJkTbl(all,mob){
+    const C=this.COL,get=(j,k)=>{const c=all.find(x=>x.jj===j&&x.jk===k);return c?c.n:0;},dim=(j,k)=>this.inSel({jj:j,jk:k})?'':' style="opacity:.35"';
+    const js=this.JJ.filter(j=>get(j,'L')+get(j,'P')>0||all.some(x=>x.jj===j));
+    let tl=0,tp=0;
+    const body=js.map(j=>{const l=get(j,'L'),p=get(j,'P');if(this.inSel({jj:j,jk:'L'}))tl+=l;if(this.inSel({jj:j,jk:'P'}))tp+=p;
+      return `<tr><td><i class="lv-dot" style="background:${C[j]||'#5eead4'}"></i><b>${j}</b></td><td${dim(j,'L')}>${this.fn(l)}</td><td${dim(j,'P')}>${this.fn(p)}</td><td><b>${this.fn(l+p)}</b></td></tr>`;}).join('');
+    const filtered=!!(this.fJJ||this.fJK);
+    return `<table class="lv-t mjt"><thead><tr><th>Jenjang</th><th><i class="lv-dot" style="background:${C.L}"></i>Putra</th><th><i class="lv-dot" style="background:${C.P}"></i>Putri</th><th>Total</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td>Total${filtered?' (filter)':''}</td><td>${this.fn(tl)}</td><td>${this.fn(tp)}</td><td>${this.fn(tl+tp)}</td></tr></tfoot></table>`;
+  },
   izQ:'',izUrut:'desc',izTop:'10',izMin:'1',
   izSet(f,v){
     this[f]=v;
@@ -11653,6 +11668,7 @@ Object.assign(SRIT.LiveTV,{
     const gen=t.n?`<div class="mseg"><div style="width:${L/t.n*100}%;background:${C.L}">${this.f1(this.pc(L,t.n))}%</div><div style="width:${P/t.n*100}%;background:${C.P}">${this.f1(this.pc(P,t.n))}%</div></div><div class="mgender"><span style="color:${C.L}">Putra <b>${L}</b></span><span style="color:${C.P}"><b>${P}</b> Putri</span></div>`:this.emp();
     return this.mRow([this.mT('Peserta didik',this.fn(t.n),this.filterLabel(),'#e8eefc'),this.mT('Usia rata-rata',na?this.f1(avg):'–','tahun',C.SRMP),this.mT('Data lengkap',lt?this.f1(this.pc(lg,lt)):'–','NIK, KK, alamat…',this.pc(lg,lt)>=90?C.hadir:C.sakit,lt?'%':'')],3)
       +this.mC('Putra dan putri','',gen,'g0')
+      +this.mC('Jumlah per jenjang','Putra · putri · total',this.jjJkTbl(all,true),'g0')
       +this.mC('Komposisi peserta','Jenjang × jenis kelamin',this.mDon(segs,this.fn(this.sum(all,c=>c.n)),'peserta'),'g2')
       +this.mPair(this.mC('Per kelas','',kH,'tr'),this.mC('Asal wilayah','',wH,'tr'),true);
   },
