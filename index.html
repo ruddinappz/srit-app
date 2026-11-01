@@ -10461,35 +10461,60 @@ SRIT.Router={
 .lv-btn.on{background:rgba(52,211,153,.3)}
 #ltvFilter{position:fixed;bottom:110px;right:12px;z-index:1601;display:none;background:#0e1830;border:1px solid var(--ln);border-radius:12px;padding:14px;width:min(300px,90vw);box-shadow:0 12px 40px rgba(0,0,0,.5)}
 #ltvFilter label{font-size:12px;color:var(--mu);display:block;margin:6px 0 3px}
-/* ---- HP / layar sempit: halaman bertumpuk, KPI 2 kolom, filter lengket, grafik terbaca ---- */
-.lv-mob{overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch}
-.lv-mob .lv-stage{position:relative;width:100%!important;height:auto!important;min-height:100%;transform:none!important;left:0!important;top:0!important;padding-bottom:68px}
-.lv-mob .lv-head{height:auto;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:6px 10px;padding:10px 14px}
-.lv-mob .lv-logo{width:40px;height:40px;font-size:17px;border-radius:10px}
-.lv-mob .lv-school b{font-size:15px;white-space:normal;overflow:visible;line-height:1.2}
-.lv-mob .lv-school small{display:block;font-size:11px;letter-spacing:.2px;margin-top:2px}
-.lv-mob .lv-ptitle,.lv-mob .lv-tabs{display:none}
+/* ---- HP / layar sempit (v1.9.32) — MODEL SLIDE: satu jenis data = satu slide, geser kiri/kanan; ukuran mengikuti layar (dvh/clamp) ---- */
+.lv-tabrow{display:contents}
+.lv-ftog,.lv-capbtn,.lv-sh{display:none}
+.lv-mob{overflow:hidden!important}
+.lv-mob .lv-stage{position:absolute;left:0!important;top:0!important;width:100%!important;height:100%!important;transform:none!important;padding-bottom:calc(58px + env(safe-area-inset-bottom,0px))}
+.lv-mob .lv-head{height:auto;flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:4px 10px;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 8px}
+.lv-mob .lv-logo{width:38px;height:38px;font-size:16px;border-radius:10px}
+.lv-mob .lv-school b{font-size:clamp(13px,3.9vw,16px);white-space:normal;overflow:visible;line-height:1.2}
+.lv-mob .lv-school small{display:block;font-size:clamp(10px,2.8vw,11.5px);letter-spacing:.2px;margin-top:1px}
+.lv-mob .lv-ptitle{display:none}
 .lv-mob .lv-clockbox{min-width:0}
-.lv-mob .lv-clock{font-size:20px}
-.lv-mob .lv-date{font-size:11px}
-.lv-mob .lv-status{grid-column:1/-1;justify-self:start;padding:3px 10px;font-size:11px}
-.lv-mob .lv-bar{height:auto;flex-direction:column;align-items:stretch;gap:6px;padding:8px 12px;position:sticky;top:0;z-index:20;background:rgba(7,14,28,.96);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.lv-mob .lv-fg{flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none}
+.lv-mob .lv-clock{font-size:clamp(17px,5vw,21px)}
+.lv-mob .lv-date{font-size:clamp(10px,2.8vw,11.5px)}
+.lv-mob .lv-status{grid-column:1/-1;justify-self:start;padding:2px 10px;font-size:11px}
+.lv-mob .lv-status:not(.hist){display:none}
+.lv-mob .lv-bar{height:auto;flex:none;flex-direction:column;align-items:stretch;gap:6px;padding:0 12px 8px}
+.lv-mob .lv-tabrow{display:flex;align-items:center;gap:8px;order:-1;min-width:0}
+.lv-mob .lv-tabs{margin:0;flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+.lv-mob .lv-tabs::-webkit-scrollbar{display:none}
+.lv-mob .lv-tab{flex:none;padding:7px 14px;font-size:13px;border:1px solid var(--ln);background:var(--pn);border-radius:999px}
+.lv-mob .lv-tab.on{background:var(--tc,var(--tx));color:#07101f;border-color:transparent}
+.lv-mob .lv-tab.on::after{display:none}
+.lv-mob .lv-ftog{display:flex;flex:none;align-items:center;border:1px solid var(--ln);background:var(--pn);color:var(--mu);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer}
+.lv-mob.lv-fopen .lv-ftog{background:var(--tx);color:#0a1428}
+.lv-mob .lv-fg{display:none;flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none}
+.lv-mob.lv-fopen .lv-fg{display:flex}
 .lv-mob .lv-fg::-webkit-scrollbar{display:none}
 .lv-mob .lv-fg>span:not(.lv-chip){font-size:12px;flex:none;min-width:80px;margin:0}
 .lv-mob .lv-chip{padding:5px 11px;font-size:13px;flex:none}
-.lv-mob .lv-body{flex:none;position:static}
-.lv-mob .lv-pg{position:relative;inset:auto;opacity:1;visibility:visible;transition:none;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none!important;grid-auto-rows:auto;gap:10px;padding:4px 12px 12px}
-.lv-mob .lv-pg::before{content:attr(data-t);grid-column:1/-1;display:block;font-size:18px;font-weight:700;margin:16px 0 2px;color:var(--acc)}
+.lv-mob .lv-capbtn{display:block}
+/* papan slide: satu layar = satu jenis data; tiap slide menggulir sendiri ke bawah bila isinya panjang */
+.lv-mob .lv-body{flex:1;min-height:0;position:relative;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.lv-mob .lv-body::-webkit-scrollbar{display:none}
+.lv-mob .lv-pg{position:relative;inset:auto;flex:0 0 100%;width:100%;height:100%;opacity:1;visibility:visible;transition:none;display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none!important;grid-auto-rows:max-content;align-content:start;gap:10px;
+  padding:0 12px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:none;
+  scroll-snap-align:start;scroll-snap-stop:always;scroll-snap-type:y proximity;scroll-padding-top:58px;-webkit-overflow-scrolling:touch}
+.lv-mob .lv-pg::-webkit-scrollbar{display:none}
+.lv-mob .lv-pg::before{content:none;display:none}
 .lv-mob .lv-pg>*{grid-column:1/-1!important;grid-row:auto!important;min-height:0;margin:0}
+.lv-mob .lv-pg>.lv-sh{display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:6;margin:0 -12px!important;padding:11px 14px;
+  background:rgba(7,14,28,.93);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:2px solid var(--sl,var(--acc))}
+.lv-sh .n{flex:none;font-size:11.5px;font-weight:700;color:#07101f;background:var(--sl,var(--acc));border-radius:999px;padding:2px 9px}
+.lv-sh b{flex:1;min-width:0;font-size:clamp(15px,4.4vw,18px);font-weight:700;line-height:1.15}
+.lv-sh small{flex:none;max-width:44%;font-size:11px;color:var(--mu);text-align:right;line-height:1.25}
+.lv-mob .lv-pg>.lv-p{scroll-snap-align:start;border-top:3px solid var(--sl,var(--acc))}
+.lv-mob .lv-pg>.lv-k:first-of-type{scroll-snap-align:start}
 .lv-mob .lv-pg>.lv-k{grid-column:auto!important;min-height:88px;padding:11px 14px}
 .lv-mob .lv-pg>.lv-k.lv-wide{grid-column:1/-1!important}
 .lv-mob .lv-k .l{font-size:12px}
-.lv-mob .lv-k .v{font-size:28px;margin-top:3px}
+.lv-mob .lv-k .v{font-size:clamp(24px,7.4vw,30px);margin-top:3px}
 .lv-mob .lv-k .v small{font-size:14px}
 .lv-mob .lv-k .s{font-size:11.5px;line-height:1.3}
 .lv-mob .lv-k .sp{display:none}
-.lv-mob .lv-k.lv-wide .sp{display:block;height:36px}
 .lv-mob .lv-p{min-height:0;padding:14px}
 .lv-mob .lv-empty{padding:24px 12px}
 .lv-mob .lv-p h4{font-size:16px}
@@ -10518,6 +10543,7 @@ SRIT.Router={
 .lv-mob .lv-t td{font-size:12.5px}
 .lv-mob .in{font-size:14px}
 .lv-mob .hm .c b{font-size:28px}
+.lv-mob .hm .c{padding:8px 0;min-height:64px}
 .lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:column;align-items:stretch}
 .lv-mob .lv-pb>div[style*="gap:20px"]>svg{align-self:center;height:210px}
 .lv-mob .lv-foot{height:40px}
@@ -10531,11 +10557,24 @@ SRIT.Router={
 .lv-mob .lv-pg>.lv-k.lv-wide{grid-column:auto!important}
 .lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:row;align-items:center}
 }
+/* HP mendatar: ringkas supaya slide tetap lega */
 @media (max-height:480px){
-.lv-mob .lv-bar{position:static}
-.lv-mob .lv-admin{position:static;padding:6px 10px}
-.lv-mob .lv-stage{padding-bottom:0}
+.lv-mob .lv-head{padding:4px 14px;gap:2px 10px}
+.lv-mob .lv-logo{width:30px;height:30px}
+.lv-mob .lv-school small{display:none}
+.lv-mob .lv-foot{display:none}
+.lv-mob .lv-stage{padding-bottom:calc(44px + env(safe-area-inset-bottom,0px))}
+.lv-mob .lv-admin{padding:4px 10px}
+.lv-mob .lv-admin .lv-btn{padding:6px 10px}
+.lv-mob .lv-pg>.lv-sh{padding:6px 14px}
+.lv-mob .lv-pg{scroll-padding-top:40px}
 }
+/* MODE TANGKAP: sembunyikan tab/filter/tombol/teks berjalan -> tangkapan layar bersih (kop sekolah + judul slide + isi) */
+.lv-mob.lv-cap .lv-bar,.lv-mob.lv-cap .lv-foot,.lv-mob.lv-cap .lv-admin,.lv-mob.lv-cap #ltvFilter{display:none!important}
+.lv-mob.lv-cap .lv-stage{padding-bottom:0}
+.lv-mob.lv-cap .lv-head{border-bottom:1px solid var(--ln)}
+#ltvToast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:1700;max-width:86vw;background:rgba(15,25,48,.97);border:1px solid var(--ln);color:var(--tx);padding:9px 16px;border-radius:12px;font-size:13px;text-align:center;line-height:1.35;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none;animation:lvtoast .25s ease}
+@keyframes lvtoast{from{opacity:0;transform:translate(-50%,8px)}}
 .lv-mob:not(.lv-act){cursor:auto}
 </style>
 <script>
@@ -10545,8 +10584,9 @@ SRIT.Router={
    lalu memfilter Jenjang × Jenis Kelamin di sisi klien tanpa panggilan server.
    ========================================================================= */
 SRIT.LiveTV={
-  timer:null,clockTimer:null,rotTimer:null,mobile:false,slide:0,slideCount:9,fDate:'',fSesi:'',fJJ:'',fJK:'',autoJJ:false,data:null,_rounds:0,
+  timer:null,clockTimer:null,rotTimer:null,mobile:false,slide:0,slideCount:9,cap:false,fOpen:false,fDate:'',fSesi:'',fJJ:'',fJK:'',autoJJ:false,data:null,_rounds:0,
   JJ:['SRD','SRMP','SRMA'],
+  SLC:['#5eead4','#38bdf8','#34d399','#f472b6','#fb923c','#fbbf24','#a78bfa','#818cf8','#facc15'],   // warna aksen tiap slide (urut PAGES)
   COL:{hadir:'#34d399',izin:'#818cf8',sakit:'#fbbf24',alpa:'#f87171',belum:'#64748b',L:'#38bdf8',P:'#f472b6',SRD:'#fb923c',SRMP:'#c084fc',SRMA:'#2dd4bf',baik:'#34d399',perbaikan:'#fbbf24',rusak:'#f87171'},
   PAGES:[['Ringkasan Eksekutif','Ringkasan'],['Profil Peserta Didik','Profil'],['Absensi & Kehadiran','Kehadiran'],['Kesehatan','Kesehatan'],['Kedisiplinan & Pembinaan','Disiplin'],['Aset & Sarana Prasarana','Aset'],['Operasional Hari Ini','Operasional'],['Izin & Kepulangan','Izin'],['Gamifikasi & Peringkat','Gamifikasi']],
   /* ---------- siklus hidup ---------- */
@@ -10554,7 +10594,7 @@ SRIT.LiveTV={
     this._forceMobile=!!mobile;this.mobile=this._forceMobile||this.isNarrow();this.slide=0;this.fDate='';this.fSesi='';this.fJJ='';this.fJK='';this._rounds=0;this.data=null;
     try{this.autoJJ=localStorage.getItem('ltvAutoJJ')==='1';}catch(e){this.autoJJ=false;}
     $('#appShell').style.display='none';$('#loginRoot').style.display='none';
-    const root=$('#liveTvRoot');root.classList.add('show');root.classList.toggle('lv-mob',this.mobile);root.style.display='flex';
+    const root=$('#liveTvRoot');root.classList.add('show');root.classList.toggle('lv-mob',this.mobile);root.classList.remove('lv-cap','lv-fopen');this.cap=false;this.fOpen=false;root.style.display='flex';
     this.buildShell();
     try{const c=JSON.parse(SRIT.LS.get('SRIT_LTV_LAST')||'null');   // tampilkan salinan terakhir (hari ini, <30 menit) selagi data baru diambil
       if(c&&c.d&&Date.now()-c.t<1800000&&new Date(c.t).toDateString()===new Date().toDateString()){this.data=c.d;this.render();}}catch(e){this.data=null;}
@@ -10597,12 +10637,48 @@ SRIT.LiveTV={
       this.goto(n);
     },this.rotateSec()*1000);
   },
-  goto(i){
-    this.slide=i;
+  goto(i,instant){
+    this.slide=i;this._mark(i);
+    if(this.mobile)this._snapTo(i,instant);
+    this.setupAutoScroll();
+  },
+  /* tandai tab/judul aktif (tanpa menggeser slide) */
+  _mark(i){
     $$('#ltvPages .lv-pg').forEach((el,ix)=>el.classList.toggle('on',ix===i));
     $$('#ltvTabs .lv-tab').forEach((el,ix)=>{el.classList.remove('on');if(ix===i){void el.offsetWidth;el.classList.add('on');}});
     const t=$('#ltvPT');if(t)t.innerHTML=this.PAGES[i][0]+'<em>'+(i+1)+' / '+this.PAGES.length+'</em>';
-    this.setupAutoScroll();
+    if(this.mobile){const tb=$('#ltvTabs'),a=tb&&tb.querySelector('.lv-tab.on');
+      if(a){const ar=a.getBoundingClientRect(),br=tb.getBoundingClientRect();tb.scrollBy({left:(ar.left+ar.width/2)-(br.left+br.width/2),behavior:'smooth'});}}
+  },
+  /* HP: geser papan slide ke slide ke-i */
+  _snapTo(i,instant){
+    const b=$('#ltvPages');if(!b)return;const w=b.clientWidth;if(!w)return;
+    b.scrollTo({left:i*w,behavior:instant?'auto':'smooth'});
+  },
+  /* HP: pantau geseran jari -> perbarui tab aktif */
+  bindSlides(){
+    const b=$('#ltvPages');if(!b||b._sb)return;b._sb=1;
+    b.addEventListener('scroll',()=>{
+      if(!this.mobile)return;clearTimeout(this._st);
+      this._st=setTimeout(()=>{const w=b.clientWidth||1,i=Math.max(0,Math.min(this.PAGES.length-1,Math.round(b.scrollLeft/w)));
+        if(i!==this.slide){this.slide=i;this._mark(i);}},70);
+    },{passive:true});
+  },
+  toggleFRow(){const r=$('#liveTvRoot');if(!r)return;this.fOpen=!this.fOpen;r.classList.toggle('lv-fopen',this.fOpen);},
+  /* MODE TANGKAP (HP): sembunyikan semua kontrol agar screenshot bersih; ketuk kop sekolah di atas untuk keluar */
+  capture(on){
+    const r=$('#liveTvRoot');if(!r)return;
+    this.cap=(on===undefined)?!this.cap:!!on;
+    r.classList.toggle('lv-cap',this.cap);
+    if(this.cap){this.fOpen=false;r.classList.remove('lv-fopen');this.toast('Mode tangkap aktif. Geser untuk pindah slide, ketuk kop sekolah di atas untuk keluar.',2800);}
+    else this.toast('Mode tangkap selesai',1100);
+    requestAnimationFrame(()=>this._snapTo(this.slide,true));
+  },
+  headTap(){if(this.cap)this.capture(false);},
+  toast(m,ms){
+    const r=$('#liveTvRoot');if(!r)return;const o=$('#ltvToast');if(o)o.remove();
+    const t=document.createElement('div');t.id='ltvToast';t.textContent=m;r.appendChild(t);
+    clearTimeout(this._tt);this._tt=setTimeout(()=>{const x=$('#ltvToast');if(x)x.remove();},ms||2500);
   },
   prev(){this.goto((this.slide-1+this.PAGES.length)%this.PAGES.length);this.startRotation();},
   next(){this.goto((this.slide+1)%this.PAGES.length);this.startRotation();},
@@ -10628,12 +10704,12 @@ SRIT.LiveTV={
     this.mobile=m;root.classList.toggle('lv-mob',m);
     this.startRotation();this.fit();
     if(this.data)this.render();
-    this.goto(this.slide);
+    this.goto(this.slide,true);
   },
   onResize(){ /* ganti mode bila perlu; di mode HP gambar ulang grafik jika lebar layar berubah banyak */
     const w0=this._rw;this._rw=innerWidth;this.syncMode();
     if(this.mobile&&w0&&Math.abs(innerWidth-w0)>40&&this.data)this.render();
-    this.fit();this.setupAutoScroll();
+    this.fit();if(this.mobile)this._snapTo(this.slide,true);this.setupAutoScroll();
   },
   mobFix(){ /* HP: jika jumlah KPI berurutan ganjil, KPI terakhir dilebarkan penuh agar tidak ada sel kosong */
     if(!this.mobile)return;
@@ -10661,7 +10737,7 @@ SRIT.LiveTV={
   buildShell(){
     const root=$('#liveTvRoot');
     root.innerHTML=`<div class="lv-stage" id="ltvStage">
-      <div class="lv-head">
+      <div class="lv-head" onclick="SRIT.LiveTV.headTap()">
         <div class="lv-logo" id="ltvLogo"></div>
         <div class="lv-school"><b id="ltvSchool"></b><small id="ltvApp"></small></div>
         <div class="lv-ptitle" id="ltvPT"></div>
@@ -10670,7 +10746,7 @@ SRIT.LiveTV={
       </div>
       <div class="lv-bar">
         <div class="lv-fg" id="ltvFJJ"></div><div class="lv-fg" id="ltvFJK"></div>
-        <div class="lv-tabs" id="ltvTabs"></div>
+        <div class="lv-tabrow"><div class="lv-tabs" id="ltvTabs"></div><button type="button" class="lv-ftog" id="ltvFTog" onclick="SRIT.LiveTV.toggleFRow()">Filter</button></div>
       </div>
       <div class="lv-body" id="ltvPages"></div>
       <div class="lv-foot"><b>Sorotan</b><div class="lv-tick"><div id="ltvTick"></div></div></div>
@@ -10684,13 +10760,14 @@ SRIT.LiveTV={
     <div class="lv-admin">
       <button class="lv-btn" id="ltvBelBtn" onclick="SRIT.LiveTV.armBell()">Aktifkan bel</button>
       <button class="lv-btn ${this.autoJJ?'on':''}" id="ltvAutoBtn" onclick="SRIT.LiveTV.toggleAuto()" title="Setiap putaran semua halaman, filter pindah: Semua → SRD → SRMP → SRMA">Putar jenjang</button>
+      <button class="lv-btn lv-capbtn" id="ltvCapBtn" onclick="SRIT.LiveTV.capture()">Tangkap</button>
       <button class="lv-btn" onclick="SRIT.LiveTV.toggleFilter()">Tanggal</button>
       <button class="lv-btn" onclick="SRIT.LiveTV.prev()">‹</button><button class="lv-btn" onclick="SRIT.LiveTV.next()">›</button>
       <button class="lv-btn" onclick="SRIT.LiveTV.fullscreen()">Layar penuh</button>
       <button class="lv-btn" onclick="location.hash='#/login'">Masuk</button>
     </div>`;
     root.style.setProperty('--lv-dur',this.rotateSec()+'s');
-    this.fit();
+    this.fit();this.bindSlides();
   },
   async toggleFilter(show){
     const p=$('#ltvFilter');if(!p)return;
@@ -10845,14 +10922,19 @@ SRIT.LiveTV={
     $('#ltvFJJ').innerHTML='<span>Jenjang</span>'+chip(!this.fJJ,'Semua',"SRIT.LiveTV.setJJ('')")+this.JJ.map(j=>chip(this.fJJ===j,j,`SRIT.LiveTV.setJJ('${j}')`)).join('')+(this.autoJJ?'<span style="color:var(--acc)">· berputar otomatis</span>':'');
     $('#ltvFJK').innerHTML='<span>Jenis kelamin</span>'+chip(!this.fJK,'Semua',"SRIT.LiveTV.setJK('')")+chip(this.fJK==='L','Putra',"SRIT.LiveTV.setJK('L')",this.COL.L)+chip(this.fJK==='P','Putri',"SRIT.LiveTV.setJK('P')",this.COL.P);
     const ab=$('#ltvAutoBtn');if(ab)ab.classList.toggle('on',this.autoJJ);
-    $('#ltvTabs').innerHTML=this.PAGES.map((p,i)=>`<div class="lv-tab ${i===this.slide?'on':''}" onclick="SRIT.LiveTV.jump(${i})">${p[1]}</div>`).join('');
+    $('#ltvTabs').innerHTML=this.PAGES.map((p,i)=>`<div class="lv-tab ${i===this.slide?'on':''}" style="--tc:${this.SLC[i]}" onclick="SRIT.LiveTV.jump(${i})">${p[1]}</div>`).join('');
+    const ft=$('#ltvFTog');if(ft)ft.textContent='Filter'+((this.fJJ||this.fJK)?' \u2022':'');
+    const sh=i=>this.mobile?`<div class="lv-sh"><span class="n">${i+1}/${this.PAGES.length}</span><b>${E(this.PAGES[i][0])}</b><small>${E(this.filterLabel())}</small></div>`:'';
     // halaman
     const B=[this.pg1,this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7,this.pg9,this.pg8];
     const rows=['auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr'];
     let html;
-    try{html=B.map((fn,i)=>`<div class="lv-pg ${i===this.slide?'on':''}" data-t="${this.PAGES[i][0]}" style="grid-template-rows:${rows[i]}">${fn.call(this,v)}</div>`).join('');}
+    try{html=B.map((fn,i)=>`<div class="lv-pg ${i===this.slide?'on':''}" data-t="${this.PAGES[i][0]}" style="grid-template-rows:${rows[i]};--sl:${this.SLC[i]}">${sh(i)}${fn.call(this,v)}</div>`).join('');}
     catch(e){console.error('LiveTV render',e);html=`<div class="lv-pg on"><div class="lv-p c12"><div class="lv-empty">Gagal menampilkan data: ${E(e.message)}</div></div></div>`;}
-    $('#ltvPages').innerHTML=html;
+    const pb=$('#ltvPages');let sx=0,sy=[];   // HP: pertahankan posisi geser & gulir saat data diperbarui
+    if(this.mobile){sx=pb.scrollLeft;sy=[...pb.querySelectorAll('.lv-pg')].map(x=>x.scrollTop);}
+    pb.innerHTML=html;
+    if(this.mobile){pb.scrollLeft=sx;[...pb.querySelectorAll('.lv-pg')].forEach((x,i)=>{x.scrollTop=sy[i]||0;});}
     const ins=this.insights(v);
     const ic={ok:['✓','#34d399'],warn:['!','#fbbf24'],bad:['▲','#f87171']};
     const tk=ins.map(x=>`<span><i style="color:${ic[x.l][1]}">${ic[x.l][0]}</i>${x.x}</span>`).join('');
