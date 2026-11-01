@@ -10593,198 +10593,239 @@ SRIT.Router={
 .lv-btn.on{background:rgba(52,211,153,.3)}
 #ltvFilter{position:fixed;bottom:110px;right:12px;z-index:1601;display:none;background:#0e1830;border:1px solid var(--ln);border-radius:12px;padding:14px;width:min(300px,90vw);box-shadow:0 12px 40px rgba(0,0,0,.5)}
 #ltvFilter label{font-size:12px;color:var(--mu);display:block;margin:6px 0 3px}
-/* ---- HP / layar sempit (v1.9.32) — MODEL SLIDE: satu jenis data = satu slide, geser kiri/kanan; ukuran mengikuti layar (dvh/clamp) ---- */
-.lv-tabrow{display:contents}
-.lv-ftog,.lv-capbtn,.lv-sh{display:none}
-.lv-mob{overflow:hidden!important}
-.lv-mob .lv-stage{position:absolute;left:0!important;top:0!important;width:100%!important;height:100%!important;transform:none!important;padding-bottom:calc(58px + env(safe-area-inset-bottom,0px))}
-.lv-mob .lv-head{height:auto;flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:4px 10px;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 8px}
-.lv-mob .lv-logo{width:38px;height:38px;font-size:16px;border-radius:10px}
-.lv-mob .lv-school b{font-size:clamp(13px,3.9vw,16px);white-space:normal;overflow:visible;line-height:1.2}
-.lv-mob .lv-school small{display:block;font-size:clamp(10px,2.8vw,11.5px);letter-spacing:.2px;margin-top:1px}
+/* ======================================================================
+   HP / layar sempit (v1.9.36) — TATA LETAK BARU: satu slide = satu layar penuh, TANPA scroll vertikal.
+   Susunan: kop kaca -> ticker sorotan -> papan slide (geser kiri/kanan) -> dock ikon.
+   Tinggi mengikuti 100dvh; kartu mengisi sisa ruang (flex), daftar panjang dipangkas otomatis (+N lainnya).
+   ====================================================================== */
+.lv-tabrow,.lv-fgs{display:contents}
+.lv-ftog,.lv-capbtn,.lv-mact,.lv-tab svg{display:none}
+.lv-mob{--sa:#5eead4;--dock:calc(60px + env(safe-area-inset-bottom,0px));overflow:hidden!important;overscroll-behavior:none;touch-action:manipulation;
+  background:radial-gradient(110% 55% at 50% -12%,color-mix(in srgb,var(--sa) 26%,transparent),transparent 62%),radial-gradient(90% 40% at 100% 100%,rgba(99,102,241,.14),transparent 70%),#060c19;
+  transition:background .4s}
+@supports (height:100dvh){.lv-mob{bottom:auto;height:100dvh}}
+.lv-mob .lv-stage{position:absolute;left:0!important;top:0!important;width:100%!important;height:100%!important;transform:none!important;background:none;display:flex;flex-direction:column}
+/* --- kop --- */
+.lv-mob .lv-head{order:0;height:auto;flex:none;display:flex;align-items:center;gap:10px;padding:calc(9px + env(safe-area-inset-top,0px)) 14px 7px;border:0}
+.lv-mob .lv-logo{width:38px;height:38px;border-radius:12px;font-size:15px;box-shadow:0 0 0 1px rgba(255,255,255,.14),0 8px 20px -8px var(--sa)}
+.lv-mob .lv-school{flex:1;min-width:0}
+.lv-mob .lv-school b{font-size:clamp(12.5px,3.7vw,14.5px);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow:hidden;line-height:1.15;letter-spacing:-.1px}
+.lv-mob .lv-school small{display:block;font-size:10px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;letter-spacing:.1px}
 .lv-mob .lv-ptitle{display:none}
-.lv-mob .lv-clockbox{min-width:0}
-.lv-mob .lv-clock{font-size:clamp(17px,5vw,21px)}
-.lv-mob .lv-date{font-size:clamp(10px,2.8vw,11.5px)}
-.lv-mob .lv-status{grid-column:1/-1;justify-self:start;padding:2px 10px;font-size:11px}
-.lv-mob .lv-status:not(.hist){display:none}
-.lv-mob .lv-bar{height:auto;flex:none;flex-direction:column;align-items:stretch;gap:6px;padding:0 12px 8px}
-.lv-mob .lv-tabrow{display:flex;align-items:center;gap:8px;order:-1;min-width:0}
-.lv-mob .lv-tabs{margin:0;flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
-.lv-mob .lv-tabs::-webkit-scrollbar{display:none}
-.lv-mob .lv-tab{flex:none;padding:7px 14px;font-size:13px;border:1px solid var(--ln);background:var(--pn);border-radius:999px}
-.lv-mob .lv-tab.on{background:var(--tc,var(--tx));color:#07101f;border-color:transparent}
-.lv-mob .lv-tab.on::after{display:none}
-.lv-mob .lv-ftog{display:flex;flex:none;align-items:center;border:1px solid var(--ln);background:var(--pn);color:var(--mu);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer}
+.lv-mob .lv-clockbox{flex:none;min-width:0;text-align:right}
+.lv-mob .lv-clock{font-size:clamp(18px,5.4vw,22px);letter-spacing:.2px;display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.lv-mob .lv-clock::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--hadir);box-shadow:0 0 0 3px rgba(52,211,153,.18);animation:lvpulse 1.8s ease-in-out infinite}
+.lv-mob .lv-date{font-size:10px;margin-top:1px}
+.lv-mob .lv-status{display:none}
+.lv-mob .lv-status.hist{display:flex;flex:none;padding:3px 8px;font-size:9.5px;gap:0}
+.lv-mob .lv-ftog{display:flex;flex:none;position:relative;width:36px;height:36px;padding:0;align-items:center;justify-content:center;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:var(--tx);cursor:pointer}
+.lv-mob .lv-ftog svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.lv-mob .lv-ftog.has::after{content:"";position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:var(--sa);box-shadow:0 0 0 2px #0a1428}
 .lv-mob.lv-fopen .lv-ftog{background:var(--tx);color:#0a1428}
-.lv-mob .lv-fg{display:none;flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none}
-.lv-mob.lv-fopen .lv-fg{display:flex}
-.lv-mob .lv-fg::-webkit-scrollbar{display:none}
-.lv-mob .lv-fg>span:not(.lv-chip){font-size:12px;flex:none;min-width:80px;margin:0}
-.lv-mob .lv-chip{padding:5px 11px;font-size:13px;flex:none}
-.lv-mob .lv-capbtn{display:block}
-/* papan slide: satu layar = satu jenis data; tiap slide menggulir sendiri ke bawah bila isinya panjang */
-.lv-mob .lv-body{flex:1;min-height:0;position:relative;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+/* --- ticker sorotan --- */
+.lv-mob .lv-foot{order:1;flex:none;height:26px;margin:0 12px 6px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.04)}
+.lv-mob .lv-foot>b{display:flex;padding:0 9px;font-size:9px;letter-spacing:.9px;text-transform:uppercase;font-weight:800;background:var(--sa)}
+.lv-mob .lv-tick>div{font-size:11.5px;line-height:24px}
+.lv-mob .lv-tick span{margin-right:40px}
+/* --- sheet filter --- */
+.lv-mob .lv-bar{display:contents}
+.lv-mob .lv-fgs{display:none;position:absolute;z-index:30;left:10px;right:10px;bottom:calc(var(--dock) + 8px);flex-direction:column;gap:10px;padding:14px;border-radius:20px;background:rgba(12,22,44,.97);border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 50px rgba(0,0,0,.6);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.lv-mob.lv-fopen .lv-fgs{display:flex}
+.lv-mob .lv-fg{display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+.lv-mob .lv-fg>span:not(.lv-chip){flex:0 0 100%;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--mu);margin:0;font-weight:700}
+.lv-mob .lv-chip{padding:7px 14px;font-size:13px}
+.lv-mob .lv-mact{display:flex;gap:8px;padding-top:10px;border-top:1px solid rgba(255,255,255,.1)}
+.lv-mob .lv-mact .lv-btn{flex:1;padding:10px 8px;font-size:13px}
+.lv-mob #ltvFilter{bottom:calc(var(--dock) + 10px);left:12px;right:12px;width:auto;z-index:40}
+.lv-mob .lv-admin{display:none!important}
+/* --- dock navigasi --- */
+.lv-mob .lv-tabs{order:9;flex:none;margin:0;display:flex;gap:2px;overflow:visible;padding:7px 8px calc(7px + env(safe-area-inset-bottom,0px));background:rgba(7,13,28,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,.08)}
+.lv-mob .lv-tab{flex:1 1 0;min-width:0;height:44px;padding:0;border-radius:15px;border:0;background:none;color:var(--mu2);display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:800;overflow:hidden;white-space:nowrap}
+.lv-mob .lv-tab svg{display:block;width:21px;height:21px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.lv-mob .lv-tab span{display:none}
+.lv-mob .lv-tab.on{flex:0 0 auto;padding:0 14px;color:var(--tc,var(--tx));background:color-mix(in srgb,var(--tc,#fff) 17%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--tc,#fff) 42%,transparent)}
+.lv-mob .lv-tab.on span{display:inline}
+.lv-mob .lv-tab.on::after{display:none}
+/* --- papan slide --- */
+.lv-mob .lv-body{order:2;flex:1;min-height:0;position:relative;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .lv-mob .lv-body::-webkit-scrollbar{display:none}
-.lv-mob .lv-pg{position:relative;inset:auto;flex:0 0 100%;width:100%;height:100%;opacity:1;visibility:visible;transition:none;display:grid!important;
-  grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none!important;grid-auto-rows:max-content;align-content:start;gap:10px;
-  padding:0 12px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:none;
-  scroll-snap-align:start;scroll-snap-stop:always;scroll-snap-type:y proximity;scroll-padding-top:58px;-webkit-overflow-scrolling:touch}
-.lv-mob .lv-pg::-webkit-scrollbar{display:none}
-.lv-mob .lv-pg::before{content:none;display:none}
-.lv-mob .lv-pg>*{grid-column:1/-1!important;grid-row:auto!important;min-height:0;margin:0}
-.lv-mob .lv-pg>.lv-sh{display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:6;margin:0 -12px!important;padding:11px 14px;
-  background:rgba(7,14,28,.93);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:2px solid var(--sl,var(--acc))}
-.lv-sh .n{flex:none;font-size:11.5px;font-weight:700;color:#07101f;background:var(--sl,var(--acc));border-radius:999px;padding:2px 9px}
-.lv-sh b{flex:1;min-width:0;font-size:clamp(15px,4.4vw,18px);font-weight:700;line-height:1.15}
-.lv-sh small{flex:none;max-width:44%;font-size:11px;color:var(--mu);text-align:right;line-height:1.25}
-.lv-mob .lv-pg>.lv-p{scroll-snap-align:start;border-top:3px solid var(--sl,var(--acc))}
-.lv-mob .lv-pg>.lv-k:first-of-type{scroll-snap-align:start}
-.lv-mob .lv-pg>.lv-k{grid-column:auto!important;min-height:88px;padding:11px 14px}
-.lv-mob .lv-pg>.lv-k.lv-wide{grid-column:1/-1!important}
-.lv-mob .lv-k .l{font-size:12px}
-.lv-mob .lv-k .v{font-size:clamp(24px,7.4vw,30px);margin-top:3px}
-.lv-mob .lv-k .v small{font-size:14px}
-.lv-mob .lv-k .s{font-size:11.5px;line-height:1.3}
-.lv-mob .lv-k .sp{display:none}
-.lv-mob .lv-p{min-height:0;padding:14px}
-.lv-mob .lv-empty{padding:24px 12px}
-.lv-mob .lv-p h4{font-size:16px}
-.lv-mob .lv-p .lv-sub{font-size:12px}
-.lv-mob .lv-pb{overflow-x:auto}
-.lv-mob .lv-scroll{overflow:visible}
-.lv-mob .lv-pb>svg{height:auto}
-.lv-mob .lv-leg{font-size:12px}
-.lv-mob .sb{grid-template-columns:minmax(92px,36%) 1fr auto!important;gap:8px;font-size:13px;padding:5px 0}
-.lv-mob .sb .lb{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.2;overflow-wrap:anywhere}
-.lv-mob .sb .rt small{font-size:11px;margin-left:3px}
-.lv-mob .lv-pod{gap:8px;flex-wrap:nowrap}
-.lv-mob .lv-pc{padding:10px 9px}
-.lv-mob .lv-pk{font-size:10.5px;letter-spacing:.3px;white-space:nowrap}
-.lv-mob .lv-pn{font-size:14px;line-height:1.2;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;margin-top:2px}
-.lv-mob .lv-pm{font-size:11px;line-height:1.3;margin-top:2px}
-.lv-mob .lv-ps{font-size:24px;margin-top:4px}
-.lv-mob .lv-ps small{display:block;font-size:11px;margin-left:0}
+.lv-mob .lv-pg{position:relative;inset:auto;flex:0 0 100%;width:100%;height:100%;opacity:1;visibility:visible;transition:none;display:flex!important;flex-direction:column;gap:7px;padding:2px 12px 10px;overflow:hidden;scroll-snap-align:start;scroll-snap-stop:always}
+.lv-mob .lv-pg>*:not(.m-sh){zoom:var(--z,1)}
+.m-sh{flex:none;display:flex;align-items:center;gap:9px;padding:2px 0 1px}
+.m-sh .n{flex:none;width:26px;height:26px;border-radius:9px;background:var(--sl,var(--acc));color:#06101f;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px -6px var(--sl,var(--acc))}
+.m-sh b{flex:1;min-width:0;font-size:clamp(15.5px,4.6vw,19px);font-weight:800;letter-spacing:-.25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-sh em{flex:none;font-style:normal;font-size:10.5px;font-weight:600;color:var(--mu);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);padding:3px 9px;border-radius:999px;white-space:nowrap;max-width:44%;overflow:hidden;text-overflow:ellipsis}
+/* kartu angka */
+.mrow{flex:0 0 auto;display:grid;gap:7px;grid-template-columns:repeat(var(--cols,3),minmax(0,1fr))}
+.mt{position:relative;border-radius:14px;padding:9px 10px 8px;background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;justify-content:center;min-width:0;overflow:hidden}
+.mt::before{content:"";position:absolute;left:10px;right:10px;top:0;height:2px;border-radius:0 0 2px 2px;background:var(--c)}
+.mt .ml{font-size:10.5px;color:var(--mu);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt .mv{font-size:clamp(21px,6.6vw,28px);font-weight:800;line-height:1.05;color:var(--c);margin-top:2px;white-space:nowrap}
+.mt .mv small{font-size:11px;color:var(--mu);margin-left:2px;font-weight:600}
+.mt .ms{font-size:9.5px;color:var(--mu2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* kartu panel */
+.mc{flex:0 0 auto;min-height:0;min-width:0;display:flex;flex-direction:column;border-radius:16px;padding:10px 12px;background:linear-gradient(165deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);overflow:hidden}
+.mc.g2{flex-grow:.35}.mc.g3{flex-grow:.5}.mc.g0{flex-grow:0}
+.mc.tr{flex:1 0 auto}.mc.tr.g2{flex-grow:1.6}
+.mc>header{flex:none;display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.mc h5{margin:0;font-size:12.5px;font-weight:700;white-space:nowrap}
+.mc>header small{min-width:0;font-size:10px;color:var(--mu);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb{flex:1;min-height:0;margin-top:7px;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.mc.tr .mb{justify-content:flex-start}
+.mb>svg{display:block;width:100%;height:auto;max-height:100%}
+.mpair{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:7px;min-height:0}
+.mpair.tr{flex:1 0 auto}
+.mpair .mc{flex:none;min-height:0}
+.mmore{flex:none;text-align:center;font-size:10px;color:var(--mu);padding-top:4px}
+/* hero cincin */
+.mhero{display:flex;align-items:center;gap:14px}
+.mring{flex:none;width:clamp(84px,25vw,108px);height:auto}
+.mleg{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.mlg{display:flex;align-items:center;gap:7px;font-size:12px;padding:1.5px 0}
+.mlg i{width:9px;height:9px;border-radius:3px;flex:none}
+.mlg span{flex:1;min-width:0;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mlg b{font-weight:800}
+.mlg u{text-decoration:none;color:var(--mu2);font-size:10.5px;min-width:34px;text-align:right}
+.mdelta{font-size:10.5px;color:var(--mu);margin-top:6px}
+/* baris batang */
+.lv-mob .sb{grid-template-columns:minmax(66px,31%) 1fr auto!important;gap:8px;font-size:11.5px;padding:3px 0}
+.lv-mob .sb .tr{height:10px;border-radius:5px}
+.lv-mob .sb .lb{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
 .lv-mob .sb .rt{white-space:nowrap}
-.lv-mob .lv-t{font-size:13px}
-.lv-mob .lv-t th{font-size:11px;padding:5px;white-space:normal}
-.lv-mob .lv-t td{padding:7px 5px;white-space:normal}
-.lv-mob .lv-t td.tx{max-width:none}
-.lv-mob .sb>span[style*="font-size:20px"]{white-space:normal!important;font-size:16px!important;line-height:1.25}
-.lv-mob .lv-b{font-size:10.5px;padding:2px 7px;white-space:normal;text-align:center;line-height:1.25}
-.lv-mob .lv-t td{font-size:12.5px}
-.lv-mob .in{font-size:14px}
-.lv-mob .hm .c b{font-size:28px}
-.lv-mob .hm .c{padding:8px 0;min-height:64px}
-.lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:column;align-items:stretch}
-.lv-mob .lv-pb>div[style*="gap:20px"]>svg{align-self:center;height:210px}
-.lv-mob .lv-foot{height:40px}
-.lv-mob .lv-foot>b{display:none}
-.lv-mob .lv-admin{opacity:1;pointer-events:auto;position:fixed;bottom:0;left:0;right:0;flex-wrap:nowrap;justify-content:center;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(10,20,40,.96);border-top:1px solid var(--ln)}
-.lv-mob .lv-admin .lv-btn{flex:1;max-width:170px;padding:9px 10px;font-size:13px;white-space:nowrap}
-.lv-mob .lv-admin #ltvBelBtn,.lv-mob .lv-admin #ltvAutoBtn,.lv-mob .lv-admin .lv-btn[onclick*="prev()"],.lv-mob .lv-admin .lv-btn[onclick*="next()"],.lv-mob .lv-admin .lv-btn[onclick*="fullscreen()"]{display:none}
-.lv-mob #ltvFilter{bottom:64px;left:12px;right:12px;width:auto}
-@media (min-width:600px){
-.lv-mob .lv-pg{grid-template-columns:repeat(4,minmax(0,1fr))}
-.lv-mob .lv-pg>.lv-k.lv-wide{grid-column:auto!important}
-.lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:row;align-items:center}
-}
-/* HP mendatar: ringkas supaya slide tetap lega */
-@media (max-height:480px){
-.lv-mob .lv-head{padding:4px 14px;gap:2px 10px}
-.lv-mob .lv-logo{width:30px;height:30px}
-.lv-mob .lv-school small{display:none}
-.lv-mob .lv-foot{display:none}
-.lv-mob .lv-stage{padding-bottom:calc(44px + env(safe-area-inset-bottom,0px))}
-.lv-mob .lv-admin{padding:4px 10px}
-.lv-mob .lv-admin .lv-btn{padding:6px 10px}
-.lv-mob .lv-pg>.lv-sh{padding:6px 14px}
-.lv-mob .lv-pg{scroll-padding-top:40px}
-}
-/* MODE TANGKAP: sembunyikan tab/filter/tombol/teks berjalan -> tangkapan layar bersih (kop sekolah + judul slide + isi) */
-.lv-mob.lv-cap .lv-bar,.lv-mob.lv-cap .lv-foot,.lv-mob.lv-cap .lv-admin,.lv-mob.lv-cap #ltvFilter{display:none!important}
-.lv-mob.lv-cap .lv-stage{padding-bottom:0}
-.lv-mob.lv-cap .lv-head{border-bottom:1px solid var(--ln)}
+.lv-mob .sb .rt small{font-size:9.5px;margin-left:3px}
+.lv-mob .lv-leg{font-size:10px;gap:3px 11px;margin-top:5px}
+.lv-mob .lv-leg i{width:8px;height:8px;margin-right:4px}
+/* daftar */
+.mi{flex:none;display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dashed rgba(255,255,255,.09);font-size:11.5px;line-height:1.25}
+.mi:last-child{border:0}
+.mi .t{flex:none;min-width:44px;color:var(--mu);font-size:10.5px;font-variant-numeric:tabular-nums}
+.mi .x{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mi .x small{display:block;color:var(--mu);font-size:10px;overflow:hidden;text-overflow:ellipsis}
+.mi .r{flex:none;font-weight:800}
+.mi.now .x{color:var(--acc);font-weight:700}
+.mi.dn .x{color:var(--mu2)}
+.mi .rk{flex:none;width:18px;height:18px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#07101f;background:var(--mu2)}
+.lv-mob .lv-b{font-size:9.5px;padding:1px 7px;white-space:nowrap}
+.lv-mob .lv-empty{padding:10px;font-size:12px}
+/* podium */
+.mpod{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;align-items:end;margin-top:2px}
+.mpod>div{border-radius:14px;padding:9px 8px;background:linear-gradient(170deg,rgba(255,255,255,.09),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.1);border-top:3px solid var(--mc);text-align:center;min-width:0}
+.mpod>div.f{padding-top:20px;padding-bottom:14px;background:linear-gradient(170deg,rgba(251,191,36,.18),rgba(255,255,255,.02))}
+.mpod .k{font-size:9.5px;font-weight:800;letter-spacing:.7px;color:var(--mc)}
+.mpod .nm{font-size:12px;font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mpod .sc{font-size:clamp(19px,6vw,25px);font-weight:800;color:var(--mc);line-height:1.1;margin-top:2px}
+.mpod .sm{font-size:9.5px;color:var(--mu)}
+.mseg{display:flex;height:26px;border-radius:9px;overflow:hidden;gap:2px;background:rgba(255,255,255,.05)}
+.mseg>div{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#06101f;min-width:0;overflow:hidden}
+.mgender{display:flex;justify-content:space-between;font-size:12px;margin-top:6px}
+.mgender b{font-size:clamp(17px,5.4vw,22px);font-weight:800}
+/* tangkap */
+.lv-mob.lv-cap .lv-tabs,.lv-mob.lv-cap .lv-foot,.lv-mob.lv-cap .lv-fgs,.lv-mob.lv-cap .lv-ftog,.lv-mob.lv-cap #ltvFilter{display:none!important}
+.lv-mob.lv-cap .lv-pg{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 #ltvToast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:1700;max-width:86vw;background:rgba(15,25,48,.97);border:1px solid var(--ln);color:var(--tx);padding:9px 16px;border-radius:12px;font-size:13px;text-align:center;line-height:1.35;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none;animation:lvtoast .25s ease}
 @keyframes lvtoast{from{opacity:0;transform:translate(-50%,8px)}}
 .lv-mob:not(.lv-act){cursor:auto}
-/* ===== v1.9.33 — HP: satu slide PAS satu layar, tanpa gulir. Widget dirapatkan; JS (fitSlides) menyesuaikan skala per slide ===== */
-.lv-mob{--chh:clamp(90px,16vh,170px);--lsh:clamp(72px,14vh,150px)}
-@supports (height:1dvh){.lv-mob{--chh:clamp(90px,16dvh,170px);--lsh:clamp(72px,14dvh,150px)}}
-.lv-mob .lv-stage{padding-bottom:calc(44px + env(safe-area-inset-bottom,0px))}
-.lv-mob .lv-head{padding:calc(5px + env(safe-area-inset-top,0px)) 10px 4px;gap:2px 8px}
-.lv-mob .lv-logo{width:28px;height:28px;font-size:13px;border-radius:8px}
-.lv-mob .lv-school b{font-size:clamp(11.5px,3.3vw,14px);line-height:1.15}
-.lv-mob .lv-school small{font-size:9.5px}
-.lv-mob .lv-clock{font-size:clamp(15px,4.4vw,18px)}
-.lv-mob .lv-date{font-size:9.5px;margin-top:1px}
-.lv-mob .lv-bar{padding:0 8px 4px;gap:4px}
-.lv-mob .lv-tabs{gap:4px;padding:1px 0}
-.lv-mob .lv-tab{padding:4px 10px;font-size:11.5px}
-.lv-mob .lv-ftog{padding:4px 10px;font-size:11.5px}
-.lv-mob .lv-chip{padding:3px 9px;font-size:11.5px}
-.lv-mob .lv-foot{height:26px}
-.lv-mob .lv-tick>div{font-size:12px}
-.lv-mob .lv-admin{padding:5px 8px calc(5px + env(safe-area-inset-bottom,0px));gap:6px}
-.lv-mob .lv-admin .lv-btn{padding:6px 8px;font-size:12px}
-/* papan slide: tidak ada gulir vertikal; isi diskalakan (--z) hingga pas, sisa ruang dibagi rata */
-.lv-mob .lv-pg{overflow:hidden;scroll-snap-type:none;align-content:space-between;gap:5px;padding:0 8px 6px;scroll-padding-top:0;touch-action:pan-x}
-.lv-mob .lv-pg>*:not(.lv-sh){zoom:var(--z,1)}
-.lv-mob .lv-pg>.lv-sh{margin:0 -8px!important;padding:5px 10px;gap:8px}
-.lv-sh .n{font-size:10px;padding:1px 7px}
-.lv-sh b{font-size:clamp(13px,3.8vw,15px)}
-.lv-sh small{font-size:9.5px}
-/* kartu angka */
-.lv-mob .lv-pg>.lv-k{min-height:0;padding:6px 10px}
-.lv-mob .lv-k::before{top:8px;bottom:8px;width:3px}
-.lv-mob .lv-k .l{font-size:10.5px}
-.lv-mob .lv-k .v{font-size:clamp(19px,5.6vw,23px);margin-top:1px}
-.lv-mob .lv-k .v small{font-size:11px}
-.lv-mob .lv-k .s{font-size:9.5px;margin-top:1px;line-height:1.2}
-/* panel */
-.lv-mob .lv-p{padding:7px 9px;border-radius:10px}
-.lv-mob .lv-pg>.lv-p{border-top-width:2px}
-.lv-mob .lv-p h4{font-size:12px}
-.lv-mob .lv-p .lv-sub{font-size:9.5px;margin-top:1px}
-.lv-mob .lv-pb{margin-top:4px;overflow:hidden}
-.lv-mob .lv-pb>svg{height:auto;width:100%;max-height:var(--chh)}
-.lv-mob .lv-p.r2 .lv-pb>svg{max-height:calc(var(--chh)*1.5)}
-.lv-mob .lv-pb.lv-scroll{flex:none;max-height:calc(var(--lsh)*var(--f,1));overflow:hidden}
-.lv-mob .lv-leg{font-size:9.5px;gap:2px 10px}
-.lv-mob .lv-leg i{width:8px;height:8px;margin-right:4px}
-.lv-mob .sb{font-size:10.5px;padding:2px 0;gap:6px;grid-template-columns:minmax(70px,32%) 1fr auto!important}
-.lv-mob .sb .tr{height:12px;border-radius:3px}
-.lv-mob .sb .lb{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
-.lv-mob .sb .rt small{font-size:9px}
-.lv-mob .sb>span[style*="font-size:20px"]{font-size:12px!important;line-height:1.2}
-.lv-mob .lv-t{font-size:10.5px}
-.lv-mob .lv-t th{font-size:9.5px;padding:3px 4px}
-.lv-mob .lv-t td{font-size:10.5px;padding:3px 4px}
-.lv-mob .lv-b{font-size:9px;padding:1px 6px}
-.lv-mob .in{font-size:11px;padding:4px 0;gap:8px;line-height:1.25}
-.lv-mob .in i{width:17px;height:17px;font-size:10px;border-radius:5px}
-.lv-mob .hm{gap:4px;grid-template-columns:44px 1fr 1fr}
-.lv-mob .hm .h{font-size:10px}.lv-mob .hm .r{font-size:11px}
-.lv-mob .hm .c{padding:3px 0;min-height:34px;border-radius:7px}
-.lv-mob .hm .c b{font-size:17px}.lv-mob .hm .c small{font-size:9px;margin-top:1px}
-.lv-mob .lv-pod{gap:6px}
-.lv-mob .lv-pc{padding:6px 7px}
-.lv-mob .lv-pk{font-size:9px}.lv-mob .lv-pn{font-size:12px}.lv-mob .lv-pm{font-size:9.5px}
-.lv-mob .lv-ps{font-size:18px;margin-top:2px}.lv-mob .lv-ps small{font-size:9.5px}
-.lv-mob .lv-empty{padding:8px;font-size:12px}
-/* donat: bulatan di kiri, keterangan di kanan (hemat tinggi) */
-.lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:row!important;align-items:center;gap:10px!important}
-.lv-mob .lv-pb>div[style*="gap:20px"]>svg{height:calc(var(--chh)*.8)!important;max-height:none!important;width:auto;flex:none;align-self:center}
-.lv-mob .lv-pb [style*="padding:5px 0"]{padding:2px 0!important}
-.lv-mob .lv-pb [style*="font-size:16px"]{font-size:11px!important;line-height:1.35!important}
-.lv-mob .lv-pb [style*="font-size:26px"]{font-size:17px!important}
-/* HP mendatar: dua panel per baris */
+/* ===== v1.9.37 — widget diperkecil: lebih banyak data per layar ===== */
+.lv-mob{--dock:calc(46px + env(safe-area-inset-bottom,0px))}
+.lv-mob .lv-head{padding:calc(6px + env(safe-area-inset-top,0px)) 12px 4px;gap:8px}
+.lv-mob .lv-logo{width:30px;height:30px;font-size:13px;border-radius:10px}
+.lv-mob .lv-school b{font-size:clamp(11.5px,3.3vw,13px)}
+.lv-mob .lv-school small{font-size:9px}
+.lv-mob .lv-clock{font-size:clamp(16px,4.6vw,19px)}
+.lv-mob .lv-date{font-size:9px}
+.lv-mob .lv-ftog{width:30px;height:30px;border-radius:10px}
+.lv-mob .lv-ftog svg{width:16px;height:16px}
+.lv-mob .lv-foot{height:20px;margin:0 10px 4px;border-radius:7px}
+.lv-mob .lv-foot>b{font-size:8px;padding:0 7px}
+.lv-mob .lv-tick>div{font-size:10.5px;line-height:18px}
+.lv-mob .lv-tabs{padding:4px 8px calc(4px + env(safe-area-inset-bottom,0px))}
+.lv-mob .lv-tab{height:38px;border-radius:13px}
+.lv-mob .lv-tab svg{width:19px;height:19px}
+.lv-mob .lv-tab.on{padding:0 11px;font-size:11.5px}
+.lv-mob .lv-pg{gap:5px;padding:0 10px 6px}
+.m-sh{padding:0}
+.m-sh .n{width:21px;height:21px;border-radius:7px;font-size:11px}
+.m-sh b{font-size:clamp(13.5px,4vw,15.5px)}
+.m-sh em{font-size:9.5px;padding:2px 7px}
+.mrow{gap:5px}
+.mt{padding:5px 8px 5px;border-radius:11px}
+.mt .ml{font-size:9.5px}
+.mt .mv{font-size:clamp(17px,5.3vw,21px);margin-top:1px}
+.mt .mv small{font-size:9.5px}
+.mt .ms{font-size:8.5px;margin-top:0}
+.mc{padding:6px 9px;border-radius:12px}
+.mc h5{font-size:11px}
+.mc>header small{font-size:9px}
+.mb{margin-top:4px}
+.mpair{gap:5px}
+.mring{width:clamp(66px,20vw,80px)}
+.mhero{gap:10px}
+.mleg{gap:0}
+.mleg.two{display:grid;grid-template-columns:1fr 1fr;column-gap:12px}
+.mleg.two u{display:none}
+.mlg{font-size:10.5px;padding:1px 0;gap:5px}
+.mlg i{width:7px;height:7px;border-radius:2px}
+.mlg u{font-size:9px;min-width:28px}
+.lv-mob .sb{grid-template-columns:minmax(78px,36%) 1fr auto!important;gap:6px;font-size:10.5px;padding:1.5px 0}
+.lv-mob .sb .tr{height:8px;border-radius:4px}
+.lv-mob .sb .rt small{font-size:8.5px}
+.lv-mob .lv-leg{font-size:9px;gap:2px 8px;margin-top:3px}
+.lv-mob .lv-leg i{width:7px;height:7px;margin-right:3px}
+.mi{padding:3px 0;gap:6px;font-size:10.5px;line-height:1.2}
+.mi .t{min-width:36px;font-size:9.5px}
+.mi .x small{font-size:9px}
+.mi .rk{width:15px;height:15px;font-size:9px;border-radius:5px}
+.lv-mob .lv-b{font-size:8.5px;padding:1px 6px}
+.mmore{font-size:9px;padding-top:2px}
+.mc.tr{min-height:52px}
+.mpod>div{padding:5px 6px;border-radius:11px}
+.mpod>div.f{padding-top:10px;padding-bottom:8px}
+.mpod .k{font-size:8.5px}.mpod .nm{font-size:10.5px;margin-top:1px}.mpod .sc{font-size:clamp(16px,5vw,20px)}.mpod .sm{font-size:8.5px}
+.mseg{height:20px;border-radius:7px}.mseg>div{font-size:10px}
+.mgender{font-size:10.5px;margin-top:3px}.mgender b{font-size:clamp(14px,4.4vw,17px)}
+.lv-mob .lv-empty{padding:6px;font-size:11px}
+/* kepadatan bertahap: semua baris data tampil, tanpa dipotong */
+.mc.tr .mb{overflow:visible}
+.mb.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:10px;align-content:start}
+.d1 .mt{padding:3px 8px}.d1 .mt .ms{display:none}
+.d1 .mc{padding:5px 8px}.d1 .mb{margin-top:3px}
+.d1 .mring{width:58px}
+.d1 .lv-leg{display:none}
+.d1.lv-pg{gap:4px}
+.d1 .sb{padding:.5px 0!important;font-size:10px!important}
+.d1 .mi{padding:1.5px 0;font-size:10px}
+.d1 .mlg{padding:0}
+/* HP kecil (iPhone SE dkk.) */
+@media (max-height:620px){
+.lv-mob{--dock:calc(54px + env(safe-area-inset-bottom,0px))}
+.lv-mob .lv-head{padding-top:calc(6px + env(safe-area-inset-top,0px));padding-bottom:4px}
+.lv-mob .lv-logo{width:32px;height:32px}
+.lv-mob .lv-tab{height:40px}
+.lv-mob .lv-tabs{padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom,0px))}
+.lv-mob .lv-foot{margin-bottom:4px}
+.lv-mob .lv-pg{gap:6px}
+}
+/* HP mendatar: dua kolom, kop & ticker dirapatkan */
 @media (orientation:landscape) and (max-height:520px){
-.lv-mob{--chh:clamp(70px,28vh,150px);--lsh:clamp(60px,24vh,130px)}
-.lv-mob .lv-pg{grid-template-columns:repeat(4,minmax(0,1fr))}
-.lv-mob .lv-pg>.lv-p{grid-column:span 2!important}
-.lv-mob .lv-pg>.lv-p.c12{grid-column:1/-1!important}
-.lv-mob .lv-pg>.lv-k,.lv-mob .lv-pg>.lv-k.lv-wide{grid-column:auto!important}
+.lv-mob{--dock:calc(44px + env(safe-area-inset-bottom,0px))}
+.lv-mob .lv-head{padding:4px 14px}
+.lv-mob .lv-logo{width:28px;height:28px;font-size:12px}
+.lv-mob .lv-school small,.lv-mob .lv-date,.lv-mob .lv-foot{display:none}
+.lv-mob .lv-clock{font-size:17px}
+.lv-mob .lv-tabs{padding:3px 8px}.lv-mob .lv-tab{height:36px}
+.lv-mob .lv-pg{gap:5px;padding:0 12px 6px}
+.lv-mob .lv-pg>.m-sh{display:none}
+.lv-mob .mring{width:62px}
+.lv-mob .mleg{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}
+.lv-mob .mlg{font-size:11px}
+.lv-mob .mc{padding:6px 10px}.lv-mob .mb{margin-top:4px}
+.lv-mob .mt{padding:5px 9px}.lv-mob .mt .mv{font-size:19px}.lv-mob .mt .ms{display:none}
+.lv-mob .mpod>div{padding:5px 6px}.lv-mob .mpod>div.f{padding-top:8px}
+.lv-mob .mc>header small{display:none}
+.lv-mob .mrow+.mrow,.lv-mob .mpair:not(.tr){display:none}
+.lv-mob .mc:not(.tr) .mb>svg:not(.mring){max-height:84px}
+.lv-mob .mc .lv-leg{display:none}
+}
 }
 </style>
 <script>
@@ -10857,6 +10898,7 @@ SRIT.LiveTV={
     $$('#ltvPages .lv-pg').forEach((el,ix)=>el.classList.toggle('on',ix===i));
     $$('#ltvTabs .lv-tab').forEach((el,ix)=>{el.classList.remove('on');if(ix===i){void el.offsetWidth;el.classList.add('on');}});
     const t=$('#ltvPT');if(t)t.innerHTML=this.PAGES[i][0]+'<em>'+(i+1)+' / '+this.PAGES.length+'</em>';
+    const rt=$('#liveTvRoot');if(rt)rt.style.setProperty('--sa',this.SLC[i]);
     if(this.mobile){const tb=$('#ltvTabs'),a=tb&&tb.querySelector('.lv-tab.on');
       if(a){const ar=a.getBoundingClientRect(),br=tb.getBoundingClientRect();tb.scrollBy({left:(ar.left+ar.width/2)-(br.left+br.width/2),behavior:'smooth'});}}
   },
@@ -10874,20 +10916,18 @@ SRIT.LiveTV={
         if(i!==this.slide){this.slide=i;this._mark(i);this.setupAutoScroll();}},70);
     },{passive:true});
   },
-  /* HP: tiap slide harus PAS satu layar tanpa gulir. Cari skala (--z) & batas tinggi daftar (--f) terbesar yang masih muat.
-     Kandidat diurutkan dari paling lega ke paling rapat; pencarian biner (pas atau tidak pas bersifat monoton). */
+  /* HP: tiap slide harus PAS satu layar tanpa gulir. Kartu mengisi sisa ruang (flex); jika isi non-daftar masih lebih tinggi
+     dari layar, skala (--z) diturunkan bertahap (min 0,72); lalu daftar panjang dipangkas menjadi "+N lainnya". */
   fitSlides(){
     if(!this.mobile)return;
     const pgs=$$('#ltvPages .lv-pg');if(!pgs.length)return;
-    const C=[];for(let z=100;z>=60;z-=5)C.push([z/100,1]);
-    C.push([.6,.8],[.6,.65],[.55,.65],[.5,.5]);
     pgs.forEach(pg=>{
       if(!pg.clientHeight)return;
-      const set=i=>{pg.style.setProperty('--z',C[i][0]);pg.style.setProperty('--f',C[i][1]);};
-      const fits=()=>pg.scrollHeight<=pg.clientHeight+2;
-      let lo=0,hi=C.length-1,best=hi;
-      while(lo<=hi){const m=(lo+hi)>>1;set(m);if(fits()){best=m;hi=m-1;}else lo=m+1;}
-      set(best);
+      pg.classList.remove('d1');pg.querySelectorAll('.mb.two').forEach(x=>x.classList.remove('two'));pg.style.setProperty('--z',1);
+      const over=()=>pg.scrollHeight>pg.clientHeight+1;
+      if(over())pg.classList.add('d1');
+      if(over())pg.querySelectorAll('.mc.tr .mb').forEach(x=>{if(x.children.length>=6&&[...x.children].every(e=>e.classList.contains('mi')))x.classList.add('two');});
+      let z=1;while(over()&&z>.5){z=Math.round((z-.03)*100)/100;pg.style.setProperty('--z',z);}
     });
   },
   toggleFRow(){const r=$('#liveTvRoot');if(!r)return;this.fOpen=!this.fOpen;r.classList.toggle('lv-fopen',this.fOpen);requestAnimationFrame(()=>this.fitSlides());},
@@ -10969,10 +11009,12 @@ SRIT.LiveTV={
         <div class="lv-ptitle" id="ltvPT"></div>
         <div class="lv-clockbox"><div class="lv-clock" id="ltvClock">${new Date().toLocaleTimeString('id-ID')}</div><div class="lv-date" id="ltvDate"></div></div>
         <div class="lv-status" id="ltvSt"><i></i>OPERASIONAL</div>
+        <button type="button" class="lv-ftog" id="ltvFTog" aria-label="Filter" onclick="event.stopPropagation();SRIT.LiveTV.toggleFRow()">${this.FUNNEL}</button>
       </div>
       <div class="lv-bar">
-        <div class="lv-fg" id="ltvFJJ"></div><div class="lv-fg" id="ltvFJK"></div>
-        <div class="lv-tabrow"><div class="lv-tabs" id="ltvTabs"></div><button type="button" class="lv-ftog" id="ltvFTog" onclick="SRIT.LiveTV.toggleFRow()">Filter</button></div>
+        <div class="lv-fgs"><div class="lv-fg" id="ltvFJJ"></div><div class="lv-fg" id="ltvFJK"></div>
+          <div class="lv-mact"><button class="lv-btn" onclick="SRIT.LiveTV.toggleFilter()">Tanggal</button><button class="lv-btn" onclick="SRIT.LiveTV.capture()">Tangkap</button><button class="lv-btn" onclick="location.hash='#/login'">Masuk</button></div></div>
+        <div class="lv-tabrow"><div class="lv-tabs" id="ltvTabs"></div></div>
       </div>
       <div class="lv-body" id="ltvPages"></div>
       <div class="lv-foot"><b>Sorotan</b><div class="lv-tick"><div id="ltvTick"></div></div></div>
@@ -11053,7 +11095,7 @@ SRIT.LiveTV={
   },
   /** garis multi-seri. series:[{name,color,vals:[v|null],dim}] labels:[str]; fmt untuk sumbu-y */
   line(series,labels,o={}){
-    const mb=this.mobile,W=mb?(innerWidth<500?430:Math.min(760,innerWidth-48)):760,H=o.h||(mb?300:330),pl=mb?44:50,pr=mb?92:96,pt=14,pb=32,all=series.flatMap(s=>s.vals).filter(v=>v!=null);
+    const mb=this.mobile,W=o.w||(mb?(innerWidth<500?430:Math.min(760,innerWidth-48)):760),H=o.h||(mb?300:330),pl=o.pl||(mb?44:50),pr=o.pr||(mb?92:96),pt=14,pb=32,fs=mb?11:13,all=series.flatMap(s=>s.vals).filter(v=>v!=null);
     if(!all.length)return this.emp('Belum ada data tren');
     let lo=o.min!=null?o.min:Math.min(...all),hi=o.max!=null?o.max:Math.max(...all);
     if(!o.fmt){ // sumbu persen: 0–100, tiap garis kisi = kelipatan bulat
@@ -11064,8 +11106,8 @@ SRIT.LiveTV={
     if(hi<=lo)hi=lo+4;
     const X=i=>pl+(labels.length>1?i/(labels.length-1):.5)*(W-pl-pr),Y=v=>pt+(1-(v-lo)/(hi-lo))*(H-pt-pb);
     const fmt=o.fmt||(v=>v+'%');let g='';
-    for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="#21314f" stroke-width="1"/><text x="${pl-8}" y="${y+4}" text-anchor="end" style="fill:#8fa3c7;font-size:13px">${fmt(Math.round(v*10)/10)}</text>`;}
-    g+=labels.map((l,i)=>`<text x="${X(i)}" y="${H-10}" text-anchor="middle" style="fill:#8fa3c7;font-size:13px">${l}</text>`).join('');
+    for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="#21314f" stroke-width="1"/><text x="${pl-8}" y="${y+4}" text-anchor="end" style="fill:#8fa3c7;font-size:${fs}px">${fmt(Math.round(v*10)/10)}</text>`;}
+    g+=labels.map((l,i)=>`<text x="${X(i)}" y="${H-10}" text-anchor="middle" style="fill:#8fa3c7;font-size:${fs}px">${l}</text>`).join('');
     const ends=[];let body='';
     series.forEach(s=>{
       let seg=[],paths=[];s.vals.forEach((v,i)=>{if(v==null){if(seg.length)paths.push(seg);seg=[];}else seg.push([X(i),Y(v),v]);});if(seg.length)paths.push(seg);
@@ -11074,15 +11116,15 @@ SRIT.LiveTV={
       const lastP=paths.length?paths[paths.length-1].slice(-1)[0]:null;if(lastP)ends.push({y:lastP[1],x:lastP[0],c:s.color,t:s.name+' '+fmt(Math.round(lastP[2]*10)/10),dim:s.dim});
     });
     ends.sort((a,b)=>a.y-b.y);for(let i=1;i<ends.length;i++)if(ends[i].y-ends[i-1].y<16)ends[i].y=ends[i-1].y+16;
-    body+=ends.map(e=>`<text x="${e.x+10}" y="${e.y+4}" opacity="${e.dim?.4:1}" style="fill:#e8eefc;font-size:14px;font-weight:600">${e.t}</text>`).join('');
+    body+=ends.map(e=>`<text x="${e.x+10}" y="${e.y+4}" opacity="${e.dim?.4:1}" style="fill:#e8eefc;font-size:${fs+1}px;font-weight:700">${e.t}</text>`).join('');
     return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${g}${body}</svg>`;
   },
   /** kolom sederhana. vals:[n], labels:[str] */
   cols(vals,labels,color,o={}){
-    const W=this.mobile?(innerWidth<500?400:Math.min(620,innerWidth-48)):620,H=o.h||300,pl=34,pb=30,pt=24,n=vals.length,mx=Math.max(1,...vals),bw=Math.min(64,(W-pl)/n*.62),st=(W-pl)/n;
+    const W=o.w||(this.mobile?(innerWidth<500?400:Math.min(620,innerWidth-48)):620),H=o.h||300,pl=34,pb=30,pt=24,n=vals.length,mx=Math.max(1,...vals),bw=Math.min(64,(W-pl)/n*.62),st=(W-pl)/n;
     let s=`<line x1="${pl}" x2="${W}" y1="${H-pb}" y2="${H-pb}" stroke="#21314f"/>`;
     vals.forEach((v,i)=>{const h=(H-pt-pb)*v/mx,x=pl+st*i+(st-bw)/2,y=H-pb-h;
-      s+=`<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h,v?3:0)}" rx="5" fill="${color}"/><text x="${x+bw/2}" y="${y-7}" text-anchor="middle" style="fill:#e8eefc;font-size:16px;font-weight:700">${v}</text><text x="${x+bw/2}" y="${H-9}" text-anchor="middle" style="fill:#8fa3c7;font-size:13px">${labels[i]}</text>`;});
+      s+=`<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h,v?3:0)}" rx="5" fill="${color}"/><text x="${x+bw/2}" y="${y-7}" text-anchor="middle" style="fill:#e8eefc;font-size:16px;font-weight:700">${v}</text><text x="${x+bw/2}" y="${H-9}" text-anchor="middle" style="fill:#8fa3c7;font-size:${o.fs||13}px">${labels[i]}</text>`;});
     return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
   },
   radar(labels,a,b,ca){
@@ -11141,21 +11183,21 @@ SRIT.LiveTV={
     $('#ltvLogo').innerHTML=d.logoUrl?`<img src="${d.logoUrl}">`:E(d.logo);
     $('#ltvSchool').textContent=d.school;
     $('#ltvApp').textContent=(d.settings.APP_NAME||'SRITi')+' · '+(d.settings.APP_SUBTITLE||'Sistem Rekam Informasi Terintegrasi');
-    $('#ltvDate').textContent=SRIT.Util.fmtDate(d.date);
+    $('#ltvDate').textContent=this.mobile?new Date(d.date+'T00:00:00').toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short',year:'numeric'}):SRIT.Util.fmtDate(d.date);
     const st=$('#ltvSt');st.className='lv-status'+(hist?' hist':'');st.innerHTML=hist?'DATA '+SRIT.Util.fmtDateShort(d.iso).toUpperCase():'<i></i>OPERASIONAL';
     // filter chips
     const chip=(on,label,act,dot)=>`<span class="lv-chip ${on?'on':''}" onclick="${act}">${dot?`<i style="background:${dot}"></i>`:''}${label}</span>`;
     $('#ltvFJJ').innerHTML='<span>Jenjang</span>'+chip(!this.fJJ,'Semua',"SRIT.LiveTV.setJJ('')")+this.JJ.map(j=>chip(this.fJJ===j,j,`SRIT.LiveTV.setJJ('${j}')`)).join('')+(this.autoJJ?'<span style="color:var(--acc)">· berputar otomatis</span>':'');
     $('#ltvFJK').innerHTML='<span>Jenis kelamin</span>'+chip(!this.fJK,'Semua',"SRIT.LiveTV.setJK('')")+chip(this.fJK==='L','Putra',"SRIT.LiveTV.setJK('L')",this.COL.L)+chip(this.fJK==='P','Putri',"SRIT.LiveTV.setJK('P')",this.COL.P);
     const ab=$('#ltvAutoBtn');if(ab)ab.classList.toggle('on',this.autoJJ);
-    $('#ltvTabs').innerHTML=this.PAGES.map((p,i)=>`<div class="lv-tab ${i===this.slide?'on':''}" style="--tc:${this.SLC[i]}" onclick="SRIT.LiveTV.jump(${i})">${p[1]}</div>`).join('');
-    const ft=$('#ltvFTog');if(ft)ft.textContent='Filter'+((this.fJJ||this.fJK)?' \u2022':'');
-    const sh=i=>this.mobile?`<div class="lv-sh"><span class="n">${i+1}/${this.PAGES.length}</span><b>${E(this.PAGES[i][0])}</b><small>${E(this.filterLabel())}</small></div>`:'';
+    $('#ltvTabs').innerHTML=this.PAGES.map((p,i)=>`<div class="lv-tab ${i===this.slide?'on':''}" style="--tc:${this.SLC[i]}" onclick="SRIT.LiveTV.jump(${i})"><svg viewBox="0 0 24 24">${this.ICON[i]}</svg><span>${p[1]}</span></div>`).join('');
+    const ft=$('#ltvFTog');if(ft)ft.classList.toggle('has',!!(this.fJJ||this.fJK));
+    const sh=i=>this.mobile?this.mSh(i):'';
     // halaman
-    const B=[this.pg1,this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7,this.pg9,this.pg8];
+    const B=this.mobile?[this.mp1,this.mp2,this.mp3,this.mp4,this.mp5,this.mp6,this.mp7,this.mp9,this.mp8]:[this.pg1,this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7,this.pg9,this.pg8];
     const rows=['auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr'];
     let html;
-    try{html=B.map((fn,i)=>`<div class="lv-pg ${i===this.slide?'on':''}" data-t="${this.PAGES[i][0]}" style="grid-template-rows:${rows[i]};--sl:${this.SLC[i]}">${sh(i)}${fn.call(this,v)}</div>`).join('');}
+    try{html=B.map((fn,i)=>`<div class="lv-pg ${i===this.slide?'on':''}" data-t="${this.PAGES[i][0]}" style="${this.mobile?'':'grid-template-rows:'+rows[i]+';'}--sl:${this.SLC[i]}">${sh(i)}${fn.call(this,v)}</div>`).join('');}
     catch(e){console.error('LiveTV render',e);html=`<div class="lv-pg on"><div class="lv-p c12"><div class="lv-empty">Gagal menampilkan data: ${E(e.message)}</div></div></div>`;}
     const pb=$('#ltvPages');let sx=0,sy=[];   // HP: pertahankan posisi geser & gulir saat data diperbarui
     if(this.mobile){sx=pb.scrollLeft;sy=[...pb.querySelectorAll('.lv-pg')].map(x=>x.scrollTop);}
@@ -11482,6 +11524,202 @@ SRIT.LiveTV={
       +this.pnl('Lencana bulan ini','Jumlah anak per lencana',bdH,'c4');
   },
 };
+/* =========================================================================
+   LIVE TV — TAMPILAN HP (v1.9.36). Tiap slide dirakit khusus untuk layar sempit:
+   kartu angka + 2–4 kartu visual yang MENGISI TEPAT satu layar (tanpa scroll vertikal).
+   Daftar panjang dipangkas otomatis menjadi "+N lainnya" (trimLists); bila masih kelebihan, fitSlides menyusutkan skala.
+   ========================================================================= */
+Object.assign(SRIT.LiveTV,{
+  ICON:[
+    '<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
+    '<circle cx="9" cy="8" r="3.4"/><path d="M2.5 20c.6-3.6 3.2-5.6 6.5-5.6s5.9 2 6.5 5.6"/><circle cx="17.2" cy="9" r="2.6"/><path d="M17.5 14.2c2.4.2 4 1.8 4.4 4.6"/>',
+    '<circle cx="12" cy="12" r="9"/><path d="M7.8 12.4l3 3 5.6-6.4"/>',
+    '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8v8M8 12h8"/>',
+    '<path d="M12 3l8 3v6c0 4.8-3.3 7.9-8 9-4.7-1.1-8-4.2-8-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
+    '<path d="M4 21V6l8-3 8 3v15"/><path d="M9.5 21v-5h5v5M9 9.5h.01M15 9.5h.01M9 13h.01M15 13h.01"/>',
+    '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.6 2.2"/>',
+    '<path d="M9 21H5.5A1.5 1.5 0 0 1 4 19.5v-15A1.5 1.5 0 0 1 5.5 3H9"/><path d="M16 16.5l4.5-4.5L16 7.5M20.5 12H9.5"/>',
+    '<path d="M12 2.8l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.6 6.1 20.8l1.2-6.5L2.5 9.7l6.6-.9z"/>'
+  ],
+  FUNNEL:'<svg viewBox="0 0 24 24"><path d="M3.5 5h17l-6.6 7.6V19l-3.8 1.8v-8.2z"/></svg>',
+  mW(){return Math.max(240,Math.min(560,innerWidth-48));},
+  /* ---------- komponen ---------- */
+  mSh(i){return `<div class="m-sh"><span class="n">${i+1}</span><b>${SRIT.Util.esc(this.PAGES[i][0])}</b>${(this.fJJ||this.fJK)?`<em>${SRIT.Util.esc(this.filterLabel())}</em>`:''}</div>`;},
+  mT(l,v,s,c,u){return `<div class="mt" style="--c:${c||'var(--acc)'}"><span class="ml">${l}</span><b class="mv">${v}${u?`<small>${u}</small>`:''}</b>${s?`<span class="ms">${s}</span>`:''}</div>`;},
+  mRow(tiles,cols){return `<div class="mrow" style="--cols:${cols||tiles.length}">${tiles.join('')}</div>`;},
+  mC(title,sub,body,cls){return `<section class="mc ${cls||''}"><header><h5>${title}</h5>${sub?`<small>${sub}</small>`:''}</header><div class="mb">${body}</div></section>`;},
+  mPair(a,b,list){return `<div class="mpair ${list?'tr':''}">${a}${b}</div>`;},
+  mRing(pct,color,big,small){
+    const R=42,Cc=2*Math.PI*R,l=Math.max(0,Math.min(100,pct||0))/100*Cc;
+    return `<svg class="mring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="${R}" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="9"/><circle cx="50" cy="50" r="${R}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${l.toFixed(1)} ${Cc.toFixed(1)}" transform="rotate(-90 50 50)"/><text x="50" y="${small?52:56}" text-anchor="middle" style="fill:#e8eefc;font-size:${String(big).length>4?19:23}px;font-weight:800">${big}</text>${small?`<text x="50" y="65" text-anchor="middle" style="fill:#8fa3c7;font-size:8.5px">${small}</text>`:''}</svg>`;
+  },
+  mLeg(rows,tot,two){return `<div class="mleg ${two?'two':''}">${rows.map(r=>`<div class="mlg"><i style="background:${r[2]}"></i><span>${r[0]}</span><b>${this.fn(r[1])}</b>${tot?`<u>${this.f1(this.pc(r[1],tot))}%</u>`:''}</div>`).join('')}</div>`;},
+  mDon(segs,big,small){
+    const tot=segs.reduce((a,s)=>a+s.v,0),R=42,Cc=2*Math.PI*R;let off=0;
+    const arcs=tot?segs.filter(s=>s.v>0).map(s=>{const len=s.v/tot*Cc,el=`<circle cx="50" cy="50" r="${R}" fill="none" stroke="${s.c}" stroke-width="12" stroke-dasharray="${Math.max(0,len-1.6).toFixed(2)} ${Cc.toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 50 50)"/>`;off+=len;return el;}).join(''):`<circle cx="50" cy="50" r="${R}" fill="none" stroke="#21314f" stroke-width="12"/>`;
+    const svg=`<svg class="mring" viewBox="0 0 100 100">${arcs}<text x="50" y="${small?51:56}" text-anchor="middle" style="fill:#e8eefc;font-size:${String(big).length>4?17:21}px;font-weight:800">${big}</text>${small?`<text x="50" y="64" text-anchor="middle" style="fill:#8fa3c7;font-size:8.5px">${small}</text>`:''}</svg>`;
+    return `<div class="mhero">${svg}${this.mLeg(segs.map(s=>[s.l,s.v,s.c]),tot)}</div>`;
+  },
+  attDelta(v){
+    const ps=this.hadirPctSeries(v.cs,v.dates),idx=ps.map((x,i)=>x!=null?i:-1).filter(i=>i>=0),now=ps[v.dates.length-1],prev=idx.length>1?ps[idx[idx.length-2]]:null;
+    const dl=(now!=null&&prev!=null&&idx[idx.length-1]===v.dates.length-1)?Math.round((now-prev)*10)/10:null;
+    return dl==null?SRIT.Util.esc(this.filterLabel()):`<span class="${dl>0?'up':dl<0?'dn':'flat'}">${dl>0?'▲':dl<0?'▼':'■'} ${this.f1(Math.abs(dl))} poin</span> vs kemarin`;
+  },
+  attHero(v){
+    const {t}=v,C=this.COL,has=t.hadir+t.izin+t.sakit+t.alpa>0,hp=this.pc(t.hadir,t.n),col=hp>=90?C.hadir:hp>=75?C.sakit:C.alpa;
+    const lg=this.mLeg([['Hadir',t.hadir,C.hadir],['Izin',t.izin,C.izin],['Sakit',t.sakit,C.sakit],['Alpa',t.alpa,C.alpa],['Belum tercatat',t.belum,C.belum]],0,true);
+    return `<div class="mhero">${this.mRing(has?hp:0,has?col:C.belum,has?this.f1(hp)+'%':'–','hadir')}${lg}</div>`;
+  },
+  segRows(all,withSub){const C=this.COL;return all.filter(c=>c.n>0).map(c=>({label:this.segName(c),dim:!this.inSel(c),parts:[{v:c.att.hadir,c:C.hadir},{v:c.att.izin,c:C.izin},{v:c.att.sakit,c:C.sakit},{v:c.att.alpa,c:C.alpa},{v:c.att.belum,c:C.belum}],right:this.f1(this.pc(c.att.hadir,c.n))+'%',sub:withSub?c.n+' org':''}));},
+  mLab(dates){return dates.map(x=>x.slice(8));},
+  /* ---------- 1 RINGKASAN ---------- */
+  mp1(v){
+    const {d,p,all,cs,t}=v,C=this.COL,E=SRIT.Util.esc,cur=d.curInfo||{};
+    const sp=this.spFiltered(p),bm=sp.rusak+sp.perbaikan,pel7=this.sum(cs,c=>c.pel.d7),bed={t:this.sum(cs,c=>c.bed.total),o:this.sum(cs,c=>c.bed.terisi)};
+    const L=this.sum(cs,c=>c.jk==='L'?c.n:0),P=this.sum(cs,c=>c.jk==='P'?c.n:0);
+    const rows=this.segRows(all);
+    return this.mC('Kehadiran hari ini',this.attDelta(v),this.attHero(v),'g0')
+      +this.mRow([this.mT('Peserta aktif',this.fn(t.n),`L ${L} · P ${P}`,'#e8eefc'),this.mT('Pelanggaran',this.fn(pel7),'7 hari terakhir','#fb923c'),this.mT('Aset masalah',this.fn(bm),`${sp.rusak} rusak`,bm?C.sakit:C.hadir)],3)
+      +this.mC('Status tiap segmen','Hadir · izin · sakit · alpa',rows.length?this.stack(rows,Math.max(1,...all.map(c=>c.n))):this.emp(),'tr')
+      +this.mC('Kegiatan sekarang',E(cur.jam||''),`<div style="font-size:clamp(15px,4.6vw,18px);font-weight:800;line-height:1.2;color:var(--acc)">${E(cur.nama||'Belum ada kegiatan')}</div><div style="font-size:11px;color:var(--mu);margin-top:3px">${E(cur.sasaran||'')}</div><div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--mu);margin-top:7px"><span>Berikutnya: <b style="color:var(--tx)">${E(d.next||'-')}</b></span><span>Hunian <b style="color:var(--tx)">${bed.t?this.f1(this.pc(bed.o,bed.t)):'–'}%</b></span></div>`,'g0');
+  },
+  /* ---------- 2 PROFIL ---------- */
+  mp2(v){
+    const {cs,all,t}=v,C=this.COL,E=SRIT.Util.esc;
+    const L=this.sum(cs,c=>c.jk==='L'?c.n:0),P=this.sum(cs,c=>c.jk==='P'?c.n:0);
+    const ages=cs.flatMap(c=>Object.keys(c.umur).map(a=>[+a,c.umur[a]])),na=ages.reduce((s,x)=>s+x[1],0),avg=na?ages.reduce((s,x)=>s+x[0]*x[1],0)/na:0;
+    const lg=this.sum(cs,c=>c.lengkap[0]),lt=this.sum(cs,c=>c.lengkap[1]);
+    const kelas={};cs.forEach(c=>Object.keys(c.kelas).forEach(k=>{const key=c.jj+' '+k,o=kelas[key]||(kelas[key]={jj:c.jj,k,L:0,P:0});o[c.jk]+=c.kelas[k];}));
+    const kr=Object.values(kelas).sort((a,b)=>(this.JJ.indexOf(a.jj)-this.JJ.indexOf(b.jj))||String(a.k).localeCompare(String(b.k),'id',{numeric:true}));
+    const kMax=Math.max(1,...kr.map(r=>r.L+r.P));
+    const kH=kr.length?kr.map(r=>`<div class="sb"><span class="lb">${r.jj} · ${E(r.k)}</span><div class="tr"><i style="width:${r.L/kMax*100}%;background:${C.L}"></i><i style="width:${r.P/kMax*100}%;background:${C.P}"></i></div><span class="rt">${r.L+r.P}</span></div>`).join(''):this.emp();
+    const wil={};cs.forEach(c=>Object.keys(c.wilayah).forEach(w=>wil[w]=(wil[w]||0)+c.wilayah[w]));
+    const wr=Object.keys(wil).map(w=>({w,n:wil[w]})).sort((a,b)=>b.n-a.n),wMax=Math.max(1,...wr.map(x=>x.n));
+    const wH=wr.length?wr.map(x=>`<div class="sb"><span class="lb">${E(x.w)}</span><div class="tr"><i style="width:${x.n/wMax*100}%;background:#5eead4"></i></div><span class="rt">${x.n}</span></div>`).join(''):this.emp('Kecamatan belum terisi');
+    const segs=all.filter(c=>c.n>0).map(c=>({v:c.n,c:C[c.jj],l:this.segName(c)}));
+    const gen=t.n?`<div class="mseg"><div style="width:${L/t.n*100}%;background:${C.L}">${this.f1(this.pc(L,t.n))}%</div><div style="width:${P/t.n*100}%;background:${C.P}">${this.f1(this.pc(P,t.n))}%</div></div><div class="mgender"><span style="color:${C.L}">Putra <b>${L}</b></span><span style="color:${C.P}"><b>${P}</b> Putri</span></div>`:this.emp();
+    return this.mRow([this.mT('Peserta didik',this.fn(t.n),this.filterLabel(),'#e8eefc'),this.mT('Usia rata-rata',na?this.f1(avg):'–','tahun',C.SRMP),this.mT('Data lengkap',lt?this.f1(this.pc(lg,lt)):'–','NIK, KK, alamat…',this.pc(lg,lt)>=90?C.hadir:C.sakit,lt?'%':'')],3)
+      +this.mC('Putra dan putri','',gen,'g0')
+      +this.mC('Komposisi peserta','Jenjang × jenis kelamin',this.mDon(segs,this.fn(this.sum(all,c=>c.n)),'peserta'),'g2')
+      +this.mPair(this.mC('Per kelas','',kH,'tr'),this.mC('Asal wilayah','',wH,'tr'),true);
+  },
+  /* ---------- 3 KEHADIRAN ---------- */
+  mp3(v){
+    const {d,all,cs,dates}=v,C=this.COL,E=SRIT.Util.esc,W=this.mW();
+    const sL=this.JJ.filter(j=>all.some(c=>c.jj===j&&c.n>0)).map(j=>({name:j,color:C[j],vals:this.hadirPctSeries(all.filter(c=>c.jj===j&&(!this.fJK||c.jk===this.fJK)),dates),dim:!!this.fJJ&&this.fJJ!==j}));
+    const rk=d.rekapKegiatan||[];
+    const rkH=rk.length?rk.map(k=>`<div class="mi ${k.now?'now':''}"><span class="t">${E(k.jam)}</span><span class="x">${k.now?'● ':''}${E(k.nama)}<div class="tr" style="height:5px;border-radius:3px;margin-top:3px;display:flex;background:rgba(255,255,255,.06)"><i style="width:${k.pct}%;background:${k.done||k.now?(k.pct>=90?C.hadir:k.pct>=75?C.sakit:C.alpa):C.belum}"></i></div></span><span class="r">${k.hadir}/${k.total}</span></div>`).join(''):this.emp('Tidak ada kegiatan ber-absensi');
+    return this.mC('Kehadiran hari ini',this.attDelta(v),this.attHero(v),'g0')
+      +this.mC('Tren 7 hari','% hadir per jenjang · tanggal',this.line(sL,this.mLab(dates),{w:W,h:Math.round(W*.36),pr:90,pl:42})+this.legend(this.JJ.map(j=>[C[j],j])),'g2')
+      +this.mC('Status tiap segmen','',this.stack(this.segRows(all),Math.max(1,...all.map(c=>c.n))),'tr')
+      +this.mC('Kehadiran tiap kegiatan','',rkH,'tr');
+  },
+  /* ---------- 4 KESEHATAN ---------- */
+  mp4(v){
+    const {p,all,cs,t,dates}=v,C=this.COL,E=SRIT.Util.esc,W=this.mW(),ins=p.insiden||{kesehatan:{aktif:0,d7:0,d30:0},list:[]};
+    const trS=this.trend(cs,dates),sk7=this.sum(cs,c=>c.sakitUnik7);
+    const rate=all.filter(c=>c.n>0).map(c=>({c,r:this.pc(c.att.sakit,c.n)})).sort((a,b)=>b.r-a.r),rMax=Math.max(5,...rate.map(x=>x.r));
+    const rH=rate.map(x=>`<div class="sb ${this.inSel(x.c)?'':'dim'}"><span class="lb">${this.segName(x.c)}</span><div class="tr"><i style="width:${x.r/rMax*100}%;background:${x.r>=5?C.alpa:C.sakit}"></i></div><span class="rt">${this.f1(x.r)}%<small>${x.c.att.sakit}/${x.c.n}</small></span></div>`).join('')||this.emp();
+    const priC={LOW:'b-ok',MEDIUM:'b-wr',HIGH:'b-bd',CRITICAL:'b-bd'};
+    const li=(ins.list||[]).map(i=>`<div class="mi"><span class="t">${SRIT.Util.fmtDateShort(i.tanggal).slice(0,6)}</span><span class="x">${E(i.kat)}</span><span class="lv-b ${priC[String(i.pri).toUpperCase()]||''}">${E(i.pri)}</span></div>`).join('')||`<div class="lv-empty" style="color:var(--hadir)">Tidak ada insiden aktif</div>`;
+    return this.mRow([this.mT('Sakit hari ini',this.fn(t.sakit),`${this.f1(this.pc(t.sakit,t.n))}% peserta`,C.sakit),this.mT('Sakit 7 hari',this.fn(sk7),'orang berbeda',C.sakit),this.mT('Kasus aktif',this.fn(ins.kesehatan.aktif),`${ins.kesehatan.d30} dlm 30 hr`,ins.kesehatan.aktif?C.alpa:C.hadir)],3)
+      +this.mC('Peserta sakit per hari','dari status absensi',this.cols(trS.map(x=>x.rec?x.sakit:0),this.mLab(dates),C.sakit,{w:W,h:Math.round(W*.26)}),'g2')
+      +this.mC('Tingkat sakit tiap segmen','merah bila ≥ 5%',rH,'tr')
+      +this.mC('Insiden yang masih ditangani','tanpa uraian demi privasi',li,'tr');
+  },
+  /* ---------- 5 DISIPLIN ---------- */
+  mp5(v){
+    const {all,cs,t,dates}=v,C=this.COL,W=this.mW(),pel=k=>this.sum(cs,c=>c[k]===undefined?c.pel[k]:0);
+    const P=k=>this.sum(cs,c=>c.pel[k]);
+    const pelS=dates.map((_,i)=>this.sum(cs,c=>c.pelTrend[i])),tot30=P('d30');
+    const hw=Math.floor((W-7)/2)-4;
+    const don=this.mDon([{v:P('ringan'),c:C.hadir,l:'Ringan'},{v:P('sedang'),c:C.sakit,l:'Sedang'},{v:P('berat'),c:C.alpa,l:'Berat'}],this.fn(tot30),'30 hari').replace('class="mhero"','class="mhero" style="flex-direction:column;gap:4px"');
+    const sr=all.filter(c=>c.n>0).map(c=>({label:this.segName(c),dim:!this.inSel(c),parts:[{v:c.pel.d30-c.pel.berat,c:'#fb923c'},{v:c.pel.berat,c:C.alpa}],right:c.pel.d30,sub:'30 hr'}));
+    return this.mRow([this.mT('Hari ini',this.fn(P('hari')),`${P('d7')} dlm 7 hari`,'#fb923c'),this.mT('30 hari',this.fn(tot30),`${this.f1(this.pc(tot30,t.n))} /100 peserta`,'#fb923c'),this.mT('Tingkat berat',this.fn(P('berat')),'30 hari',P('berat')?C.alpa:C.hadir)],3)
+      +this.mRow([this.mT('Peserta terlibat',this.fn(P('anak30')),`${this.f1(this.pc(P('anak30'),t.n))}%`,C.sakit),this.mT('Belum selesai',this.fn(P('buka')),'dalam proses',P('buka')?C.sakit:C.hadir),this.mT('Pembinaan aktif',this.fn(this.sum(cs,c=>c.pem.aktif)),`${this.sum(cs,c=>c.pem.selesai)} selesai`,C.hadir)],3)
+      +this.mPair(this.mC('Per hari','7 hari',this.cols(pelS,this.mLab(dates),'#fb923c',{w:hw,h:Math.round(hw*.7),fs:10}),'g2'),this.mC('Tingkat','30 hari',don,'g2'))
+      +this.mC('Pelanggaran tiap segmen','oranye ringan–sedang · merah berat',this.stack(sr,Math.max(1,...sr.map(r=>r.parts[0].v+r.parts[1].v))),'tr');
+  },
+  /* ---------- 6 ASET ---------- */
+  mp6(v){
+    const {p}=v,C=this.COL,E=SRIT.Util.esc,sp=this.spFiltered(p),S=p.sarpras||{tl:{dilaporkan:0,ditindaklanjuti:0,selesai:0},lokasi:[],laporan:[],seg:{}},tl=S.tl;
+    const hb=this.pc(sp.baik,sp.total);
+    const hero=`<div class="mhero">${this.mRing(hb,hb>=85?C.baik:hb>=65?C.sakit:C.rusak,this.f1(hb)+'%','kondisi baik')}${this.mLeg([['Baik',sp.baik,C.baik],['Perlu perbaikan',sp.perbaikan,C.perbaikan],['Rusak',sp.rusak,C.rusak]],sp.total)}</div>`;
+    const kat=Object.keys(sp.kat).map(k=>({k,...sp.kat[k]})).sort((a,b)=>(b.rusak+b.perbaikan)-(a.rusak+a.perbaikan)||b.total-a.total),kMax=Math.max(1,...kat.map(x=>x.total));
+    const kH=kat.length?this.stack(kat.map(k=>({label:E(k.k.charAt(0)+k.k.slice(1).toLowerCase()),parts:[{v:k.baik,c:C.baik},{v:k.perbaikan,c:C.perbaikan},{v:k.rusak,c:C.rusak}],right:this.f1(this.pc(k.baik,k.total))+'%',sub:k.total})),kMax):this.emp();
+    const lok=(S.lokasi||[]).filter(l=>this.keyIn(l.key)),lMax=Math.max(1,...lok.map(l=>l.bermasalah));
+    const lH=lok.length?lok.map(l=>`<div class="sb"><span class="lb">${E(l.lokasi)}</span><div class="tr"><i style="width:${(l.bermasalah-l.rusak)/lMax*100}%;background:${C.perbaikan}"></i><i style="width:${l.rusak/lMax*100}%;background:${C.rusak}"></i></div><span class="rt">${l.bermasalah}<small>/${l.total}</small></span></div>`).join(''):`<div class="lv-empty" style="color:var(--hadir)">Tidak ada lokasi bermasalah</div>`;
+    return this.mC('Kondisi aset',this.fn(sp.total)+' aset',hero,'g0')
+      +this.mRow([this.mT('Dilaporkan',this.fn(tl.dilaporkan),'belum ditangani',tl.dilaporkan?C.rusak:C.hadir),this.mT('Diproses',this.fn(tl.ditindaklanjuti),'ditindaklanjuti',C.izin),this.mT('Selesai',this.fn(tl.selesai),'laporan',C.hadir)],3)
+      +this.mC('Kondisi per kategori','baik · perbaikan · rusak',kH,'tr')
+      +this.mC('Lokasi bermasalah','kuning perbaikan · merah rusak',lH,'tr');
+  },
+  /* ---------- 7 OPERASIONAL ---------- */
+  mp7(v){
+    const {d,p,all}=v,C=this.COL,E=SRIT.Util.esc,L=d.layanan||{},jd=d.jadwal||[],pk=d.piket||[];
+    const jH=jd.length?jd.map(k=>`<div class="mi ${k.now?'now':k.done?'dn':''}"><span class="t">${E(k.jamMulai)}</span><span class="x">${k.now?'● ':''}${E(k.nama)}</span>${k.now?'<span class="lv-b b-ok">Sekarang</span>':k.done?'<span class="lv-b">Selesai</span>':'<span class="lv-b b-in">Menyusul</span>'}</div>`).join(''):this.emp('Tidak ada kegiatan terjadwal');
+    const bedRows=all.filter(c=>c.bed.total>0).map(c=>({label:this.segName(c),dim:!this.inSel(c),parts:[{v:c.bed.terisi,c:C[c.jk]},{v:c.bed.total-c.bed.terisi,c:'#2a3a5c'}],right:this.f1(this.pc(c.bed.terisi,c.bed.total))+'%',sub:c.bed.terisi+'/'+c.bed.total}));
+    const pH=pk.length?pk.map(x=>`<div class="mi"><span class="x"><b>${E(x.nama)}</b><small>${E(x.shift||'')} · ${E(x.lokasi||'')}</small></span><span class="lv-b b-ok">${E(x.status||'')}</span></div>`).join(''):this.emp('Tidak ada piket terjadwal');
+    return this.mRow([this.mT('Izin aktif',this.fn(L.izinAktif||0),'berlangsung',C.izin),this.mT('Telat',this.fn(L.belumKembali||0),'belum kembali',(L.belumKembali||0)?C.alpa:C.hadir),this.mT('Tamu',this.fn(L.kunjungan||0),'hari ini','#5eead4'),this.mT('Insiden',this.fn((d.insiden||{}).aktif||0),'aktif',((d.insiden||{}).aktif)?C.sakit:C.hadir)],4)
+      +this.mC('Jadwal kegiatan hari ini','berikutnya: '+E(d.next||'-'),jH,'tr g2')
+      +this.mC('Hunian asrama','tempat tidur terisi',this.stack(bedRows,Math.max(1,...all.map(c=>c.bed.total))),'tr')
+      +this.mC('Petugas piket','',pH,'tr');
+  },
+  /* ---------- 8 IZIN ---------- */
+  cycleIzinWin(){this.izinWin=this.izinWin===30?90:this.izinWin===90?365:30;this.render();},
+  mp9(v){
+    const {d,all}=v,C=this.COL,E=SRIT.Util.esc,Z=d.izin;
+    if(Z===undefined||!Z||Z.error)return this.mC('Izin & Kepulangan','',this.emp(Z&&Z.error?'Data izin belum dapat dimuat: '+E(Z.error):'Data izin belum diterima dari server. Deploy ulang Api_LiveTV.gs.'),'');
+    const catOf=x=>x.telat?'telat':x.status==='BERANGKAT'?'luar':x.status==='DISETUJUI'?'setuju':x.status==='MENUNGGU'?'tunggu':'kembali';
+    const inSel=x=>(!this.fJJ||x.jj===this.fJJ)&&(!this.fJK||x.jk===this.fJK);
+    const rows=(Z.list||[]).filter(inSel),T={tunggu:0,setuju:0,luar:0,telat:0,kembali:0};rows.forEach(x=>T[catOf(x)]++);
+    const nP=this.sum(v.cs,c=>c.n),diLuar=T.luar+T.telat;
+    const seg=x=>x.jj&&x.jk?x.jj+' '+(x.jk==='L'?'Putra':'Putri'):'-';
+    const luar=rows.filter(x=>x.status==='BERANGKAT'||x.status==='TERLAMBAT').sort((a,b)=>(b.telat-a.telat)||String(a.kb).localeCompare(String(b.kb))||String(a.nama).localeCompare(String(b.nama)));
+    const lH=luar.length?luar.map(x=>`<div class="mi"><span class="x"><b>${E(x.nama)}</b><small>${seg(x)}${x.kelas?' · '+E(x.kelas):''} · kembali ${x.kb?SRIT.Util.fmtDateShort(x.kb).slice(0,6):'-'}</small></span>${x.telat?`<span class="lv-b b-bd">Telat ${x.telat} hr</span>`:'<span class="lv-b b-in">Di luar</span>'}</div>`).join(''):`<div class="lv-empty" style="color:var(--hadir)">Tidak ada yang sedang izin keluar</div>`;
+    const W=this.izinWin===30?0:this.izinWin===365?2:1,WL=['30 hari','90 hari','1 tahun'][W];
+    const cmp=(a,b)=>b.n[W]-a.n[W]||b.h[W]-a.h[W]||String(a.nama).localeCompare(String(b.nama));
+    const top=(Z.rank||[]).filter(x=>x.n[W]>0&&inSel(x)).sort(cmp);
+    const tH=top.length?top.map((x,i)=>`<div class="mi"><span class="rk" style="background:${['#fbbf24','#cbd5e1','#cd7f32'][i]||'#5f7299'}">${i+1}</span><span class="x"><b>${E(x.nama)}</b><small>${seg(x)}${x.kelas?' · '+E(x.kelas):''}</small></span><span class="r">${x.n[W]}×<span style="color:var(--mu);font-weight:500;font-size:10px"> ${x.h[W]} hr</span></span></div>`).join(''):this.emp('Belum ada izin pada periode ini');
+    return this.mRow([this.mT('Menunggu',this.fn(T.tunggu),'persetujuan',C.sakit),this.mT('Disetujui',this.fn(T.setuju),'belum berangkat',C.izin),this.mT('Di luar',this.fn(diLuar),`${this.f1(this.pc(diLuar,nP))}% peserta`,'#5eead4'),this.mT('Terlambat',this.fn(T.telat),'belum kembali',T.telat?C.alpa:C.hadir)],4)
+      +this.mC('Sedang izin keluar',luar.length+' orang',lH,'tr g2')
+      +this.mC('Paling sering izin',`<span onclick="SRIT.LiveTV.cycleIzinWin()" style="color:var(--acc);font-weight:700">${WL} ⟳</span>`,tH,'tr');
+  },
+  /* ---------- 9 GAMIFIKASI ---------- */
+  mp8(v){
+    const {d}=v,G=d.gamif,C=this.COL,E=SRIT.Util.esc;
+    if(!G||G.error||!(G.kamar||[]).length)return this.mC('Gamifikasi & Peringkat','',this.emp(G&&G.error?'Data gamifikasi belum dapat dimuat':'Belum ada data peringkat bulan ini'),'');
+    const LVC={PERUNGGU:'#cd7f32',PERAK:'#cbd5e1',EMAS:'#fbbf24',PLATINUM:'#5eead4'},LVN={PERUNGGU:'Perunggu',PERAK:'Perak',EMAS:'Emas',PLATINUM:'Platinum'},med=['#fbbf24','#cbd5e1','#cd7f32'];
+    const km=G.kamar.filter(k=>(!this.fJJ||k.jj===this.fJJ)&&(!this.fJK||k.jk===this.fJK)),kl=G.kelompok.filter(k=>!this.fJJ||k.jj===this.fJJ);
+    const n=this.sum(km,k=>k.n),tot=this.sum(km,k=>k.total),lv={},nBd=this.sum(km,k=>Object.keys(k.bd).reduce((a,x)=>a+k.bd[x],0));
+    Object.keys(LVN).forEach(k=>lv[k]=this.sum(km,x=>x.lv[k]));const hi=lv.EMAS+lv.PLATINUM;
+    const bln=new Date(G.period+'-01T00:00:00').toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+    const kMax=Math.max(1,...km.map(k=>k.skor)),gMax=Math.max(1,...kl.map(k=>k.skor));
+    const rank=(list,mx,colorOf)=>list.length?this.stack(list.map((k,i)=>({label:`<span style="color:${med[i]||'var(--mu2)'};font-weight:800;margin-right:6px">${i+1}</span>${E(k.nama)}`,parts:[{v:k.skor,c:colorOf(k)}],right:this.f1(k.skor),sub:k.n+' anak'})),mx):this.emp();
+    const pod=`<div class="mpod">${[1,0,2].filter(i=>km[i]).map(i=>{const k=km[i];return `<div class="${i===0?'f':''}" style="--mc:${med[i]};order:${i===1?0:i===0?1:2}"><div class="k">JUARA ${i+1}</div><div class="nm">${E(k.nama)}</div><div class="sm">${E(k.jj)}${k.jk?' · '+(k.jk==='L'?'Putra':'Putri'):''}</div><div class="sc">${this.f1(k.skor)}</div></div>`;}).join('')}</div>`;
+    const lt=Object.keys(LVN).reduce((a,k)=>a+lv[k],0)||1;
+    const lvH=`<div class="mseg">${Object.keys(LVN).filter(k=>lv[k]>0).map(k=>`<div style="width:${lv[k]/lt*100}%;background:${LVC[k]}">${lv[k]}</div>`).join('')}</div>`+this.legend(Object.keys(LVN).map(k=>[LVC[k],LVN[k]]));
+    return pod
+      +this.mRow([this.mT('Dinilai',this.fn(n),'anak','#e8eefc'),this.mT('Rata poin',this.f1(n?tot/n:0),'per anak','#5eead4'),this.mT('Emas+',this.fn(hi),`${this.f1(this.pc(hi,n))}%`,'#fbbf24'),this.mT('Lencana',this.fn(nBd),'bulan ini',C.izin)],4)
+      +this.mC('Sebaran level',bln,lvH,'g0')
+      +this.mC('Peringkat kamar','urut skor',rank(km,kMax,k=>C[k.jk]||'#5eead4'),'tr g2')
+      +this.mC('Kelompok asuh','rata-rata poin',rank(kl,gMax,()=>'#5eead4'),'tr');
+  },
+  /* ---------- pas satu layar ---------- */
+  trimLists(){
+    if(!this.mobile)return;
+    $$('#ltvPages .mc.tr .mb').forEach(b=>{
+      b.querySelectorAll('.mmore').forEach(x=>x.remove());
+      const it=[...b.children];it.forEach(x=>{x.style.display='';});
+      if(!b.clientHeight)return;
+      const over=()=>b.scrollHeight>b.clientHeight+1;let hid=0,k=it.length-1;
+      while(k>0&&over()){it[k].style.display='none';hid++;k--;}
+      if(hid){const m=document.createElement('div');m.className='mmore';m.textContent='+'+hid+' lainnya';b.appendChild(m);
+        while(over()&&k>0){it[k].style.display='none';hid++;k--;m.textContent='+'+hid+' lainnya';}
+        if(over())m.remove();}
+    });
+  }
+});
 </script>
 
 
