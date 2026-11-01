@@ -6103,21 +6103,21 @@ SRIT.Features.analytics={
         ${kpi(nf(rows.filter(a=>a.WALI_ASUH).length),'Punya Wali Asuh','#00b8a9',pct(rows.filter(a=>a.WALI_ASUH).length,N)+'% dari total')}
       </div>
       <div class="row g-3 mb-3">
-        ${card('Komposisi Jenis Kelamin',chartBox('prJk',true),'col-lg-4')}
-        ${card('Jenjang × Jenis Kelamin',chartBox('prJenjang',true),'col-lg-4')}
+        ${card('Komposisi Jenis Kelamin',chartBox('prJkCh',true),'col-lg-4')}
+        ${card('Jenjang × Jenis Kelamin',chartBox('prJenjangCh',true),'col-lg-4')}
         ${card('Tabel Jenjang × Jenis Kelamin',tbl('Jenjang × Jenis Kelamin',['Jenjang','Putra','Putri','Total','%'],jRows,{lastTotal:true}),'col-lg-4')}
         ${card('Sebaran Per Kelas (Putra / Putri)',chartBox('prKelas'),'col-lg-7')}
         ${card('Tabel Per Kelas',tbl('Per Kelas',['Kelas','Putra','Putri','Total','%'],kRows),'col-lg-5')}
       </div>
       <div class="row g-3 mb-3">
-        ${card('Penempatan Per Asrama (Putra / Putri)',chartBox('prAsrama'),'col-lg-7')}
+        ${card('Penempatan Per Asrama (Putra / Putri)',chartBox('prAsramaCh'),'col-lg-7')}
         ${card('Tabel Per Asrama',tbl('Per Asrama',['Asrama','Putra','Putri','Total','%'],aRows),'col-lg-5')}
         ${card('Per Gedung',tbl('Per Gedung',['Asrama · Gedung','Putra','Putri','Total'],gRows),'col-lg-6')}
         ${card('Jumlah Anak Per Wali Asuh',tbl('Per Wali Asuh',['Wali Asuh','Putra','Putri','Total'],wRows),'col-lg-6')}
       </div>
       <div class="row g-3 mb-3">
         ${card('Sebaran Usia',ages.length?chartBox('prUsia'):'<div class="text-muted-2 py-4 text-center">Belum ada data tanggal lahir</div>','col-lg-6',ages.length?(nf(N-ages.length)+' siswa belum memiliki tanggal lahir'):'')}
-        ${card('Tahun Ajaran',chartBox('prTa',true),'col-lg-6')}
+        ${card('Tahun Ajaran',chartBox('prTaCh',true),'col-lg-6')}
         ${card('10 Sekolah Asal Terbanyak',chartBox('prSekolah'),'col-lg-6')}
         ${card('10 Kecamatan Terbanyak',chartBox('prKec'),'col-lg-6')}
         ${card('10 Desa / Kelurahan Terbanyak',tbl('Desa',['Desa / Kelurahan','Jumlah','%'],rankRows(desa)),'col-lg-6')}
@@ -6160,12 +6160,12 @@ SRIT.Features.analytics={
     const base={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}};
     const stacked=(labels,map)=>({type:'bar',data:{labels,datasets:[{label:'Putra',data:labels.map(k=>(map[k]||{L:0}).L),backgroundColor:C.L,borderRadius:3},{label:'Putri',data:labels.map(k=>(map[k]||{P:0}).P),backgroundColor:C.P,borderRadius:3}].concat(labels.some(k=>(map[k]||{X:0}).X)?[{label:'JK belum diisi',data:labels.map(k=>(map[k]||{X:0}).X),backgroundColor:C.X,borderRadius:3}]:[])},options:{...base,scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
     const horiz=(entries,color)=>({type:'bar',data:{labels:entries.map(e=>e[0]),datasets:[{label:'Jumlah',data:entries.map(e=>e[1]),backgroundColor:color,borderRadius:4}]},options:{...base,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}},y:{grid:{display:false}}}}});
-    mk('prJk',{type:'doughnut',data:{labels:['Putra','Putri'].concat(rows.some(a=>a.JK!=='L'&&a.JK!=='P')?['Belum diisi']:[]),datasets:[{data:[L,P].concat(rows.some(a=>a.JK!=='L'&&a.JK!=='P')?[N-L-P]:[]),backgroundColor:[C.L,C.P,C.X],borderWidth:0}]},options:base});
-    const jl=jenjangKeys.filter(k=>jMap[k]);mk('prJenjang',stacked(jl,jMap));
+    mk('prJkCh',{type:'doughnut',data:{labels:['Putra','Putri'].concat(rows.some(a=>a.JK!=='L'&&a.JK!=='P')?['Belum diisi']:[]),datasets:[{data:[L,P].concat(rows.some(a=>a.JK!=='L'&&a.JK!=='P')?[N-L-P]:[]),backgroundColor:[C.L,C.P,C.X],borderWidth:0}]},options:base});
+    const jl=jenjangKeys.filter(k=>jMap[k]);mk('prJenjangCh',stacked(jl,jMap));
     mk('prKelas',stacked(kKeys,kMap));
-    mk('prAsrama',stacked(aKeys,aMap));
+    mk('prAsramaCh',stacked(aKeys,aMap));
     if(ages.length)mk('prUsia',{type:'bar',data:{labels:ageKeys.map(a=>a+' th'),datasets:[{label:'Jumlah siswa',data:ageKeys.map(a=>ageMap[a]),backgroundColor:'#8b5cf6',borderRadius:4}]},options:{...base,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0}}}}});
-    mk('prTa',{type:'bar',data:{labels:taKeys,datasets:[{label:'Jumlah siswa',data:taKeys.map(k=>taMap[k]),backgroundColor:'#0ea5e9',borderRadius:4}]},options:{...base,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0}}}}});
+    mk('prTaCh',{type:'bar',data:{labels:taKeys,datasets:[{label:'Jumlah siswa',data:taKeys.map(k=>taMap[k]),backgroundColor:'#0ea5e9',borderRadius:4}]},options:{...base,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0}}}}});
     mk('prSekolah',horiz(sekolah,'#10b981'));
     mk('prKec',horiz(kec,'#f59e0b'));
     mk('prJabatan',{type:'bar',data:{labels:tKeys,datasets:[{label:'Jumlah',data:tKeys.map(k=>tot(tMap[k])),backgroundColor:tKeys.map((k,i)=>PAL[i%PAL.length]),borderRadius:4}]},options:{...base,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}},y:{grid:{display:false}}}}});
