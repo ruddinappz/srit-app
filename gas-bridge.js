@@ -7,8 +7,24 @@
   function valid(u){return /^https:\/\/script\.google\.com\/(a\/[^\/]+\/)?macros\/s\/[^\/]+\/exec$/.test(String(u||'').trim());}
   // 1) ?exec=ALAMAT di URL → simpan (berguna untuk membagikan tautan siap pakai)
   try{var q=new URLSearchParams(location.search).get('exec');if(q&&valid(q)){ls('s',KEY,q.trim());history.replaceState(null,'',location.pathname+location.hash);}}catch(e){}
-  function execUrl(){var c=(window.SRIT_CONFIG&&window.SRIT_CONFIG.EXEC_URL)||'';return valid(c)?c.trim():(ls('g',KEY)||'');}
+  /* Alamat yang diumumkan server (Pengaturan > Alamat Server). Hanya dipakai bila dasar (config.js) belum berubah sejak diumumkan. */
+  var AKEY='srit_exec_auto';
+  function cfgUrl(){var c=(window.SRIT_CONFIG&&window.SRIT_CONFIG.EXEC_URL)||'';return valid(c)?c.trim():'';}
+  function autoUrl(){try{var a=JSON.parse(ls('g',AKEY)||'null');if(a&&valid(a.u)&&(a.b||'')===cfgUrl())return a.u;}catch(e){}return '';}
+  function execUrl(){return autoUrl()||cfgUrl()||(ls('g',KEY)||'');}
   window.SRIT_EXEC_URL=execUrl;
+  function probe(u){return fetch(u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'apiExecUrl',args:[]}),redirect:'follow'}).then(function(r){return r.json();});}
+  /* Tanya server alamat terbarunya; bila berbeda & alamat baru menjawab, simpan (panggilan berikutnya otomatis ke sana, tanpa muat ulang). */
+  var lastSync=0;
+  function syncExec(force){
+    var now=Date.now();if(!force&&now-lastSync<60000)return;lastSync=now;
+    var cur=execUrl();if(!cur)return;
+    probe(cur).then(function(j){
+      var n=j&&j.ok&&j.data&&j.data.url;if(!n||!valid(n)||n===cur)return;
+      return probe(n).then(function(j2){if(j2&&j2.ok&&j2.data!==undefined)ls('s',AKEY,JSON.stringify({u:n,b:cfgUrl()}));});
+    }).catch(function(){});
+  }
+  window.SRIT_SyncExec=syncExec;
 
   function askUrl(){
     if(document.getElementById('srit-exec-ask'))return;
@@ -27,8 +43,10 @@
       ls('s',KEY,v);location.reload();
     };
   }
-  window.SRIT_ChangeExec=function(){ls('d',KEY);location.reload();};
-  document.addEventListener('DOMContentLoaded',function(){if(!execUrl())askUrl();});
+  window.SRIT_ChangeExec=function(){ls('d',KEY);ls('d',AKEY);location.reload();};
+  document.addEventListener('DOMContentLoaded',function(){if(!execUrl())askUrl();else syncExec(true);});
+  setInterval(function(){syncExec(false);},600000);   // cek ulang tiap 10 menit (TV yang menyala terus)
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)syncExec(false);});
 
   function post(fn,args){
     var url=execUrl();
