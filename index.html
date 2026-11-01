@@ -10599,7 +10599,22 @@ SRIT.Router={
    Tinggi mengikuti 100dvh; kartu mengisi sisa ruang (flex), daftar panjang dipangkas otomatis (+N lainnya).
    ====================================================================== */
 .lv-tabrow,.lv-fgs{display:contents}
-.lv-ftog,.lv-capbtn,.lv-mact,.lv-tab svg{display:none}
+.lv-ftog,.lv-capbtn,.lv-mact,.lv-tab svg,.lv-lgn{display:none}
+/* v1.9.37: tombol Masuk permanen di kop (HP) + penyaring nama di tab Izin */
+.lv-mob .lv-lgn{display:flex;flex:none;width:36px;height:36px;padding:0;align-items:center;justify-content:center;border-radius:12px;cursor:pointer;color:var(--sa);border:1px solid color-mix(in srgb,var(--sa) 55%,transparent);background:color-mix(in srgb,var(--sa) 16%,transparent)}
+.lv-mob .lv-lgn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.iz-tools{flex:none;display:flex;flex-wrap:wrap;gap:6px;margin:0 0 7px}
+.iz-tools input,.iz-tools select{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:var(--tx);border-radius:8px;padding:5px 8px;font-size:13px;min-width:0;outline:0;font-family:inherit}
+.iz-tools input:focus,.iz-tools select:focus{border-color:var(--acc)}
+.iz-tools select option{color:#0b1220}
+.iz-tools input{flex:1 1 130px}
+.iz-list{max-height:46vh;overflow:auto}
+.lv-mob .iz-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-bottom:5px}
+.lv-mob .iz-tools input{grid-column:1/-1;font-size:16px;padding:4px 9px}
+.lv-mob .iz-tools select{font-size:13px;padding:4px 5px}
+.lv-mob .mc.iz{flex:1 1 0;min-height:190px}
+.lv-mob .mc.iz .mb{display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden}
+.lv-mob .iz-list{flex:1;min-height:0;max-height:none;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .lv-mob{--sa:#5eead4;--dock:calc(60px + env(safe-area-inset-bottom,0px));overflow:hidden!important;overscroll-behavior:none;touch-action:manipulation;
   background:radial-gradient(110% 55% at 50% -12%,color-mix(in srgb,var(--sa) 26%,transparent),transparent 62%),radial-gradient(90% 40% at 100% 100%,rgba(99,102,241,.14),transparent 70%),#060c19;
   transition:background .4s}
@@ -10720,7 +10735,7 @@ SRIT.Router={
 .mgender{display:flex;justify-content:space-between;font-size:12px;margin-top:6px}
 .mgender b{font-size:clamp(17px,5.4vw,22px);font-weight:800}
 /* tangkap */
-.lv-mob.lv-cap .lv-tabs,.lv-mob.lv-cap .lv-foot,.lv-mob.lv-cap .lv-fgs,.lv-mob.lv-cap .lv-ftog,.lv-mob.lv-cap #ltvFilter{display:none!important}
+.lv-mob.lv-cap .lv-tabs,.lv-mob.lv-cap .lv-foot,.lv-mob.lv-cap .lv-fgs,.lv-mob.lv-cap .lv-ftog,.lv-mob.lv-cap .lv-lgn,.lv-mob.lv-cap #ltvFilter{display:none!important}
 .lv-mob.lv-cap .lv-pg{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 #ltvToast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:1700;max-width:86vw;background:rgba(15,25,48,.97);border:1px solid var(--ln);color:var(--tx);padding:9px 16px;border-radius:12px;font-size:13px;text-align:center;line-height:1.35;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none;animation:lvtoast .25s ease}
 @keyframes lvtoast{from{opacity:0;transform:translate(-50%,8px)}}
@@ -11010,6 +11025,7 @@ SRIT.LiveTV={
         <div class="lv-clockbox"><div class="lv-clock" id="ltvClock">${new Date().toLocaleTimeString('id-ID')}</div><div class="lv-date" id="ltvDate"></div></div>
         <div class="lv-status" id="ltvSt"><i></i>OPERASIONAL</div>
         <button type="button" class="lv-ftog" id="ltvFTog" aria-label="Filter" onclick="event.stopPropagation();SRIT.LiveTV.toggleFRow()">${this.FUNNEL}</button>
+        <button type="button" class="lv-lgn" id="ltvLogin" aria-label="Masuk" title="Masuk" onclick="event.stopPropagation();location.hash='#/login'"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.5c.8-4 3.7-6 7.2-6s6.4 2 7.2 6"/></svg></button>
       </div>
       <div class="lv-bar">
         <div class="lv-fgs"><div class="lv-fg" id="ltvFJJ"></div><div class="lv-fg" id="ltvFJK"></div>
@@ -11179,6 +11195,7 @@ SRIT.LiveTV={
   /* ---------- render ---------- */
   render(){
     const root=$('#liveTvRoot');if(!root||!this.data)return;
+    const ae=document.activeElement;if(ae&&ae.classList&&ae.classList.contains('iz-q'))return;   // v1.9.37: jangan ganggu pengetikan di kolom cari Izin
     const v=this.view(),d=v.d,E=SRIT.Util.esc,hist=this.isHist();
     $('#ltvLogo').innerHTML=d.logoUrl?`<img src="${d.logoUrl}">`:E(d.logo);
     $('#ltvSchool').textContent=d.school;
@@ -11433,6 +11450,42 @@ SRIT.LiveTV={
   setIzinWin(n){this.izinWin=n;this.render();},
   izinAll:false,   // false = 10 teratas, true = semua anak (termasuk yang belum pernah izin)
   setIzinAll(b){this.izinAll=!!b;this.render();},
+  /* v1.9.37: penyaring daftar "Paling sering izin" (seperti Analisis Data): cari nama, urutan, batas teratas, minimal jumlah izin */
+  izQ:'',izUrut:'desc',izTop:'10',izMin:'1',
+  izSet(f,v){
+    this[f]=v;
+    const x=this.view&&this.data?this.view():null;if(!x)return;
+    const o=this.izBody(x);const l=document.getElementById('izList');if(l)l.innerHTML=o.html;
+    const c=document.getElementById('izCount');if(c)c.textContent=o.cnt;
+  },
+  izTools(){
+    const E=SRIT.Util.esc,op=(v,cur,t)=>`<option value="${v}" ${String(cur)===String(v)?'selected':''}>${t}</option>`,f="SRIT.LiveTV.izSet('";
+    return `<div class="iz-tools"><input class="iz-q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="Cari nama anak&hellip;" value="${E(this.izQ)}" oninput="${f}izQ',this.value)">`
+      +`<select aria-label="Urutan" onchange="${f}izUrut',this.value)">${op('desc',this.izUrut,'Tersering')}${op('asc',this.izUrut,'Terjarang')}${op('nama',this.izUrut,'Nama A–Z')}</select>`
+      +`<select aria-label="Batas teratas" onchange="${f}izTop',this.value)">${op('0',this.izTop,'Semua')}${op('10',this.izTop,'10 teratas')}${op('25',this.izTop,'25 teratas')}${op('50',this.izTop,'50 teratas')}</select>`
+      +`<select aria-label="Minimal izin" onchange="${f}izMin',this.value)">${op('0',this.izMin,'Min. 0× (semua)')}${op('1',this.izMin,'Min. 1×')}${op('2',this.izMin,'Min. 2×')}${op('3',this.izMin,'Min. 3×')}${op('5',this.izMin,'Min. 5×')}</select></div>`;
+  },
+  /* isi daftar (tabel di TV/desktop, baris .mi di HP) + teks jumlah; dipakai render penuh & pembaruan saat mengetik */
+  izBody(v){
+    const Z=v.d.izin;if(!Z||Z.error)return {html:'',cnt:''};
+    const E=SRIT.Util.esc,W=this.izinWin===30?0:this.izinWin===365?2:1;
+    const sel=x=>(!this.fJJ||x.jj===this.fJJ)&&(!this.fJK||x.jk===this.fJK);
+    const q=String(this.izQ||'').trim().toLowerCase(),min=isNaN(+this.izMin)?1:+this.izMin,top=+this.izTop||0;
+    const nm=x=>String(x.nama||'');
+    const cmp=(p,r)=>r.n[W]-p.n[W]||r.h[W]-p.h[W]||nm(p).localeCompare(nm(r),'id');
+    let L=(Z.rank||[]).filter(x=>sel(x)&&x.n[W]>=min&&(!q||(nm(x)+' '+(x.kelas||'')+' '+(x.jj||'')).toLowerCase().indexOf(q)>=0));
+    L.sort(this.izUrut==='nama'?(p,r)=>nm(p).localeCompare(nm(r),'id'):this.izUrut==='asc'?(p,r)=>(p.n[W]-r.n[W])||(p.h[W]-r.h[W])||nm(p).localeCompare(nm(r),'id'):cmp);
+    const tot=L.length;if(top)L=L.slice(0,top);
+    const cnt=L.length+(L.length<tot?' dari '+tot:'')+' anak';
+    const seg=x=>x.jj&&x.jk?x.jj+' '+(x.jk==='L'?'Putra':'Putri'):'-';
+    if(!L.length)return {html:this.emp('Tidak ada yang cocok dengan penyaringan'),cnt};
+    if(this.mobile){
+      const medal=this.izUrut==='desc'&&!q;
+      return {cnt,html:L.map((x,i)=>`<div class="mi"><span class="rk" style="background:${(medal&&['#fbbf24','#cbd5e1','#cd7f32'][i])||'#5f7299'}">${i+1}</span><span class="x"><b>${E(x.nama)}</b><small>${seg(x)}${x.kelas?' · '+E(x.kelas):''}</small></span><span class="r">${x.n[W]}×<span style="color:var(--mu);font-weight:500;font-size:10px"> ${x.h[W]} hr</span></span></div>`).join('')};
+    }
+    const th=['#','Nama','Segmen','Izin','Hari','Terakhir'].map(h=>`<th>${h}</th>`).join('');
+    return {cnt,html:`<table class="lv-t"><thead><tr>${th}</tr></thead><tbody>${L.map((x,i)=>`<tr><td>${i+1}</td><td class="tx"><b>${E(x.nama)}</b>${x.kelas?'<div style="color:var(--mu);font-size:13px">'+E(x.kelas)+'</div>':''}</td><td>${seg(x)}</td><td><b>${x.n[W]}&times;</b></td><td>${x.h[W]}</td><td>${x.last?SRIT.Util.fmtDateShort(x.last):'-'}</td></tr>`).join('')}</tbody></table>`};
+  },
   pg9(v){
     const {d,all}=v,C=this.COL,E=SRIT.Util.esc,Z=d.izin;
     if(Z===undefined)return this.pnl('Izin & Kepulangan','',this.emp('Data izin belum diterima dari server. Pastikan Api_LiveTV.gs versi terbaru sudah di-deploy (Deploy &gt; Kelola deployment &gt; Versi baru).'),'c12');
@@ -11465,9 +11518,9 @@ SRIT.LiveTV={
       return `<div style="margin:0 0 9px"><div style="font-weight:700;font-size:15px"><i class="lv-dot" style="background:${C[sg.jk]}"></i>${sg.jj} ${sg.jk==='L'?'Putra':'Putri'}</div>`
         +(top.length?top.map((x,i)=>`<div style="display:flex;gap:8px;font-size:15px;line-height:1.45"><span style="color:var(--mu);width:16px">${i+1}.</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>${E(x.nama)}</b>${x.kelas?' <span style="color:var(--mu)">('+E(x.kelas)+')</span>':''}</span><span><b>${x.n[W]}&times;</b> <span style="color:var(--mu)">${x.h[W]} hari</span></span></div>`).join(''):'<div style="color:var(--mu);font-size:14px">Belum ada izin pada periode ini</div>')+'</div>';
     }).join(''):this.emp('Tidak ada segmen pada filter ini');
-    // C. paling sering izin (semua sesuai filter)
-    const top10=this.izinAll?R.slice().sort(cmp):R.slice().sort(cmp).slice(0,10);
-    const cH=top10.length?`<div style="${this.izinAll?'max-height:70vh;overflow:auto':''}"><table class="lv-t">${th(['#','Nama','Segmen','Izin','Hari','Terakhir'])}<tbody>${top10.map((x,i)=>`<tr><td>${i+1}</td><td class="tx"><b>${E(x.nama)}</b>${x.kelas?'<div style="color:var(--mu);font-size:13px">'+E(x.kelas)+'</div>':''}</td><td>${seg(x)}</td><td><b>${x.n[W]}&times;</b></td><td>${x.h[W]}</td><td>${x.last?SRIT.Util.fmtDateShort(x.last):'-'}</td></tr>`).join('')}</tbody></table></div>`:this.emp('Belum ada data izin pada periode ini');
+    // C. paling sering izin — penyaring nama (cari, urutan, batas teratas, minimal izin)
+    const _iz=this.izBody(v);
+    const cH=this.izTools()+`<div class="iz-list" id="izList">${_iz.html}</div>`;
     // D. rekap per jenjang x jenis kelamin
     const segRows=all.filter(c=>c.n>0).map(c=>{const o=cnt((Z.list||[]).filter(x=>x.jj===c.jj&&x.jk===c.jk));return {c,o};});
     const sel=segRows.filter(r=>this.inSel(r.c)),sumO=k=>sel.reduce((a,r)=>a+r.o[k],0);
@@ -11488,7 +11541,7 @@ SRIT.LiveTV={
       +this.kpi('Sudah kembali',this.fn(T.kembali),'berangkat/kembali hari ini',C.hadir,null,'c2')
       +this.pnl('Sedang izin keluar / belum kembali',`${luar.length} orang &middot; ${note}${Z.dibaca!=null?' &middot; '+Z.dibaca+' data izin terbaca':''}`,aT,'c5',true)
       +this.pnl('Izin terbanyak per jenjang &amp; jenis kelamin',`${wsel} &middot; 3 teratas`,bH,'c4',true)
-      +this.pnl('Paling sering izin',`${wsel} &middot; <span style="display:inline-flex;gap:6px;vertical-align:middle">${wchipAll(false,'10 teratas')}${wchipAll(true,'Semua anak')}</span>`,cH,'c3',true)
+      +this.pnl('Paling sering izin',`${wsel} &middot; <span id="izCount">${_iz.cnt}</span>`,cH,'c3',true)
       +this.pnl('Rekap per jenjang &amp; jenis kelamin','Redup = di luar filter',dT,'c5',true)
       +this.pnl('Pengajuan &amp; kepulangan lain',`Menunggu, disetujui, sudah kembali`,eT,'c4',true)
       +this.pnl('Menurut jenis izin',this.filterLabel(),fH,'c3',true);
@@ -11679,11 +11732,10 @@ Object.assign(SRIT.LiveTV,{
     const lH=luar.length?luar.map(x=>`<div class="mi"><span class="x"><b>${E(x.nama)}</b><small>${seg(x)}${x.kelas?' · '+E(x.kelas):''} · kembali ${x.kb?SRIT.Util.fmtDateShort(x.kb).slice(0,6):'-'}</small></span>${x.telat?`<span class="lv-b b-bd">Telat ${x.telat} hr</span>`:'<span class="lv-b b-in">Di luar</span>'}</div>`).join(''):`<div class="lv-empty" style="color:var(--hadir)">Tidak ada yang sedang izin keluar</div>`;
     const W=this.izinWin===30?0:this.izinWin===365?2:1,WL=['30 hari','90 hari','1 tahun'][W];
     const cmp=(a,b)=>b.n[W]-a.n[W]||b.h[W]-a.h[W]||String(a.nama).localeCompare(String(b.nama));
-    const top=(Z.rank||[]).filter(x=>x.n[W]>0&&inSel(x)).sort(cmp);
-    const tH=top.length?top.map((x,i)=>`<div class="mi"><span class="rk" style="background:${['#fbbf24','#cbd5e1','#cd7f32'][i]||'#5f7299'}">${i+1}</span><span class="x"><b>${E(x.nama)}</b><small>${seg(x)}${x.kelas?' · '+E(x.kelas):''}</small></span><span class="r">${x.n[W]}×<span style="color:var(--mu);font-weight:500;font-size:10px"> ${x.h[W]} hr</span></span></div>`).join(''):this.emp('Belum ada izin pada periode ini');
+    const _iz=this.izBody(v);
     return this.mRow([this.mT('Menunggu',this.fn(T.tunggu),'persetujuan',C.sakit),this.mT('Disetujui',this.fn(T.setuju),'belum berangkat',C.izin),this.mT('Di luar',this.fn(diLuar),`${this.f1(this.pc(diLuar,nP))}% peserta`,'#5eead4'),this.mT('Terlambat',this.fn(T.telat),'belum kembali',T.telat?C.alpa:C.hadir)],4)
       +this.mC('Sedang izin keluar',luar.length+' orang',lH,'tr g2')
-      +this.mC('Paling sering izin',`<span onclick="SRIT.LiveTV.cycleIzinWin()" style="color:var(--acc);font-weight:700">${WL} ⟳</span>`,tH,'tr');
+      +this.mC('Paling sering izin',`<span id="izCount">${_iz.cnt}</span> · <span onclick="SRIT.LiveTV.cycleIzinWin()" style="color:var(--acc);font-weight:700">${WL} ⟳</span>`,this.izTools()+`<div class="iz-list" id="izList">${_iz.html}</div>`,'iz');
   },
   /* ---------- 9 GAMIFIKASI ---------- */
   mp8(v){
