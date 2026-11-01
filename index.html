@@ -10576,6 +10576,84 @@ SRIT.Router={
 #ltvToast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:1700;max-width:86vw;background:rgba(15,25,48,.97);border:1px solid var(--ln);color:var(--tx);padding:9px 16px;border-radius:12px;font-size:13px;text-align:center;line-height:1.35;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none;animation:lvtoast .25s ease}
 @keyframes lvtoast{from{opacity:0;transform:translate(-50%,8px)}}
 .lv-mob:not(.lv-act){cursor:auto}
+/* ===== v1.9.33 — HP: satu slide PAS satu layar, tanpa gulir. Widget dirapatkan; JS (fitSlides) menyesuaikan skala per slide ===== */
+.lv-mob{--chh:clamp(90px,16vh,170px);--lsh:clamp(72px,14vh,150px)}
+@supports (height:1dvh){.lv-mob{--chh:clamp(90px,16dvh,170px);--lsh:clamp(72px,14dvh,150px)}}
+.lv-mob .lv-stage{padding-bottom:calc(44px + env(safe-area-inset-bottom,0px))}
+.lv-mob .lv-head{padding:calc(5px + env(safe-area-inset-top,0px)) 10px 4px;gap:2px 8px}
+.lv-mob .lv-logo{width:28px;height:28px;font-size:13px;border-radius:8px}
+.lv-mob .lv-school b{font-size:clamp(11.5px,3.3vw,14px);line-height:1.15}
+.lv-mob .lv-school small{font-size:9.5px}
+.lv-mob .lv-clock{font-size:clamp(15px,4.4vw,18px)}
+.lv-mob .lv-date{font-size:9.5px;margin-top:1px}
+.lv-mob .lv-bar{padding:0 8px 4px;gap:4px}
+.lv-mob .lv-tabs{gap:4px;padding:1px 0}
+.lv-mob .lv-tab{padding:4px 10px;font-size:11.5px}
+.lv-mob .lv-ftog{padding:4px 10px;font-size:11.5px}
+.lv-mob .lv-chip{padding:3px 9px;font-size:11.5px}
+.lv-mob .lv-foot{height:26px}
+.lv-mob .lv-tick>div{font-size:12px}
+.lv-mob .lv-admin{padding:5px 8px calc(5px + env(safe-area-inset-bottom,0px));gap:6px}
+.lv-mob .lv-admin .lv-btn{padding:6px 8px;font-size:12px}
+/* papan slide: tidak ada gulir vertikal; isi diskalakan (--z) hingga pas, sisa ruang dibagi rata */
+.lv-mob .lv-pg{overflow:hidden;scroll-snap-type:none;align-content:space-between;gap:5px;padding:0 8px 6px;scroll-padding-top:0;touch-action:pan-x}
+.lv-mob .lv-pg>*:not(.lv-sh){zoom:var(--z,1)}
+.lv-mob .lv-pg>.lv-sh{margin:0 -8px!important;padding:5px 10px;gap:8px}
+.lv-sh .n{font-size:10px;padding:1px 7px}
+.lv-sh b{font-size:clamp(13px,3.8vw,15px)}
+.lv-sh small{font-size:9.5px}
+/* kartu angka */
+.lv-mob .lv-pg>.lv-k{min-height:0;padding:6px 10px}
+.lv-mob .lv-k::before{top:8px;bottom:8px;width:3px}
+.lv-mob .lv-k .l{font-size:10.5px}
+.lv-mob .lv-k .v{font-size:clamp(19px,5.6vw,23px);margin-top:1px}
+.lv-mob .lv-k .v small{font-size:11px}
+.lv-mob .lv-k .s{font-size:9.5px;margin-top:1px;line-height:1.2}
+/* panel */
+.lv-mob .lv-p{padding:7px 9px;border-radius:10px}
+.lv-mob .lv-pg>.lv-p{border-top-width:2px}
+.lv-mob .lv-p h4{font-size:12px}
+.lv-mob .lv-p .lv-sub{font-size:9.5px;margin-top:1px}
+.lv-mob .lv-pb{margin-top:4px;overflow:hidden}
+.lv-mob .lv-pb>svg{height:auto;width:100%;max-height:var(--chh)}
+.lv-mob .lv-p.r2 .lv-pb>svg{max-height:calc(var(--chh)*1.5)}
+.lv-mob .lv-pb.lv-scroll{flex:none;max-height:calc(var(--lsh)*var(--f,1));overflow:hidden}
+.lv-mob .lv-leg{font-size:9.5px;gap:2px 10px}
+.lv-mob .lv-leg i{width:8px;height:8px;margin-right:4px}
+.lv-mob .sb{font-size:10.5px;padding:2px 0;gap:6px;grid-template-columns:minmax(70px,32%) 1fr auto!important}
+.lv-mob .sb .tr{height:12px;border-radius:3px}
+.lv-mob .sb .lb{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+.lv-mob .sb .rt small{font-size:9px}
+.lv-mob .sb>span[style*="font-size:20px"]{font-size:12px!important;line-height:1.2}
+.lv-mob .lv-t{font-size:10.5px}
+.lv-mob .lv-t th{font-size:9.5px;padding:3px 4px}
+.lv-mob .lv-t td{font-size:10.5px;padding:3px 4px}
+.lv-mob .lv-b{font-size:9px;padding:1px 6px}
+.lv-mob .in{font-size:11px;padding:4px 0;gap:8px;line-height:1.25}
+.lv-mob .in i{width:17px;height:17px;font-size:10px;border-radius:5px}
+.lv-mob .hm{gap:4px;grid-template-columns:44px 1fr 1fr}
+.lv-mob .hm .h{font-size:10px}.lv-mob .hm .r{font-size:11px}
+.lv-mob .hm .c{padding:3px 0;min-height:34px;border-radius:7px}
+.lv-mob .hm .c b{font-size:17px}.lv-mob .hm .c small{font-size:9px;margin-top:1px}
+.lv-mob .lv-pod{gap:6px}
+.lv-mob .lv-pc{padding:6px 7px}
+.lv-mob .lv-pk{font-size:9px}.lv-mob .lv-pn{font-size:12px}.lv-mob .lv-pm{font-size:9.5px}
+.lv-mob .lv-ps{font-size:18px;margin-top:2px}.lv-mob .lv-ps small{font-size:9.5px}
+.lv-mob .lv-empty{padding:8px;font-size:12px}
+/* donat: bulatan di kiri, keterangan di kanan (hemat tinggi) */
+.lv-mob .lv-pb>div[style*="gap:20px"]{flex-direction:row!important;align-items:center;gap:10px!important}
+.lv-mob .lv-pb>div[style*="gap:20px"]>svg{height:calc(var(--chh)*.8)!important;max-height:none!important;width:auto;flex:none;align-self:center}
+.lv-mob .lv-pb [style*="padding:5px 0"]{padding:2px 0!important}
+.lv-mob .lv-pb [style*="font-size:16px"]{font-size:11px!important;line-height:1.35!important}
+.lv-mob .lv-pb [style*="font-size:26px"]{font-size:17px!important}
+/* HP mendatar: dua panel per baris */
+@media (orientation:landscape) and (max-height:520px){
+.lv-mob{--chh:clamp(70px,28vh,150px);--lsh:clamp(60px,24vh,130px)}
+.lv-mob .lv-pg{grid-template-columns:repeat(4,minmax(0,1fr))}
+.lv-mob .lv-pg>.lv-p{grid-column:span 2!important}
+.lv-mob .lv-pg>.lv-p.c12{grid-column:1/-1!important}
+.lv-mob .lv-pg>.lv-k,.lv-mob .lv-pg>.lv-k.lv-wide{grid-column:auto!important}
+}
 </style>
 <script>
 //# sourceURL=View_LiveTV.html
@@ -10661,10 +10739,26 @@ SRIT.LiveTV={
     b.addEventListener('scroll',()=>{
       if(!this.mobile)return;clearTimeout(this._st);
       this._st=setTimeout(()=>{const w=b.clientWidth||1,i=Math.max(0,Math.min(this.PAGES.length-1,Math.round(b.scrollLeft/w)));
-        if(i!==this.slide){this.slide=i;this._mark(i);}},70);
+        if(i!==this.slide){this.slide=i;this._mark(i);this.setupAutoScroll();}},70);
     },{passive:true});
   },
-  toggleFRow(){const r=$('#liveTvRoot');if(!r)return;this.fOpen=!this.fOpen;r.classList.toggle('lv-fopen',this.fOpen);},
+  /* HP: tiap slide harus PAS satu layar tanpa gulir. Cari skala (--z) & batas tinggi daftar (--f) terbesar yang masih muat.
+     Kandidat diurutkan dari paling lega ke paling rapat; pencarian biner (pas atau tidak pas bersifat monoton). */
+  fitSlides(){
+    if(!this.mobile)return;
+    const pgs=$$('#ltvPages .lv-pg');if(!pgs.length)return;
+    const C=[];for(let z=100;z>=60;z-=5)C.push([z/100,1]);
+    C.push([.6,.8],[.6,.65],[.55,.65],[.5,.5]);
+    pgs.forEach(pg=>{
+      if(!pg.clientHeight)return;
+      const set=i=>{pg.style.setProperty('--z',C[i][0]);pg.style.setProperty('--f',C[i][1]);};
+      const fits=()=>pg.scrollHeight<=pg.clientHeight+2;
+      let lo=0,hi=C.length-1,best=hi;
+      while(lo<=hi){const m=(lo+hi)>>1;set(m);if(fits()){best=m;hi=m-1;}else lo=m+1;}
+      set(best);
+    });
+  },
+  toggleFRow(){const r=$('#liveTvRoot');if(!r)return;this.fOpen=!this.fOpen;r.classList.toggle('lv-fopen',this.fOpen);requestAnimationFrame(()=>this.fitSlides());},
   /* MODE TANGKAP (HP): sembunyikan semua kontrol agar screenshot bersih; ketuk kop sekolah di atas untuk keluar */
   capture(on){
     const r=$('#liveTvRoot');if(!r)return;
@@ -10672,7 +10766,7 @@ SRIT.LiveTV={
     r.classList.toggle('lv-cap',this.cap);
     if(this.cap){this.fOpen=false;r.classList.remove('lv-fopen');this.toast('Mode tangkap aktif. Geser untuk pindah slide, ketuk kop sekolah di atas untuk keluar.',2800);}
     else this.toast('Mode tangkap selesai',1100);
-    requestAnimationFrame(()=>this._snapTo(this.slide,true));
+    requestAnimationFrame(()=>{this._snapTo(this.slide,true);this.fitSlides();});
   },
   headTap(){if(this.cap)this.capture(false);},
   toast(m,ms){
@@ -10709,7 +10803,7 @@ SRIT.LiveTV={
   onResize(){ /* ganti mode bila perlu; di mode HP gambar ulang grafik jika lebar layar berubah banyak */
     const w0=this._rw;this._rw=innerWidth;this.syncMode();
     if(this.mobile&&w0&&Math.abs(innerWidth-w0)>40&&this.data)this.render();
-    this.fit();if(this.mobile)this._snapTo(this.slide,true);this.setupAutoScroll();
+    this.fit();if(this.mobile){this._snapTo(this.slide,true);this.fitSlides();}this.setupAutoScroll();
   },
   mobFix(){ /* HP: jika jumlah KPI berurutan ganjil, KPI terakhir dilebarkan penuh agar tidak ada sel kosong */
     if(!this.mobile)return;
@@ -10943,12 +11037,12 @@ SRIT.LiveTV={
     root.style.setProperty('--lv-dur',this.rotateSec()+'s');
     this._ins=ins;
     $('#ltvPT').innerHTML=this.PAGES[this.slide][0]+'<em>'+(this.slide+1)+' / '+this.PAGES.length+'</em>';
-    this.fit();this.mobFix();
-    requestAnimationFrame(()=>this.setupAutoScroll());
+    this.fit();this.mobFix();this.fitSlides();
+    requestAnimationFrame(()=>{this.fitSlides();this.setupAutoScroll();});
   },
   setupAutoScroll(){
     if(this._scrollTimers)this._scrollTimers.forEach(t=>clearInterval(t));
-    this._scrollTimers=[];if(this.mobile)return;
+    this._scrollTimers=[];
     $$('#ltvPages .lv-pg.on .lv-scroll').forEach(el=>{
       if(el.scrollHeight<=el.clientHeight+3)return;
       let dir=1,pause=30;
