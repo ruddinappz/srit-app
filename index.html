@@ -3959,18 +3959,34 @@ SRIT.Features['jurnal-piket']=(function(){
   const selBadge=d=>d===null?'<span class="text-muted-2">–</span>':`<span class="badge-soft ${d?'st-ALPA':'st-HADIR'}">${d}</span>`;
   const selisih=r=>(r.akhir===''||r.akhir==null||r.seharusnya===''||r.seharusnya==null)?null:(+r.seharusnya)-(+r.akhir);
 
+  const TL_ST={DRAFT:{t:'Draf',cls:'st-IZIN'},BARU:{t:'Baru',cls:'st-IZIN'},PROSES:{t:'Diproses',cls:'st-SAKIT'},SELESAI:{t:'Selesai',cls:'st-HADIR'}};
+  const TL_PRIO={BIASA:'Biasa',PENTING:'Penting',MENDESAK:'Mendesak'};
+  const tlOpen=r=>r.STATUS==='BARU'||r.STATUS==='PROSES';
+  const tlLate=r=>tlOpen(r)&&!!r.TENGGAT&&String(r.TENGGAT).slice(0,10)<SRIT.Util.todayISO();
+  const tlBadges=r=>(r.PRIORITAS==='MENDESAK'?'<span class="badge-soft st-ALPA me-1">Mendesak</span>':r.PRIORITAS==='PENTING'?'<span class="badge-soft st-SAKIT me-1">Penting</span>':'')+(tlLate(r)?'<span class="badge-soft st-ALPA me-1">Terlambat</span>':'');
+
   const F={
-    state:{page:1,size:20,search:'',status:'',shift:''},
+    state:{page:1,size:20,search:'',status:'',shift:'',tab:'jurnal',tlWho:'mine',tlSt:'open',tlQ:''},
     cur:null,_host:null,_dirty:false,_t:null,_anakMap:{},
     can(a){return SRIT.Auth.can('jurnal-piket:'+a);},
+    // Hapus: perlu izin Hapus. Jurnal yang masih berjalan boleh dihapus petugasnya sendiri; yang sudah diserahkan/diketahui hanya koordinator (server juga menolak bila tidak berhak)
+    canDel(r){if(!r||!this.can('DELETE'))return false;const co=SRIT.Approval.canJurnal();return r.STATUS==='BERLANGSUNG'?(co||r.PETUGAS===(SRIT.Auth.user||{}).ID):co;},
+    del(id){
+      const r=SRIT.Repo.getById('JURNAL_PIKET',id);if(!r||!this.canDel(r))return;
+      if(!confirm('Hapus jurnal piket '+dstr(r.TANGGAL)+' · '+(SHIFT[r.SHIFT]||r.SHIFT||'')+' ('+(r.NAMA_PETUGAS||'-')+')?\nIsi cek kehadiran, catatan kejadian, dan serah terima ikut terhapus dan tidak dapat dikembalikan.\nKasus yang sudah dicatat dari jurnal ini tetap ada di menu Insiden & Kasus.'))return;
+      clearTimeout(this._t);this._dirty=false;if(this.cur&&this.cur.ID===id)this.cur=null;
+      SRIT.Repo.remove('JURNAL_PIKET',id);SRIT.Audit.log('DELETE','jurnal-piket',id);SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
+      SRIT.Notify('Jurnal piket dihapus','warn');this.renderList();
+    },
     render(host){SRIT.UI.setPage('Jurnal & Serah Terima Piket','Jurnal Piket');this._host=host;
-      if(this.cur)this.renderEditor();else this.renderList();},
+      this.home();},
+    home(){if(this.cur)this.renderEditor();else if(this.state.tab==='tl')this.renderTL();else this.renderList();},
 
     /* ===================== DAFTAR ===================== */
     renderList(){
       const host=this._host,s=this.state;host.onclick=host.oninput=host.onchange=null;
       const all=SRIT.Store.read('JURNAL_PIKET'),nb=all.filter(r=>r.STATUS==='BERLANGSUNG').length,nw=all.filter(r=>r.STATUS==='DISERAHKAN').length;
-      host.innerHTML=`<div class="row g-2 mb-3">
+      host.innerHTML=`${this._tabs()}<div class="row g-2 mb-3">
         <div class="col-6"><div class="card-srit p-2 text-center"><div class="text-muted-2" style="font-size:11px">Shift berlangsung</div><div class="fw-bold" style="font-size:20px">${nb}</div></div></div>
         <div class="col-6"><div class="card-srit p-2 text-center"><div class="text-muted-2" style="font-size:11px">Menunggu diketahui koordinator</div><div class="fw-bold" style="font-size:20px">${nw}</div></div></div></div>
       <div class="card-srit p-3 mb-3"><div class="filter-bar">
@@ -3984,6 +4000,7 @@ SRIT.Features['jurnal-piket']=(function(){
       $('#jpShift').onchange=e=>{s.shift=e.target.value;s.page=1;this.loadList();};
       $('#jpStatus').onchange=e=>{s.status=e.target.value;s.page=1;this.loadList();};
       const nw2=$('#jpNew');if(nw2)nw2.onclick=()=>this.startForm();
+      this._bindTabs();
       this.loadList();
     },
     loadList(){
@@ -4003,7 +4020,7 @@ SRIT.Features['jurnal-piket']=(function(){
         <td>${sl?`<span class="badge-soft st-ALPA">${sl} anak</span>`:cek.length&&r.STATUS!=='BERLANGSUNG'?'<span class="badge-soft st-HADIR">Lengkap</span>':'<span class="text-muted-2">–</span>'}</td>
         <td><span class="badge-soft ${(STATUS[r.STATUS]||{}).cls||'st-BELUM'}">${(STATUS[r.STATUS]||{}).t||esc(r.STATUS)}</span></td>
         <td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary py-0" onclick="SRIT.Features['jurnal-piket'].open('${r.ID}')"><i class="bi bi-journal-text"></i> Buka</button>
-        <button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Cetak" onclick="SRIT.Features['jurnal-piket'].cetak('${r.ID}')"><i class="bi bi-printer"></i></button></td></tr>`;}).join(''):'<tr><td colspan="7"><div class="empty-state"><i class="bi bi-journal-bookmark d-block"></i>Belum ada jurnal piket. Klik “Mulai Shift”.</div></td></tr>'}</tbody>`;
+        <button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Cetak" onclick="SRIT.Features['jurnal-piket'].cetak('${r.ID}')"><i class="bi bi-printer"></i></button>${this.canDel(r)?`<button class="btn btn-sm btn-outline-danger py-0 ms-1" title="Hapus jurnal" onclick="SRIT.Features['jurnal-piket'].del('${r.ID}')"><i class="bi bi-trash"></i></button>`:''}</td></tr>`;}).join(''):'<tr><td colspan="7"><div class="empty-state"><i class="bi bi-journal-bookmark d-block"></i>Belum ada jurnal piket. Klik “Mulai Shift”.</div></td></tr>'}</tbody>`;
       $('#jpPag').innerHTML=SRIT.UI.pagination({rows:page,total,page:s.page,size:s.size,pages});
       $$('#jpPag [data-pg]').forEach(a=>a.onclick=()=>{s.page=+a.dataset.pg;this.loadList();});
     },
@@ -4045,7 +4062,7 @@ SRIT.Features['jurnal-piket']=(function(){
       this.cur={...r,CEK:parse(r.CEK_KAMAR,[]),KJ:parse(r.CATATAN_KEJADIAN,[]),PH:parse(r.PERHATIAN,[]),BR:parse(r.BARANG,[])};
       this._dirty=false;this.renderEditor();
     },
-    close(){this._flush();this.cur=null;this.renderList();},
+    close(){this._flush();this.cur=null;this.home();},
     ro(){const c=this.cur;return !c||c.STATUS!=='BERLANGSUNG'||!this.can('UPDATE');},
     _serialize(){
       const c=this.cur;
@@ -4115,10 +4132,12 @@ SRIT.Features['jurnal-piket']=(function(){
         <div class="ms-auto d-flex flex-wrap gap-1"><button class="btn btn-outline-secondary btn-sm" data-act="print"><i class="bi bi-printer"></i> Cetak</button>
           ${c.STATUS==='BERLANGSUNG'&&this.can('UPDATE')?'<button class="btn btn-primary btn-sm" data-act="serah"><i class="bi bi-send-check"></i> Serahkan Shift</button>':''}
           ${c.STATUS==='DISERAHKAN'&&SRIT.Approval.canJurnal()&&c.PETUGAS!==(SRIT.Auth.user||{}).ID?'<button class="btn btn-success btn-sm" data-act="tahu"><i class="bi bi-check2-circle"></i> Ketahui (Koordinator)</button>':''}
-          ${c.STATUS!=='BERLANGSUNG'&&SRIT.Approval.canJurnal()?'<button class="btn btn-outline-warning btn-sm" data-act="reopen">Buka kembali</button>':''}</div></div>
+          ${c.STATUS!=='BERLANGSUNG'&&SRIT.Approval.canJurnal()?'<button class="btn btn-outline-warning btn-sm" data-act="reopen">Buka kembali</button>':''}
+          ${this.canDel(c)?'<button class="btn btn-outline-danger btn-sm" data-act="del"><i class="bi bi-trash"></i> Hapus</button>':''}</div></div>
       ${prev?`<div class="card-srit p-2 mb-3" style="font-size:12px"><b>Dari shift sebelumnya</b> (${dstr(prev.TANGGAL)} ${SHIFT[prev.SHIFT]||''}, ${esc(prev.NAMA_PETUGAS||'-')}):
         ${prev.BELUM_SELESAI?`<div>Belum selesai: ${esc(prev.BELUM_SELESAI)}</div>`:''}${prev.PESAN?`<div>Pesan: ${esc(prev.PESAN)}</div>`:''}
         <div>${prevPH.length?prevPH.length+' anak perlu perhatian khusus':'Tidak ada anak perlu perhatian khusus yang tercatat'}.${(!ro&&prevPH.length&&!c.PH.length)?' <button class="btn btn-sm btn-outline-primary py-0 ms-1" data-act="copyPh">Salin ke bagian D</button>':''}</div></div>`:''}
+      ${this._tlMineCard(c)}
       <div class="card-srit p-3 mb-3"><div class="fw-semibold mb-2">A. Identitas shift</div><div class="row g-2">
         <div class="col-6 col-md-3"><label class="form-label-sm">Shift</label><select class="form-select form-select-sm" data-top="SHIFT" ${dis}>${sel(SHIFT,c.SHIFT)}</select></div>
         <div class="col-3 col-md-2"><label class="form-label-sm">Mulai</label><input type="time" class="form-control form-control-sm" data-top="JAM_MULAI" value="${esc(c.JAM_MULAI||'')}" ${dis}></div>
@@ -4141,15 +4160,16 @@ SRIT.Features['jurnal-piket']=(function(){
         <div class="col-12 col-md-6"><label class="form-label-sm">Hal yang belum selesai dan perlu dilanjutkan</label><textarea class="form-control form-control-sm" rows="3" data-top="BELUM_SELESAI" ${dis}>${esc(c.BELUM_SELESAI||'')}</textarea></div>
         <div class="col-12 col-md-6"><label class="form-label-sm">Pesan khusus untuk petugas berikutnya</label><textarea class="form-control form-control-sm" rows="3" data-top="PESAN" ${dis}>${esc(c.PESAN||'')}</textarea></div>
         <div class="col-12"><div class="table-responsive"><table class="table table-sm table-srit mb-0"><thead><tr><th>Barang / dokumen yang diserahterimakan</th><th>Ada / tidak</th><th>Catatan</th></tr></thead><tbody>${brRows}</tbody></table></div></div>
-        <div class="col-8 col-md-6"><label class="form-label-sm">Petugas yang menerima</label><input class="form-control form-control-sm" list="jpUsers" data-top="PENERIMA" value="${esc(c.PENERIMA||'')}" ${dis}><datalist id="jpUsers">${SRIT.Store.read('USERS').map(u=>`<option value="${esc(u.NAME)}"></option>`).join('')}</datalist></div>
+        <div class="col-8 col-md-6"><label class="form-label-sm">Petugas yang menerima (pilih dari daftar akun)</label><input class="form-control form-control-sm" list="jpUsers" data-top="PENERIMA" value="${esc(c.PENERIMA||'')}" ${dis}><datalist id="jpUsers">${SRIT.Store.read('USERS').map(u=>`<option value="${esc(u.NAME)}"></option>`).join('')}</datalist></div>
         <div class="col-4 col-md-3"><label class="form-label-sm">Jam serah terima</label><input type="time" class="form-control form-control-sm" data-top="JAM_SERAH" value="${esc(c.JAM_SERAH||'')}" ${dis}></div>
-        ${c.DIKETAHUI_OLEH?`<div class="col-12 text-muted-2" style="font-size:12px">Diketahui koordinator: ${esc(c.DIKETAHUI_OLEH)} · ${esc(String(c.DIKETAHUI_PADA||'').replace('T',' '))}</div>`:''}</div></div>`;
+        ${this._tlBlock(c,ro)}${c.DIKETAHUI_OLEH?`<div class="col-12 text-muted-2" style="font-size:12px">Diketahui koordinator: ${esc(c.DIKETAHUI_OLEH)} · ${esc(String(c.DIKETAHUI_PADA||'').replace('T',' '))}</div>`:''}</div></div>`;
       this._bind();
     },
     _bind(){
       const host=this._host,self=this;
       host.oninput=host.onchange=e=>{
         const t=e.target,c=self.cur;if(!c||self.ro())return;
+        if(t.dataset.tl){if(e.type==='change')self._tlEdit(t);return;}
         if(t.dataset.top){const k=t.dataset.top;c[k]=t.type==='checkbox'?(t.checked?'YA':''):t.value;self._persist();if(k==='NIHIL'&&e.type==='change'){self._flush2();self.renderEditor();}return;}
         if(t.dataset.a){
           const A=t.dataset.a,arr=({CEK:c.CEK,KJ:c.KJ,PH:c.PH,BR:c.BR})[A],i=+t.dataset.i,row=arr&&arr[i];if(!row)return;
@@ -4174,6 +4194,8 @@ SRIT.Features['jurnal-piket']=(function(){
         if(a==='serah'){self.serah();return;}
         if(a==='tahu'){self.tahu();return;}
         if(a==='reopen'){self.reopen();return;}
+        if(a==='del'){self.del(c.ID);return;}
+        if(a==='tlAct'){self.tlAct(b.dataset.id,()=>self.renderEditor());return;}
         if(self.ro())return;
         if(a==='delCek')c.CEK.splice(i,1);
         else if(a==='segarkan'){let n=0;c.CEK.forEach(x=>{const h=hunian(x.kamarId);if((+x.seharusnya||0)!==h||x.seharusnya===''||x.seharusnya==null){x.seharusnya=h;n++;}});
@@ -4185,12 +4207,172 @@ SRIT.Features['jurnal-piket']=(function(){
         else if(a==='addPh')c.PH.push({anak:'',anakId:'',hal:'',sejak:SRIT.Util.todayISO(),tindak:'',pihak:''});
         else if(a==='delPh')c.PH.splice(i,1);
         else if(a==='copyPh'){const pv=self._prev();if(pv)c.PH=parse(pv.PERHATIAN,[]).map(x=>({...x}));}
+        else if(a==='tlAdd')self._tlAdd(c);
+        else if(a==='tlSeed')self._tlSeed(c);
+        else if(a==='tlDel')SRIT.Repo.remove('TL_PIKET',b.dataset.id);
         else if(a==='kasus'){self._flush();self.kasus(i);return;}
         else return;
         self._flush2();self.renderEditor();
       };
     },
     _flush2(){this._dirty=true;this._flush();},
+    /* ===================== TINDAK LANJUT SERAH TERIMA (berbasis akun, berkelanjutan) ===================== */
+    _me(){return SRIT.Auth.user||{};},
+    _akun(nama){const n=String(nama||'').trim().toLowerCase();return SRIT.Store.read('USERS').find(x=>String(x.NAME||'').trim().toLowerCase()===n&&x.AKUN!=='TIDAK')||null;},
+    _tlAll(){return SRIT.Store.read('TL_PIKET');},
+    _tlVis(){const id=this._me().ID,co=SRIT.Approval.canJurnal();return this._tlAll().filter(r=>r.STATUS==='DRAFT'?r.DARI===id:(co||r.KEPADA===id||r.DARI===id));},
+    _tlDrafts(c){return this._tlAll().filter(r=>r.JURNAL===c.ID&&r.STATUS==='DRAFT');},
+    _tlCarry(c,rcv){return rcv?this._tlAll().filter(r=>r.JURNAL!==c.ID&&tlOpen(r)&&r.KEPADA===c.PETUGAS&&r.KEPADA!==rcv.ID&&(!r.ASRAMA||!c.ASRAMA||r.ASRAMA===c.ASRAMA)):[];},
+    _canAct(r){return this.can('UPDATE')&&r.STATUS!=='DRAFT'&&(r.KEPADA===this._me().ID||SRIT.Approval.canJurnal());},
+    _canDelTL(r){return this.can('DELETE')&&(SRIT.Approval.canJurnal()||(r.DARI===this._me().ID&&(r.STATUS==='DRAFT'||r.STATUS==='BARU')));},
+    _tlNew(c,x){
+      const u=this._me(),row=Object.assign({ID:SRIT.Util.uid('TL'),JURNAL:c.ID,TANGGAL:c.TANGGAL,SHIFT:c.SHIFT,ASRAMA:c.ASRAMA||'',GEDUNG:c.GEDUNG||'',URAIAN:'',SUMBER:'MANUAL',ANAK:'',NAMA_ANAK:'',PRIORITAS:'BIASA',TENGGAT:'',
+        DARI:u.ID,NAMA_DARI:u.NAME||'',KEPADA:'',NAMA_KEPADA:'',STATUS:'DRAFT',PROGRES:'[]',TL_ASAL:'',SELESAI_OLEH:'',NAMA_SELESAI:'',SELESAI_PADA:'',DIPERBARUI_PADA:''},x||{});
+      SRIT.Repo.insert('TL_PIKET',row);return row;
+    },
+    _tlAdd(c){this._tlNew(c);},
+    _tlSeed(c){
+      const have=new Set(this._tlDrafts(c).map(r=>String(r.URAIAN||'').trim()));let n=0;
+      const add=(txt,src,anak,anakId)=>{txt=String(txt||'').trim();if(!txt||have.has(txt))return;have.add(txt);this._tlNew(c,{URAIAN:txt,SUMBER:src,NAMA_ANAK:anak||'',ANAK:anakId||''});n++;};
+      String(c.BELUM_SELESAI||'').split(/\n+/).forEach(x=>add(x.replace(/^\s*(?:[-•*]|\d+[.)])\s+/,''),'BELUM_SELESAI','',''));
+      (c.PH||[]).forEach(x=>{if(x&&String(x.tindak||'').trim())add((x.anak?x.anak+': ':'')+String(x.tindak).trim(),'PERHATIAN',x.anak,x.anakId);});
+      SRIT.Notify(n?n+' tindak lanjut diambil dari isian di atas':'Tidak ada isian baru untuk diambil','ok');
+    },
+    _tlEdit(t){
+      const r=SRIT.Repo.getById('TL_PIKET',t.dataset.tl);if(!r||r.STATUS!=='DRAFT')return;
+      const f=t.dataset.f,v=t.value;
+      SRIT.Repo.update('TL_PIKET',r.ID,f==='anak'?{NAMA_ANAK:v.trim(),ANAK:this._anakMap[v]||''}:{[f]:v});
+    },
+    _tlBlock(c,ro){
+      const l=this._tlVis().filter(r=>r.JURNAL===c.ID).sort((a,b)=>String(a.ID).localeCompare(String(b.ID)));
+      if(ro&&!l.length)return '';
+      const rows=l.map(r=>{
+        if(!ro&&r.STATUS==='DRAFT')return `<div class="border rounded p-2 mb-2"><div class="row g-2">
+          <div class="col-12 col-md-5"><label class="form-label-sm">Tindak lanjut</label><input class="form-control form-control-sm" data-tl="${r.ID}" data-f="URAIAN" value="${esc(r.URAIAN)}" placeholder="Apa yang perlu dilanjutkan penerima"></div>
+          <div class="col-6 col-md-2"><label class="form-label-sm">Prioritas</label><select class="form-select form-select-sm" data-tl="${r.ID}" data-f="PRIORITAS">${sel(TL_PRIO,r.PRIORITAS||'BIASA')}</select></div>
+          <div class="col-6 col-md-2"><label class="form-label-sm">Tenggat</label><input type="date" class="form-control form-control-sm" data-tl="${r.ID}" data-f="TENGGAT" value="${esc(String(r.TENGGAT||'').slice(0,10))}"></div>
+          <div class="col-10 col-md-2"><label class="form-label-sm">Anak (opsional)</label><input class="form-control form-control-sm" list="jpAnak" data-tl="${r.ID}" data-f="anak" value="${esc(r.NAMA_ANAK||'')}"></div>
+          <div class="col-2 col-md-1 d-flex align-items-end"><button class="btn btn-sm btn-link text-danger p-0" data-act="tlDel" data-id="${r.ID}" title="Hapus"><i class="bi bi-x-lg"></i></button></div></div></div>`;
+        const last=parse(r.PROGRES,[]).slice(-1)[0];
+        return `<div class="d-flex flex-wrap gap-2 border-top py-1" style="font-size:13px"><div style="flex:1;min-width:200px">${tlBadges(r)}${esc(r.URAIAN)}${r.NAMA_ANAK?' <span class="text-muted-2">('+esc(r.NAMA_ANAK)+')</span>':''}
+          <div class="text-muted-2" style="font-size:11px">Kepada ${esc(r.NAMA_KEPADA||'(diisi saat diserahkan)')}${r.TENGGAT?' · tenggat '+dstr(r.TENGGAT):''}${last&&last.catatan?' · terakhir ('+esc(last.nama||'')+'): '+esc(String(last.catatan).slice(0,80)):''}</div></div>
+          <span class="badge-soft ${(TL_ST[r.STATUS]||TL_ST.BARU).cls}">${(TL_ST[r.STATUS]||TL_ST.BARU).t}</span></div>`;}).join('');
+      return `<div class="col-12"><div class="fw-semibold mt-2">Tindak lanjut untuk petugas penerima</div>
+        <div class="text-muted-2 mb-2" style="font-size:12px">Setiap butir menjadi tugas di akun penerima, progresnya tercatat, dan tetap terbuka (diteruskan ke shift berikutnya) sampai ditandai selesai.</div>
+        ${rows||'<div class="text-muted-2 mb-2" style="font-size:13px">Belum ada.</div>'}
+        ${ro?'':'<button class="btn btn-outline-primary btn-sm" data-act="tlAdd"><i class="bi bi-plus-lg"></i> Tambah tindak lanjut</button> <button class="btn btn-outline-secondary btn-sm" data-act="tlSeed" title="Ambil dari hal yang belum selesai dan tindak lanjut anak perhatian khusus">Ambil dari isian di atas</button>'}</div>`;
+    },
+    _tlMineCard(c){
+      if(c.STATUS!=='BERLANGSUNG')return '';
+      const id=this._me().ID,l=this._tlAll().filter(r=>r.KEPADA===id&&tlOpen(r)&&(!r.ASRAMA||!c.ASRAMA||r.ASRAMA===c.ASRAMA));
+      if(!l.length)return '';
+      return `<div class="card-srit p-3 mb-3" style="border-left:3px solid var(--srit-warning,#f0ad4e)"><div class="fw-semibold mb-1"><i class="bi bi-list-check"></i> Tindak lanjut untuk Anda (${l.length})</div>
+        <div class="text-muted-2 mb-2" style="font-size:12px">Hasil serah terima sebelumnya. Perbarui progresnya; yang belum selesai otomatis diteruskan ke penerima saat Anda menyerahkan shift.</div>
+        ${l.map(r=>`<div class="d-flex flex-wrap align-items-center gap-2 border-top py-1" style="font-size:13px"><div style="flex:1;min-width:200px">${tlBadges(r)}${esc(r.URAIAN)}
+          <div class="text-muted-2" style="font-size:11px">Dari ${esc(r.NAMA_DARI||'-')} · ${dstr(r.TANGGAL)} ${SHIFT[r.SHIFT]||''}${r.TENGGAT?' · tenggat '+dstr(r.TENGGAT):''}</div></div>
+          <span class="badge-soft ${TL_ST[r.STATUS].cls}">${TL_ST[r.STATUS].t}</span>${this._canAct(r)?`<button class="btn btn-sm btn-outline-primary py-0" data-act="tlAct" data-id="${r.ID}">Tindak lanjuti</button>`:''}</div>`).join('')}</div>`;
+    },
+    _tlSerah(c,rcv,baru,bawa){
+      const u=this._me(),now=nowLocal(),lg=(aksi,cat,st)=>({waktu:now,oleh:u.ID,nama:u.NAME||'',aksi:aksi,status:st,catatan:cat}),tag=dstr(c.TANGGAL)+' '+(SHIFT[c.SHIFT]||'');
+      this._tlDrafts(c).forEach(r=>{
+        if(!String(r.URAIAN||'').trim()){SRIT.Repo.remove('TL_PIKET',r.ID);return;}
+        SRIT.Repo.update('TL_PIKET',r.ID,{STATUS:'BARU',KEPADA:rcv.ID,NAMA_KEPADA:rcv.NAME||'',PROGRES:JSON.stringify([lg('DIBUAT','Diserahkan pada serah terima shift '+tag,'BARU')]),DIPERBARUI_PADA:now});
+      });
+      // jurnal dibuka kembali lalu diserahkan ke orang lain: butir yang belum disentuh ikut penerima terbaru
+      this._tlAll().filter(r=>r.JURNAL===c.ID&&r.STATUS==='BARU'&&parse(r.PROGRES,[]).length<=1&&r.KEPADA!==rcv.ID)
+        .forEach(r=>SRIT.Repo.update('TL_PIKET',r.ID,{KEPADA:rcv.ID,NAMA_KEPADA:rcv.NAME||'',DIPERBARUI_PADA:now}));
+      bawa.forEach(r=>{const l2=parse(r.PROGRES,[]);l2.push(lg('DITERUSKAN','Diteruskan ke '+(rcv.NAME||'')+' pada serah terima shift '+tag,r.STATUS));
+        SRIT.Repo.update('TL_PIKET',r.ID,{KEPADA:rcv.ID,NAMA_KEPADA:rcv.NAME||'',PROGRES:JSON.stringify(l2),DIPERBARUI_PADA:now});});
+      SRIT.Audit.log('UPDATE','jurnal-piket',c.ID,null,{tindakLanjutBaru:baru.length,diteruskan:bawa.length,penerima:rcv.ID});
+    },
+    _tlCetak(r){
+      const l=this._tlAll().filter(x=>x.JURNAL===r.ID&&x.STATUS!=='DRAFT');
+      return `<div style="margin:4px 0 8px"><b>Tindak lanjut yang diserahkan:</b> ${l.length?'<ol style="margin:2px 0 0 18px;padding:0">'+l.map(x=>'<li>'+esc(x.URAIAN)+(x.NAMA_ANAK?' ('+esc(x.NAMA_ANAK)+')':'')+(x.PRIORITAS&&x.PRIORITAS!=='BIASA'?' — '+esc(TL_PRIO[x.PRIORITAS]||''):'')+(x.TENGGAT?' — tenggat '+esc(dstr(x.TENGGAT)):'')+'</li>').join('')+'</ol>':'-'}</div>`;
+    },
+    _tabs(){
+      const n=this._tlAll().filter(r=>r.KEPADA===this._me().ID&&tlOpen(r)).length,t=this.state.tab;
+      return `<div class="d-flex gap-2 mb-3"><button class="btn btn-sm ${t==='tl'?'btn-outline-primary':'btn-primary'}" data-tab="jurnal">Jurnal Piket</button><button class="btn btn-sm ${t==='tl'?'btn-primary':'btn-outline-primary'}" data-tab="tl"><i class="bi bi-list-check"></i> Tindak Lanjut${n?` <span class="badge bg-danger">${n}</span>`:''}</button></div>`;
+    },
+    _bindTabs(){this._host.querySelectorAll('[data-tab]').forEach(b=>{b.onclick=()=>{this.state.tab=b.dataset.tab;this.home();};});},
+    renderTL(){
+      const host=this._host,s=this.state,u=this._me(),co=SRIT.Approval.canJurnal();
+      host.onclick=host.oninput=host.onchange=null;
+      if(!co&&s.tlWho==='all')s.tlWho='mine';
+      const vis=this._tlVis().filter(r=>r.STATUS!=='DRAFT'),mine=vis.filter(r=>r.KEPADA===u.ID&&tlOpen(r)),late=mine.filter(tlLate),sent=vis.filter(r=>r.DARI===u.ID&&r.KEPADA!==u.ID&&tlOpen(r));
+      const card=(t,n,warn)=>`<div class="col-4"><div class="card-srit p-2 text-center"><div class="text-muted-2" style="font-size:11px">${t}</div><div class="fw-bold" style="font-size:20px${warn&&n?';color:var(--srit-danger)':''}">${n}</div></div></div>`;
+      host.innerHTML=`${this._tabs()}<div class="row g-2 mb-3">${card('Menunggu Anda',mine.length)}${card('Lewat tenggat (Anda)',late.length,true)}${card('Anda serahkan, belum selesai',sent.length)}</div>
+        <div class="card-srit p-3 mb-3"><div class="filter-bar">
+          <div style="flex:1;min-width:170px"><label class="form-label-sm">Cari</label><input class="form-control form-control-sm" id="tlQ" placeholder="Uraian, anak, atau nama" value="${esc(s.tlQ)}"></div>
+          <div><label class="form-label-sm">Tampilkan</label><select class="form-select form-select-sm" id="tlWho"><option value="mine">Tugas saya</option><option value="dari">Yang saya serahkan</option>${co?'<option value="all">Semua (koordinator)</option>':''}</select></div>
+          <div><label class="form-label-sm">Status</label><select class="form-select form-select-sm" id="tlSt"><option value="open">Belum selesai</option><option value="done">Selesai</option><option value="">Semua</option></select></div>
+        </div><div class="text-muted-2 mt-2" style="font-size:12px">Tindak lanjut lahir dari serah terima shift (bagian E jurnal). Tetap terbuka dan ikut diteruskan ke penerima shift berikutnya sampai ditandai selesai. Setiap akun hanya melihat tugas yang ditujukan kepadanya atau yang ia serahkan; koordinator melihat semuanya.</div></div>
+        <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="tlTable"></table></div></div>`;
+      $('#tlWho').value=s.tlWho;$('#tlSt').value=s.tlSt;
+      $('#tlQ').oninput=e=>{clearTimeout(this._qt);this._qt=setTimeout(()=>{s.tlQ=e.target.value;this.loadTL();},300);};
+      $('#tlWho').onchange=e=>{s.tlWho=e.target.value;this.loadTL();};
+      $('#tlSt').onchange=e=>{s.tlSt=e.target.value;this.loadTL();};
+      this._bindTabs();this.loadTL();
+    },
+    loadTL(){
+      const s=this.state,u=this._me(),q=String(s.tlQ||'').toLowerCase(),J="SRIT.Features['jurnal-piket']";
+      let l=this._tlVis().filter(r=>r.STATUS!=='DRAFT');
+      if(s.tlWho==='mine')l=l.filter(r=>r.KEPADA===u.ID);else if(s.tlWho==='dari')l=l.filter(r=>r.DARI===u.ID);
+      if(s.tlSt==='open')l=l.filter(tlOpen);else if(s.tlSt==='done')l=l.filter(r=>r.STATUS==='SELESAI');
+      if(q)l=l.filter(r=>[r.URAIAN,r.NAMA_ANAK,r.NAMA_DARI,r.NAMA_KEPADA].join(' ').toLowerCase().indexOf(q)>=0);
+      const rank=r=>tlLate(r)?0:(r.PRIORITAS==='MENDESAK'?1:2);
+      l.sort((a,b)=>(tlOpen(b)-tlOpen(a))||(rank(a)-rank(b))||String(a.TENGGAT||'9999').localeCompare(String(b.TENGGAT||'9999'))||String(b.TANGGAL).localeCompare(String(a.TANGGAL)));
+      const tb=$('#tlTable');
+      if(!l.length){tb.innerHTML='<tbody><tr><td class="text-center text-muted-2 py-4">Tidak ada tindak lanjut.</td></tr></tbody>';return;}
+      tb.innerHTML=`<thead><tr><th>Tindak lanjut</th><th>Dari</th><th>Kepada</th><th>Tenggat</th><th>Status</th><th></th></tr></thead><tbody>${l.slice(0,200).map(r=>{
+        const last=parse(r.PROGRES,[]).slice(-1)[0],st=TL_ST[r.STATUS]||TL_ST.BARU;
+        return `<tr><td>${tlBadges(r)}${esc(r.URAIAN)}${r.NAMA_ANAK?' <span class="text-muted-2">('+esc(r.NAMA_ANAK)+')</span>':''}${last&&last.catatan?`<div class="text-muted-2" style="font-size:11px">Terakhir (${esc(last.nama||'')}): ${esc(String(last.catatan).slice(0,90))}</div>`:''}</td>
+          <td>${esc(r.NAMA_DARI||'-')}<div class="text-muted-2" style="font-size:11px">${dstr(r.TANGGAL)} · ${SHIFT[r.SHIFT]||''}</div></td>
+          <td>${esc(r.NAMA_KEPADA||'-')}${r.KEPADA===u.ID?' <span class="badge-soft st-HADIR">Anda</span>':''}</td>
+          <td class="text-nowrap">${r.TENGGAT?dstr(r.TENGGAT):'–'}</td><td><span class="badge-soft ${st.cls}">${st.t}</span></td>
+          <td class="text-nowrap">${this._canAct(r)?`<button class="btn btn-sm btn-outline-primary py-0" onclick="${J}.tlAct('${r.ID}')">Tindak lanjuti</button>`:''}
+            <button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Riwayat progres" onclick="${J}.tlHist('${r.ID}')"><i class="bi bi-clock-history"></i></button>
+            ${this._canDelTL(r)?`<button class="btn btn-sm btn-outline-danger py-0 ms-1" title="Hapus" onclick="${J}.tlDel('${r.ID}')"><i class="bi bi-trash"></i></button>`:''}</td></tr>`;}).join('')}</tbody>`;
+    },
+    _tlRiwayatHtml(r){
+      const lg=parse(r.PROGRES,[]);
+      return lg.length?lg.slice().reverse().map(x=>`<div style="font-size:12px" class="border-top py-1"><span class="text-muted-2">${esc(String(x.waktu||'').replace('T',' '))}</span> · <b>${esc(x.nama||'')}</b>${x.aksi==='DITERUSKAN'?' (diteruskan)':''}${x.status?' · '+esc((TL_ST[x.status]||{}).t||x.status):''}: ${esc(x.catatan||'')}</div>`).join(''):'<div class="text-muted-2" style="font-size:12px">Belum ada progres.</div>';
+    },
+    tlHist(id){
+      const r=SRIT.Repo.getById('TL_PIKET',id);if(!r)return;
+      SRIT.Modal.open({title:'Riwayat Tindak Lanjut',body:`<div class="mb-2">${tlBadges(r)}<b>${esc(r.URAIAN)}</b></div><div class="text-muted-2 mb-2" style="font-size:12px">Dari ${esc(r.NAMA_DARI||'-')} · ${dstr(r.TANGGAL)} ${SHIFT[r.SHIFT]||''} · kepada ${esc(r.NAMA_KEPADA||'-')}${r.TENGGAT?' · tenggat '+dstr(r.TENGGAT):''}</div>${this._tlRiwayatHtml(r)}`,footer:'<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button>'});
+    },
+    tlAct(id,cb){
+      const r=SRIT.Repo.getById('TL_PIKET',id);
+      if(!r||!this._canAct(r)){SRIT.Notify('Anda tidak berhak memperbarui tindak lanjut ini','err');return;}
+      const u=this._me(),users=SRIT.Store.read('USERS').filter(x=>x.AKUN!=='TIDAK'&&x.ID!==u.ID);
+      const m=SRIT.Modal.open({title:'Tindak Lanjuti',body:`<div class="mb-1">${tlBadges(r)}<b>${esc(r.URAIAN)}</b>${r.NAMA_ANAK?' <span class="text-muted-2">('+esc(r.NAMA_ANAK)+')</span>':''}</div>
+        <div class="text-muted-2 mb-2" style="font-size:12px">Dari ${esc(r.NAMA_DARI||'-')} · ${dstr(r.TANGGAL)} ${SHIFT[r.SHIFT]||''}${r.TENGGAT?' · tenggat '+dstr(r.TENGGAT):''}</div>
+        <div class="row g-2"><div class="col-6"><label class="form-label-sm">Status</label><select class="form-select form-select-sm" id="tlStat"><option value="BARU">Belum dikerjakan</option><option value="PROSES">Sedang diproses</option><option value="SELESAI">Selesai</option></select></div>
+          <div class="col-6"><label class="form-label-sm">Teruskan ke (opsional)</label><select class="form-select form-select-sm" id="tlKe"><option value="">— Tetap pada saya —</option>${users.map(x=>`<option value="${esc(x.ID)}">${esc(x.NAME||x.ID)}</option>`).join('')}</select></div>
+          <div class="col-12"><label class="form-label-sm">Catatan progres <span class="text-danger">*</span></label><textarea class="form-control form-control-sm" rows="3" id="tlCat" placeholder="Apa yang sudah dilakukan / hasilnya / kendala"></textarea></div></div>
+        <div class="mt-3 fw-semibold" style="font-size:13px">Riwayat</div>${this._tlRiwayatHtml(r)}`,
+        footer:'<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="tlSave">Simpan</button>'});
+      $('#tlStat',m.el).value=r.STATUS==='BARU'?'PROSES':r.STATUS;
+      $('#tlSave',m.el).onclick=()=>{
+        const st=$('#tlStat',m.el).value,ke=$('#tlKe',m.el).value,cat=$('#tlCat',m.el).value.trim();
+        if(!cat){SRIT.Notify('Catatan progres wajib diisi','err');return;}
+        if(ke&&st==='SELESAI'){SRIT.Notify('Tindak lanjut yang sudah selesai tidak perlu diteruskan','err');return;}
+        const now=nowLocal(),keU=ke?SRIT.Repo.getById('USERS',ke):null,lg=parse(r.PROGRES,[]);
+        lg.push(Object.assign({waktu:now,oleh:u.ID,nama:u.NAME||'',aksi:keU?'DITERUSKAN':'PROGRES',status:keU?'BARU':st,catatan:cat},keU?{ke:keU.NAME||''}:{}));
+        const patch={STATUS:keU?'BARU':st,PROGRES:JSON.stringify(lg),DIPERBARUI_PADA:now};
+        if(keU){patch.KEPADA=keU.ID;patch.NAMA_KEPADA=keU.NAME||'';}
+        if(patch.STATUS==='SELESAI'){patch.SELESAI_OLEH=u.ID;patch.NAMA_SELESAI=u.NAME||'';patch.SELESAI_PADA=now;}else{patch.SELESAI_OLEH='';patch.NAMA_SELESAI='';patch.SELESAI_PADA='';}
+        SRIT.Repo.update('TL_PIKET',id,patch);SRIT.Audit.log('UPDATE','jurnal-piket',id,{STATUS:r.STATUS},{STATUS:patch.STATUS,tabel:'TL_PIKET'});
+        m.close();SRIT.Notify(keU?'Tindak lanjut diteruskan ke '+(keU.NAME||''):(patch.STATUS==='SELESAI'?'Tindak lanjut selesai':'Progres tersimpan'),'ok');
+        SRIT.Cache.invalidate('dash');if(typeof cb==='function')cb();else this.home();
+      };
+    },
+    tlDel(id){
+      const r=SRIT.Repo.getById('TL_PIKET',id);if(!r||!this._canDelTL(r))return;
+      if(!confirm('Hapus tindak lanjut ini?\n'+r.URAIAN))return;
+      SRIT.Repo.remove('TL_PIKET',id);SRIT.Audit.log('DELETE','jurnal-piket',id,null,{tabel:'TL_PIKET'});SRIT.Notify('Tindak lanjut dihapus','warn');this.home();
+    },
+
     // ---- hubungan ke Insiden & Kasus ----
     kasus(i){
       const c=this.cur,x=c.KJ[i];if(!x||x.insiden)return;
@@ -4218,14 +4400,19 @@ SRIT.Features['jurnal-piket']=(function(){
       const isi=c.KJ.filter(x=>String(x.uraian||'').trim());
       if(!isi.length&&c.NIHIL!=='YA')err.push('Catatan kejadian kosong: isi kejadian atau centang NIHIL');
       if(c.KJ.length&&isi.length!==c.KJ.length)err.push('Ada catatan kejadian tanpa uraian');
-      if(!String(c.PENERIMA||'').trim())err.push('Nama petugas penerima belum diisi');
+      const nmP=String(c.PENERIMA||'').trim();let rcv=null;
+      if(!nmP)err.push('Nama petugas penerima belum diisi');
+      else{rcv=this._akun(nmP);
+        if(!rcv)err.push('Petugas penerima harus dipilih dari daftar akun agar tindak lanjut tercatat di akunnya');
+        else if(rcv.ID===c.PETUGAS)err.push('Petugas penerima tidak boleh sama dengan petugas yang menyerahkan');}
       if(err.length){SRIT.Notify('Belum bisa diserahterimakan:\n• '+err.join('\n• '),'err',7000);return;}
       const lap=isi.filter(x=>(x.tingkat==='SEDANG'||x.tingkat==='BERAT')&&!x.lapor);
       if(lap.length&&!confirm('Ada '+lap.length+' kejadian sedang/berat yang belum tercatat pelaporannya. Batas lapor bersifat mengikat. Tetap serahkan shift?'))return;
-      if(!confirm('Serahkan shift ini? Isi tidak dapat diubah setelah diserahkan.'))return;
-      const patch={STATUS:'DISERAHKAN',JAM_SELESAI:c.JAM_SELESAI||nowT(),JAM_SERAH:c.JAM_SERAH||nowT()};
+      const tlBaru=this._tlDrafts(c).filter(x=>String(x.URAIAN||'').trim()),tlBawa=this._tlCarry(c,rcv);
+      if(!confirm('Serahkan shift ini? Isi tidak dapat diubah setelah diserahkan.'+((tlBaru.length||tlBawa.length)?'\n\nKepada '+rcv.NAME+': '+tlBaru.length+' tindak lanjut baru'+(tlBawa.length?' dan '+tlBawa.length+' tindak lanjut belum selesai dari shift sebelumnya yang ikut diteruskan.':'.'):'')))return;
+      const patch={STATUS:'DISERAHKAN',JAM_SELESAI:c.JAM_SELESAI||nowT(),JAM_SERAH:c.JAM_SERAH||nowT(),PENERIMA_ID:rcv.ID};
       Object.assign(c,patch);SRIT.Repo.update('JURNAL_PIKET',c.ID,Object.assign(this._serialize(),patch));
-      SRIT.Audit.log('UPDATE','jurnal-piket',c.ID,{STATUS:'BERLANGSUNG'},{STATUS:'DISERAHKAN'});SRIT.Notify('Shift diserahterimakan','ok');this.renderEditor();
+      SRIT.Audit.log('UPDATE','jurnal-piket',c.ID,{STATUS:'BERLANGSUNG'},{STATUS:'DISERAHKAN'});this._tlSerah(c,rcv,tlBaru,tlBawa);SRIT.Notify('Shift diserahterimakan','ok');this.renderEditor();
     },
     tahu(){
       const c=this.cur,patch={STATUS:'DIKETAHUI',DIKETAHUI_OLEH:(SRIT.Auth.user||{}).NAME||'',DIKETAHUI_PADA:nowLocal()};
@@ -4254,7 +4441,7 @@ SRIT.Features['jurnal-piket']=(function(){
           (kj.map(x=>`<tr><td ${td}>${esc(x.jam||'')}</td><td ${td}>${esc(x.uraian||'')}</td><td ${td}>${esc(x.anak||'')}</td><td ${td}>${esc((PILAR[x.pilar]||'').slice(0,1))}</td><td ${td}>${esc(x.tindakan||'')}</td><td ${td}>${esc((TINGKAT[x.tingkat]||'').split(' ')[0])}</td><td ${td}>${esc(LAPOR[x.lapor]||'')}</td><td ${td}>${esc(x.jamLapor||'')}</td></tr>`).join(''))||`<tr><td ${td}>${r.NIHIL==='YA'?'NIHIL':'&nbsp;'}</td><td ${td} colspan="7">&nbsp;</td></tr>`)}
         <b>D. Peserta Didik yang Perlu Perhatian Khusus / Sedang Dalam Pendampingan</b>${tbl(['Nama & kamar','Hal yang dipantau','Sejak','Yang perlu dilakukan shift berikutnya','Pihak yang menangani'],ph.map(x=>`<tr><td ${td}>${esc(x.anak||'')}</td><td ${td}>${esc(x.hal||'')}</td><td ${td}>${esc(x.sejak||'')}</td><td ${td}>${esc(x.tindak||'')}</td><td ${td}>${esc(x.pihak||'')}</td></tr>`).join('')||`<tr><td ${td} colspan="5">&nbsp;</td></tr>`)}
         <b>E. Serah Terima Shift</b>
-        <div style="margin:4px 0">Hal yang belum selesai dan perlu dilanjutkan: ${esc(r.BELUM_SELESAI||'-')}</div><div style="margin:4px 0 8px">Pesan khusus untuk petugas berikutnya: ${esc(r.PESAN||'-')}</div>
+        <div style="margin:4px 0">Hal yang belum selesai dan perlu dilanjutkan: ${esc(r.BELUM_SELESAI||'-')}</div><div style="margin:4px 0 8px">Pesan khusus untuk petugas berikutnya: ${esc(r.PESAN||'-')}</div>${F._tlCetak(r)}
         ${tbl(['Barang / dokumen yang diserahterimakan','Ada','Tidak ada','Catatan'],br.map(x=>`<tr><td ${td}>${esc(x.item)}</td><td ${td} align="center">${x.ada==='YA'?'✓':''}</td><td ${td} align="center">${x.ada==='TIDAK'?'✓':''}</td><td ${td}>${esc(x.ket||'')}</td></tr>`).join(''))}
         <div style="display:flex;justify-content:space-between;text-align:center;margin-top:18px;font-size:12px">
           <div>Petugas yang menyerahkan<br><br><br><br>(${esc(r.NAMA_PETUGAS||'................')})<br>Jam: ${esc(r.JAM_SERAH||'......')}</div>
@@ -8911,7 +9098,7 @@ SRIT.Features.penilaian={
   loadRapor(){
     const R=SRIT.RaporAsrama,s=this.state,esc=SRIT.Util.esc;
     const r=SRIT.Api.list('RAPOR_ASRAMA',{page:s.page,size:s.size,search:s.search,searchFields:['NAMA_ANAK'],filters:{PERIODE:s.periode}});
-    const canU=SRIT.Auth.can('penilaian:UPDATE');
+    const canU=SRIT.Auth.can('penilaian:UPDATE'),canD=SRIT.Auth.can('penilaian:DELETE');
     $('#rpTable').innerHTML=`<thead><tr><th>Anak</th><th>Periode</th><th title="Penguatan Karakter & Keagamaan">Karakter</th><th>Pengasuhan</th><th>Kec. Hidup</th><th>Vokasional</th><th>Total</th><th>Predikat</th><th></th></tr></thead><tbody>
     ${r.rows.length?r.rows.map(p=>{
       const nilai=R.parse(p.NILAI),h=R.hitung(nilai,p.JENJANG),fin=(p.STATUS==='FINAL'||p.STATUS==='DIKETAHUI'),known=p.STATUS==='DIKETAHUI';
@@ -8926,11 +9113,23 @@ SRIT.Features.penilaian={
         <button class="btn btn-sm btn-outline-primary py-0" onclick="SRIT.Features.penilaian.raporAsrama('${p.ID}')"><i class="bi bi-file-earmark-text"></i> Rapor</button>
         ${(p.STATUS==='FINAL'&&SRIT.Approval.canRapor())?`<button class="btn btn-sm btn-outline-success py-0 ms-1" title="Ketahui (Kepala Sekolah)" onclick="SRIT.Features.penilaian.ketahui('${p.ID}')"><i class="bi bi-patch-check"></i></button>`:''}
         ${(known&&SRIT.Approval.canRapor())?`<button class="btn btn-sm btn-outline-warning py-0 ms-1" title="Buka kunci" onclick="SRIT.Features.penilaian.bukaRapor('${p.ID}')"><i class="bi bi-unlock"></i></button>`:''}
-        ${(canU&&!(known&&!SRIT.Approval.canRapor()))?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" onclick="SRIT.Features.penilaian.formRapor('${p.ID}')"><i class="bi bi-pencil"></i></button>`:''}</td>
+        ${(canU&&!(known&&!SRIT.Approval.canRapor()))?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" onclick="SRIT.Features.penilaian.formRapor('${p.ID}')"><i class="bi bi-pencil"></i></button>`:''}
+        ${(canD&&!(known&&!SRIT.Approval.canRapor()))?`<button class="btn btn-sm btn-outline-danger py-0 ms-1" title="Hapus rapor" onclick="SRIT.Features.penilaian.delRapor('${p.ID}')"><i class="bi bi-trash"></i></button>`:''}</td>
     </tr>`;}).join(''):'<tr><td colspan="9"><div class="empty-state"><i class="bi bi-journal-check d-block"></i>Belum ada rapor asrama. Klik “Buat Rapor”.</div></td></tr>'}
     </tbody>`;
     $('#rpPag').innerHTML=SRIT.UI.pagination(r);
     $$('#rpPag [data-pg]').forEach(a=>a.onclick=()=>{s.page=+a.dataset.pg;this.loadRapor();});
+  },
+  delRapor(id){
+    const p=SRIT.Repo.getById('RAPOR_ASRAMA',id);if(!p)return;
+    if(p.STATUS==='DIKETAHUI'&&!SRIT.Approval.canRapor()){SRIT.Notify('Rapor yang sudah diketahui Kepala Sekolah dikunci','err');return;}
+    if(!confirm('Hapus rapor asrama '+(SRIT.nm('ANAK',p.ANAK)||p.NAMA_ANAK||'')+' periode '+(p.PERIODE||'-')+'?'+(p.STATUS==='FINAL'||p.STATUS==='DIKETAHUI'?'\nRapor ini sudah berstatus '+p.STATUS+'.':'')+'\nData tidak dapat dikembalikan.'))return;
+    SRIT.Repo.remove('RAPOR_ASRAMA',id);SRIT.Audit.log('DELETE','penilaian',id,null,{tabel:'RAPOR_ASRAMA'});SRIT.Cache.invalidate('dash');SRIT.Notify('Rapor dihapus','warn');this.loadRapor();
+  },
+  delNilai(id){
+    const p=SRIT.Repo.getById('PENILAIAN',id);if(!p)return;
+    if(!confirm('Hapus penilaian '+(SRIT.nm('ANAK',p.ANAK)||p.NAMA_ANAK||'')+' periode '+(p.PERIODE||'-')+'?\nData tidak dapat dikembalikan.'))return;
+    SRIT.Repo.remove('PENILAIAN',id);SRIT.Audit.log('DELETE','penilaian',id,null,{tabel:'PENILAIAN'});SRIT.Cache.invalidate('dash');SRIT.Notify('Penilaian dihapus','warn');this.load();
   },
   ketahui(id){
     const p=SRIT.Repo.getById('RAPOR_ASRAMA',id);if(!p||p.STATUS!=='FINAL')return;
@@ -9105,7 +9304,8 @@ SRIT.Features.penilaian={
       ${this.aspects.map(a=>`<td><span class="badge-soft ${+p[a]>=4?'st-HADIR':+p[a]>=3?'st-IZIN':+p[a]>=2?'st-SAKIT':'st-ALPA'}">${p[a]||'-'}</span></td>`).join('')}
       <td class="fw-bold">${avg}</td>
       <td class="text-end"><button class="btn btn-sm btn-outline-primary py-0" onclick="SRIT.Features.penilaian.rapor('${p.ID}')"><i class="bi bi-file-earmark-text"></i> Rapor</button>
-      ${SRIT.Auth.can('penilaian:UPDATE')?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" onclick="SRIT.Features.penilaian.form('${p.ID}')"><i class="bi bi-pencil"></i></button>`:''}</td>
+      ${SRIT.Auth.can('penilaian:UPDATE')?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" onclick="SRIT.Features.penilaian.form('${p.ID}')"><i class="bi bi-pencil"></i></button>`:''}
+      ${SRIT.Auth.can('penilaian:DELETE')?`<button class="btn btn-sm btn-outline-danger py-0 ms-1" title="Hapus penilaian" onclick="SRIT.Features.penilaian.delNilai('${p.ID}')"><i class="bi bi-trash"></i></button>`:''}</td>
     </tr>`;}).join(''):'<tr><td colspan="12"><div class="empty-state"><i class="bi bi-clipboard-check d-block"></i>Belum ada penilaian</div></td></tr>'}
     </tbody>`;
     $('#pnPag').innerHTML=SRIT.UI.pagination(r);
@@ -10126,6 +10326,9 @@ SRIT.computeAlerts=()=>{
     if(AP.canRapor()){const rp=SRIT.Store.read('RAPOR_ASRAMA').filter(r=>r.STATUS==='FINAL').length;if(rp)al.push({title:rp+' rapor asrama final menunggu diketahui',desc:'Kepala Sekolah mengetahui sebelum dibagikan',level:'LOW',color:'var(--srit-info)',icon:'bi-journal-check'});}
     if(AP.canJurnal()){const u=(SRIT.Auth.user||{}).ID,jp=SRIT.Store.read('JURNAL_PIKET').filter(j=>j.STATUS==='DISERAHKAN'&&j.PETUGAS!==u).length;if(jp)al.push({title:jp+' jurnal piket menunggu diketahui koordinator',desc:'Periksa catatan kejadian dan anak perlu perhatian khusus',level:'LOW',color:'var(--srit-info)',icon:'bi-journal-bookmark'});}
   }
+  // tindak lanjut serah terima piket yang ditugaskan ke akun ini
+  {const me=(SRIT.Auth.user||{}).ID,td=SRIT.Util.todayISO(),tl=SRIT.Store.read('TL_PIKET').filter(r=>r.KEPADA===me&&(r.STATUS==='BARU'||r.STATUS==='PROSES')),tt=tl.filter(r=>r.TENGGAT&&String(r.TENGGAT).slice(0,10)<td).length;
+    if(tl.length)al.push({title:tl.length+' tindak lanjut serah terima piket menunggu Anda'+(tt?' ('+tt+' lewat tenggat)':''),desc:'Buka Jurnal & Serah Terima Piket → tab Tindak Lanjut',level:tt?'HIGH':'MEDIUM',color:tt?'var(--srit-danger)':'var(--srit-info)',icon:'bi-list-check'});}
   // kamar penuh
   const anak=SRIT.Store.read('ANAK');
   SRIT.Store.read('KAMAR').forEach(k=>{const occ=anak.filter(a=>a.KAMAR===k.ID&&a.STATUS==='AKTIF').length;if(occ>=(k.KAPASITAS||8))al.push({title:'Kamar penuh: '+k.NAME,desc:'Okupansi '+occ+'/'+(k.KAPASITAS||8),level:'LOW',color:'var(--srit-info)',icon:'bi-door-closed'});});
