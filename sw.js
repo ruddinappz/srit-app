@@ -1,7 +1,7 @@
 /* SRITi — service worker (GitHub Pages saja). Membuat pembukaan berikutnya cepat & tahan jaringan buruk.
    - Pustaka (libs/), ikon & logo: cache-dulu.   - index.html, config.js, gas-bridge.js: jaringan-dulu, cadangan cache.
    - Permintaan ke script.google.com / CDN TIDAK disentuh (data selalu langsung dari server). */
-const V = 'sriti-1.9.49';
+const V = 'sriti-1.9.57';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim()));
