@@ -2009,6 +2009,12 @@ SRIT.Asuh={
   nama(id){return (SRIT.Repo.getById('WALI_ASUH',id)||{}).NAME||id||'-';},
   waliKelompok(kid){const k=kid?SRIT.Repo.getById('KELOMPOK_ASUH',kid):null;return k&&k.WALI_ASUH?k.WALI_ASUH:'';},
   waliAnak(a){return this.waliKelompok(a.KELOMPOK)||a.WALI_ASUH||'';},
+  // Kelompok asuh OTOMATIS: satu wali = satu kelompok bernama "Kelompok <nama wali>" (dibuat/diubah server, Api_Kelompok.gs).
+  namaKelompokWali(waliId){const n=waliId?(SRIT.Repo.getById('WALI_ASUH',waliId)||{}).NAME:'';return n?'Kelompok '+String(n).trim():'';},
+  // kelompok utama wali (ID) — yang paling banyak anggotanya di antara kelompok aktif wali itu; '' bila belum ada (server membuatnya saat anak pertama didistribusikan)
+  kelompokWali(waliId){if(!waliId)return '';const S=SRIT.Store,ks=S.read('KELOMPOK_ASUH').filter(k=>k.WALI_ASUH===waliId&&k.STATUS!=='NONAKTIF');if(!ks.length)return '';
+    if(ks.length===1)return ks[0].ID;const an=S.read('ANAK');return ks.map(k=>({id:k.ID,n:an.filter(a=>a.KELOMPOK===k.ID).length})).sort((x,y)=>y.n-x.n||String(x.id).localeCompare(String(y.id)))[0].id;},
+  anggotaKelompok(waliId){return SRIT.Store.read('ANAK').filter(a=>this.aktif(a)&&this.waliAnak(a)===waliId).length;},
   // periksa: anak dengan >1 wali berbeda (data anak / kelompok / pemetaan) dan duplikat pemetaan
   audit(){
     const S=SRIT.Store,R=SRIT.Repo,map={};
@@ -2059,7 +2065,7 @@ SRIT.Asuh={
     const t=String(o.tanggal||SRIT.Util.todayISO()).slice(0,10),kel=kelBaru||'',sblm=o.sebelum||a;
     let rs=this.riwayat(anakId),open=rs.filter(r=>!r.SELESAI).pop();
     const stamp={DIBUAT_OLEH:(SRIT.Auth.user||{}).NAME||'',DIBUAT_PADA:new Date().toISOString()};
-    const baris=(w,k,x)=>Object.assign({ANAK_ID:anakId,WALI_ASUH:w,NAMA_WALI:this.nama(w),KELOMPOK:k||'',NAMA_KELOMPOK:this._namaKel(k),ALASAN:x||''},stamp);
+    const baris=(w,k,x)=>Object.assign({ANAK_ID:anakId,WALI_ASUH:w,NAMA_WALI:this.nama(w),KELOMPOK:k||'',NAMA_KELOMPOK:this._namaKel(k)||o.namaKel||'',ALASAN:x||''},stamp);
     if(!rs.length){   // anak belum punya riwayat: rekam keadaan lama sebagai masa awal (sejak awal data)
       const pw=sblm.WALI_ASUH||this.waliAnak(sblm);
       if(!pw||(pw===waliBaru&&(sblm.KELOMPOK||'')===kel))return 0;
@@ -2131,17 +2137,17 @@ SRIT.Asuh={
     const formGanti=(cur)=>{
       const open=A.riwayat(anakId).filter(r=>!r.SELESAI).pop(),min=open&&open.MULAI?open.MULAI:'';
       box().innerHTML=`<div class="row g-2"><div class="col-6"><label class="form-label-sm">Wali asuh baru</label><select class="form-select form-select-sm" id="rwW">${optWali(A.waliAnak(cur))}</select></div>
-        <div class="col-6"><label class="form-label-sm">Kelompok asuh</label><select class="form-select form-select-sm" id="rwK">${optKel(cur.KELOMPOK)}</select></div>
+        <div class="col-6"><label class="form-label-sm">Kelompok asuh (otomatis)</label><input class="form-control form-control-sm" id="rwK" readonly></div>
         <div class="col-6"><label class="form-label-sm">Berlaku mulai tanggal</label><input type="date" class="form-control form-control-sm" id="rwT" value="${SRIT.Util.todayISO()}" ${min?'min="'+min+'"':''}></div>
         <div class="col-6"><label class="form-label-sm">Alasan</label><input class="form-control form-control-sm" id="rwA" placeholder="mis. rotasi wali asuh"></div>
         <div class="col-12 text-muted-2" style="font-size:11px">Masa wali sebelumnya otomatis berakhir sehari sebelum tanggal berlaku, sehingga laporan lama tetap menampilkan wali yang bertugas saat itu.</div>
         <div class="col-12 d-flex gap-2"><button class="btn btn-sm btn-primary" id="rwSimpan">Simpan</button><button class="btn btn-sm btn-light" id="rwBatal">Batal</button></div></div>`;
-      const sync=()=>{const w=A.waliKelompok($('#rwK',box()).value),sel=$('#rwW',box());if(w){sel.value=w;sel.disabled=true;}else sel.disabled=false;};
-      $('#rwK',box()).onchange=sync;sync();
+      const sync=()=>{$('#rwK',box()).value=A.namaKelompokWali($('#rwW',box()).value)||'-';};
+      $('#rwW',box()).onchange=sync;sync();
       $('#rwBatal',box()).onclick=draw;
       $('#rwSimpan',box()).onclick=()=>{
-        const kel=$('#rwK',box()).value,w=A.waliKelompok(kel)||$('#rwW',box()).value,t=$('#rwT',box()).value||SRIT.Util.todayISO();
-        const r=A.catat(anakId,w,kel,{tanggal:t,alasan:$('#rwA',box()).value});
+        const w=$('#rwW',box()).value,kel=A.kelompokWali(w),t=$('#rwT',box()).value||SRIT.Util.todayISO();
+        const r=A.catat(anakId,w,kel,{tanggal:t,alasan:$('#rwA',box()).value,namaKel:A.namaKelompokWali(w)});
         if(r<0){SRIT.Notify('Tanggal berlaku tidak boleh sebelum awal masa berjalan ('+fd(min)+')','err');return;}
         SRIT.Repo.update('ANAK',anakId,{WALI_ASUH:w,KELOMPOK:kel});
         SRIT.Cache.invalidate('dash');SRIT.Notify(r?'Wali asuh diganti, riwayat tercatat':'Tidak ada perubahan','ok');draw();
@@ -8112,8 +8118,8 @@ SRIT.Features['keasramaan-master']={
   },
   // ===================== PENDISTRIBUSIAN ANAK ASUH =====================
   // 1) pilih wali asuh, 2) filter (jenjang dll.) -> semua anak aktif tampil, centang banyak sekaligus (klik baris / Shift+klik rentang), 3) simpan.
-  // Aturan "satu anak = satu wali asuh" dijaga: wali anak diganti, riwayat tanggal tercatat (SRIT.Asuh.catat), dan bila anak masih
-  // tergabung di kelompok lama yang walinya BERBEDA, ia dikeluarkan dari kelompok itu agar wali barunya tidak tertimpa.
+  // Aturan "satu anak = satu wali asuh" dijaga: wali anak diganti, riwayat tanggal tercatat (SRIT.Asuh.catat), dan anak otomatis pindah ke
+  // "Kelompok <nama wali baru>" (kelompok & kapasitasnya disesuaikan server, Api_Kelompok.gs) - tidak ada pendistribusian kelompok terpisah.
   _ds:{wali:'',jenjang:'',asrama:'',jk:'',tampil:'',q:'',sel:new Set(),last:-1},
   _distribusi(body,host){
     const E=SRIT.Util.esc,D=this._ds,A=SRIT.Asuh,self=this;
@@ -8138,7 +8144,8 @@ SRIT.Features['keasramaan-master']={
       if(!D.wali){box.innerHTML='<span class="text-muted-2" style="font-size:12px">Pilih wali asuh dulu, lalu daftar anak akan muncul di bawah.</span>';return;}
       const mine=aktif().filter(a=>A.waliAnak(a)===D.wali),by=j=>mine.filter(a=>a.JENJANG===j).length;
       const w=SRIT.Repo.getById('WALI_ASUH',D.wali)||{};
-      box.innerHTML=`<div style="font-size:13px"><b>${mine.length}</b> anak asuh saat ini <span class="text-muted-2">(SRD ${by('SRD')} &middot; SRMP ${by('SRMP')} &middot; SRMA ${by('SRMA')})</span>${w.JENJANG||w.ASRAMA?`<div class="text-muted-2" style="font-size:11px">Penempatan wali: ${E([(SRIT.Repo.getById('ASRAMA',w.ASRAMA)||{}).NAME,w.JENJANG].filter(Boolean).join(' · '))}</div>`:''}</div>`;
+      const kn=A.namaKelompokWali(D.wali);
+      box.innerHTML=`<div style="font-size:13px"><b>${mine.length}</b> anak asuh saat ini <span class="text-muted-2">(SRD ${by('SRD')} &middot; SRMP ${by('SRMP')} &middot; SRMA ${by('SRMA')})</span><div class="text-muted-2" style="font-size:11px"><i class="bi bi-diagram-2"></i> ${E(kn)} &middot; anggota otomatis mengikuti anak asuh</div>${w.JENJANG||w.ASRAMA?`<div class="text-muted-2" style="font-size:11px">Penempatan wali: ${E([(SRIT.Repo.getById('ASRAMA',w.ASRAMA)||{}).NAME,w.JENJANG].filter(Boolean).join(' · '))}</div>`:''}</div>`;
     };
     const step2=()=>{
       const box=$('#dsStep2',body);
@@ -8219,12 +8226,11 @@ SRIT.Features['keasramaan-master']={
       const pindah=anak.filter(a=>A.waliAnak(a)).length;
       if(!window.confirm('Distribusikan '+anak.length+' anak ke wali asuh '+wn+'?'+(pindah?'\n'+pindah+' di antaranya saat ini diasuh wali lain dan akan dipindahkan.':'')+'\nBerlaku mulai '+t+'. Riwayat wali asuh dicatat.'))return;
       const syncMap=SRIT.Auth.can('anak:UPDATE');   // tabel pemetaan WALI_ASUH_ANAK hanya boleh diubah pemegang izin Data Anak
-      let ok=0,tolak=0,keluarKel=0;
+      let ok=0,tolak=0;const kn=A.namaKelompokWali(wId);
       anak.forEach(a=>{
-        const kw=A.waliKelompok(a.KELOMPOK),kel=(a.KELOMPOK&&kw&&kw!==wId)?'':(a.KELOMPOK||'');
-        const r=A.catat(a.ID,wId,kel,{tanggal:t,alasan});
+        const kel=A.kelompokWali(wId);   // kelompok otomatis milik wali baru; bila belum ada, server membuat "Kelompok <nama wali>" saat simpan
+        const r=A.catat(a.ID,wId,kel,{tanggal:t,alasan,namaKel:kn});
         if(r<0){tolak++;return;}
-        if(kel!==(a.KELOMPOK||''))keluarKel++;
         R.update('ANAK',a.ID,{WALI_ASUH:wId,KELOMPOK:kel});
         if(syncMap)A.selaraskan(R.getById('ANAK',a.ID),alasan);
         ok++;
@@ -8232,7 +8238,7 @@ SRIT.Features['keasramaan-master']={
       SRIT.Audit.log('UPDATE','keasramaan-master','distribusi-anak-asuh',null,{wali:wId,jumlah:ok,mulai:t});
       SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
       D.sel.clear();D.last=-1;
-      SRIT.Notify(ok+' anak didistribusikan ke '+wn+(keluarKel?' ('+keluarKel+' dikeluarkan dari kelompok lama)':'')+(tolak?' · '+tolak+' ditolak: tanggal berlaku sebelum awal masa berjalan':''),tolak&&!ok?'err':'ok',6000);
+      SRIT.Notify(ok+' anak didistribusikan ke '+wn+' dan otomatis masuk '+kn+(tolak?' · '+tolak+' ditolak: tanggal berlaku sebelum awal masa berjalan':''),tolak&&!ok?'err':'ok',6000);
       this.render(host);
     };
     $('#dsWali',body).onchange=e=>{D.wali=e.target.value;D.sel=new Set();D.last=-1;info();step2();};
@@ -10208,19 +10214,19 @@ SRIT.Features.penghuni={
       body:`<form id="phForm"><div class="row g-2">
         ${SRIT.Place.fieldsHtml('phPl','col-6')}
         <div class="col-6"><label class="form-label-sm">Wali Asuh</label><select class="form-select form-select-sm" name="WALI_ASUH" id="phWali">${SRIT.Store.read('WALI_ASUH').map(w=>`<option value="${w.ID}" ${a.WALI_ASUH===w.ID?'selected':''}>${w.NAME}</option>`).join('')}</select></div>
-        <div class="col-6"><label class="form-label-sm">Kelompok Asuh</label><select class="form-select form-select-sm" name="KELOMPOK" id="phKel"><option value="">- Tanpa kelompok -</option>${SRIT.Store.read('KELOMPOK_ASUH').map(k=>`<option value="${k.ID}" ${a.KELOMPOK===k.ID?'selected':''}>${k.NAME}</option>`).join('')}</select></div>
+        <div class="col-6"><label class="form-label-sm">Kelompok Asuh (otomatis)</label><input class="form-control form-control-sm" id="phKel" readonly></div>
         <div class="col-6"><label class="form-label-sm">Wali/kelompok berlaku mulai</label><input type="date" class="form-control form-control-sm" name="TGL_WALI" value="${SRIT.Util.todayISO()}"></div>
         <div class="col-6 text-muted-2" style="font-size:11px;align-self:end">Hanya dipakai bila wali/kelompok berubah. Wali lama tetap tercatat pada laporan sebelum tanggal ini.</div>
-        <div class="col-12 text-muted-2" style="font-size:11px">Satu anak hanya punya satu wali asuh: bila kelompok asuh sudah punya wali, wali anak otomatis mengikuti kelompok.</div>
+        <div class="col-12 text-muted-2" style="font-size:11px">Kelompok asuh otomatis: setiap wali asuh memiliki satu kelompok bernama &quot;Kelompok &lt;nama wali&gt;&quot; dan anggotanya adalah anak asuh wali itu. Cukup pilih wali asuh; tidak perlu mendistribusikan kelompok lagi.</div>
       </div></form>`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="phSave">Simpan Penempatan</button>`});
     SRIT.Place.bind(m.el,a,'phPl');
-    const syncWali=()=>{const w=SRIT.Asuh.waliKelompok($('#phKel',m.el).value),sel=$('#phWali',m.el);if(w){sel.value=w;sel.disabled=true;sel.title='Mengikuti wali kelompok asuh';}else{sel.disabled=false;sel.title='';}};
-    $('#phKel',m.el).onchange=syncWali;syncWali();
+    const syncKel=()=>{$('#phKel',m.el).value=SRIT.Asuh.namaKelompokWali($('#phWali',m.el).value)||'-';};
+    $('#phWali',m.el).onchange=syncKel;syncKel();
     $('#phSave',m.el).onclick=()=>{
       const d=Object.fromEntries(new FormData($('#phForm',m.el)));
-      d.WALI_ASUH=SRIT.Asuh.waliKelompok(d.KELOMPOK)||d.WALI_ASUH||'';   // satu anak = satu wali (wali kelompok menjadi acuan)
-      {const rc=SRIT.Asuh.catat(id,d.WALI_ASUH,d.KELOMPOK,{tanggal:d.TGL_WALI,alasan:'Penempatan'});   // riwayat pengasuhan berbasis tanggal (sebelum data anak diubah)
+      d.KELOMPOK=SRIT.Asuh.kelompokWali(d.WALI_ASUH);   // kelompok = kelompok wali asuh yang dipilih (server membuatnya bila wali belum punya kelompok)
+      {const rc=SRIT.Asuh.catat(id,d.WALI_ASUH,d.KELOMPOK,{tanggal:d.TGL_WALI,alasan:'Penempatan',namaKel:SRIT.Asuh.namaKelompokWali(d.WALI_ASUH)});   // riwayat pengasuhan berbasis tanggal (sebelum data anak diubah)
        if(rc<0){SRIT.Notify('Tanggal berlaku wali/kelompok tidak boleh sebelum awal masa wali yang sedang berjalan','err');return;}}
       // bed lama dilepas, bed baru diisi, Asrama/Gedung/Lantai mengikuti kamar, riwayat dicatat (SRIT.Place)
       SRIT.Place.apply(id,{ASRAMA:d.ASRAMA,GEDUNG:d.GEDUNG,KAMAR:d.KAMAR,TEMPAT_TIDUR:d.TEMPAT_TIDUR},{extra:{WALI_ASUH:d.WALI_ASUH,KELOMPOK:d.KELOMPOK}});
