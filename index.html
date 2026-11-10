@@ -10442,6 +10442,9 @@ SRIT.Features.penghuni={
 //  3) LAPORAN PERKEMBANGAN ANAK DAMPINGAN (cetak): identitas + hasil angket, ditandatangani Wali Asuh dan Kepala SRT 1 Jombang.
 //  Alur rapor: Angket -> Cetak.  Alur asesmen (di Profiling): Draf -> Finalkan (Wali Asuh) -> Diketahui (Kepala Sekolah; dijaga server oleh apGuardRapor_).
 // Data lama (RAPOR_ASRAMA, PENILAIAN) TIDAK dihapus; hanya tidak dipakai menu ini lagi.
+// V1.9.72: DUA SUMBER PENILAIAN. (a) ANGKET SISWA (tabel ANGKET_SISWA; siswa memilih Selalu/Sering/Kadang-kadang/Tidak Pernah = 4/3/2/1, dikonversi x25) dan
+//          (b) PENILAIAN WALI ASUH (tabel ANGKET_NONAK, nilai 0-100 seperti sebelumnya). HASIL AKHIR = rata-rata keduanya per butir -> sub indikator -> indikator -> total (SRIT.Rapor.hitungDua).
+//          Template Nilai (Kemensos), rekap, cetak rapor, dan Profiling memakai nilai AKHIR. Bila baru satu sumber terisi, nilai sumber itu dipakai sementara.
 // =====================================================================================================================
 SRIT.Rapor=(function(){
   const IND=[{"k":"1","nama":"Disiplin tanggung jawab dan ketaatan aturan asrama","subs":[{"k":"1A","nama":"Kehadiran dan Kepatuhan jadwal harian","items":[{"id":"1A01","t":"Saya menghadiri seluruh kegiatan belajar dan kegiatan asrama tepat waktu.","d":"Menghadiri semua kegiatan belajar dan kegiatan asrama tepat waktu"},{"id":"1A02","t":"Saya mengikuti jadwal belajar malam secara mandiri tanpa harus diingatkan.","d":"Mengikuti jadwal belajar malam secara mandiri"},{"id":"1A03","t":"Saya bangun dan tidur sesuai jadwal yang ditetapkan asrama.","d":"Bangun dan tidur sesuai jadwal yang ditetapkan"}]},{"k":"1B","nama":"Partisipasi dalam kegiatan kebersihan","items":[{"id":"1B01","t":"Saya membersihkan kamar secara rutin.","d":"Membersihkan kamar secara rutin"},{"id":"1B02","t":"Saya membersihkan kamar mandi/WC sesuai jadwal atau kebutuhan.","d":"Membersihkan MCK/WC"},{"id":"1B03","t":"Saya membantu menjaga kebersihan lingkungan asrama.","d":"Membantu menjaga kebersihan lingkungan asrama"},{"id":"1B04","t":"Saya membuang sampah pada tempatnya.","d":"Membuang sampah pada tempatnya"}]},{"k":"1C","nama":"Perilaku hidup sehat","items":[{"id":"1C01","t":"Saya mandi minimal dua kali sehari.","d":"Mandi minimal 2 kali sehari"},{"id":"1C02","t":"Saya menggosok gigi secara teratur.","d":"menggosok gigi"},{"id":"1C03","t":"Saya menjaga kebersihan pakaian, kuku, dan rambut saya.","d":"Menjaga kebersihan pakaian,kuku dan rambut"},{"id":"1C04","t":"Saya berolahraga secara teratur.","d":"Berolahraga secara teratur"}]},{"k":"1D","nama":"Ketaatan ibadah","items":[{"id":"1D01","t":"Saya melaksanakan ibadah wajib sesuai agama yang saya anut.","d":"Melaksanakan ibadah wajib sesuai agama"},{"id":"1D02","t":"Saya ikut beribadah secara berjamaah/berkelompok.","d":"Berpartisipasi dalam ibadah berjamaan/kelompok"},{"id":"1D03","t":"Saya bersikap tertib dan sopan santun saat beribadah.","d":"Menunjukan etika dan sopan santun saat beribadah"}]}]},{"k":"2","nama":"Kegiatan dan Keagamaan dan Sosial","subs":[{"k":"2A","nama":"Tanggung Jawab","items":[{"id":"2A01","t":"Saya menyelesaikan tugas pribadi dan tugas akademik tepat waktu.","d":"Menyelesaikan tugas pribadi dan akademik tepat waktu"},{"id":"2A02","t":"Saya menjaga barang pribadi dan fasilitas asrama.","d":"Menjaga barang pribadi dan fasilitas asrama"},{"id":"2A03","t":"Saya mematuhi peraturan asrama dan sekolah.","d":"Mematuhi peraturan asrama dan seolah"}]},{"k":"2B","nama":"Kejujuran","items":[{"id":"2B01","t":"Saya mengakui kesalahan yang saya lakukan.","d":"Mengakui jika melakukan kesalahan"},{"id":"2B02","t":"Saya bersikap jujur dalam mengerjakan tugas dan berinteraksi dengan orang lain.","d":"Bersikap jujur dalam tugas dan interaksi sosial"},{"id":"2B03","t":"Saya mengembalikan barang yang bukan milik saya kepada pemiliknya.","d":"Mengembalikan barang yang bukan miliknya"}]},{"k":"2C","nama":"Kepedulian dan empati","items":[{"id":"2C01","t":"Saya membantu teman yang membutuhkan.","d":"Membantu teman yang membutuhkan"},{"id":"2C02","t":"Saya mendengarkan teman saat ia bercerita tentang masalahnya.","d":"Mendengarkan teman saat ada masalah"},{"id":"2C03","t":"Saya menghargai perasaan orang lain.","d":"Menghargai perasaan orang lain"},{"id":"2C04","t":"Saya berusaha mencegah dan menghindari kekerasan atau pertengkaran.","d":"Mencegah dan menghindari kekerasan atau konflik"}]},{"k":"2D","nama":"Kerjasama","items":[{"id":"2D01","t":"Saya aktif bekerja sama dalam kegiatan kelompok.","d":"Aktif bekerja sama dalam kegiatan kelompok"},{"id":"2D02","t":"Saya menghargai pendapat teman.","d":"Menghargai pendapat teman"},{"id":"2D03","t":"Saya berkontribusi untuk mencapai tujuan kelompok.","d":"Berkontribusi untuk mencapai tujuan kelompok"}]},{"k":"2E","nama":"Keterampilan sosial","items":[{"id":"2E01","t":"Saya berkomunikasi dengan sopan dan jelas.","d":"Berkomunikasi dengan sopan dan jelas"},{"id":"2E02","t":"Saya mampu mengelola emosi saya dengan baik.","d":"Mampu mengelola emosi"},{"id":"2E03","t":"Saya menjalin hubungan dengan teman secara demokratis (tidak memaksakan kehendak).","d":"Menjalin relasi secara demokratis"},{"id":"2E04","t":"Saya mampu menyelesaikan perselisihan dengan teman secara baik.","d":"Mampu menyelesaikan konflik dengan baik"}]},{"k":"2F","nama":"Sikap terhadap sesama & warga lain","items":[{"id":"2F01","t":"Saya menghormati teman, pembina, dan staf asrama.","d":"Menghormati teman dan staf"},{"id":"2F02","t":"Saya menjaga ketertiban lingkungan asrama.","d":"Menjaga ketertiban lingkungan asrama"},{"id":"2F03","t":"Saya memelihara hubungan baik dengan semua warga asrama.","d":"Memelihara hubungan baik dengan semua warga asrama"}]}]},{"k":"3","nama":"Kemandirian dan Kepemimpinan","subs":[{"k":"3A","nama":"Kemampuan mengelola diri","items":[{"id":"3A01","t":"Saya mengambil keputusan sendiri dengan tepat.","d":"Mengambil keputusan sendiri dengan tepat"},{"id":"3A02","t":"Saya mengatur waktu dan jadwal pribadi saya dengan baik.","d":"Mengatur waktu dan jadwal pribadi"},{"id":"3A03","t":"Saya menjaga barang milik pribadi saya.","d":"Menjaga barang milik pribadi"}]},{"k":"3B","nama":"Pengembangan diri","items":[{"id":"3B01","t":"Saya mengikuti organisasi atau kegiatan ekstrakurikuler.","d":"Mengikuti organisasi atau kegiatan ekstrakurikuler"},{"id":"3B02","t":"Saya berusaha menunjukkan prestasi dan berkarya.","d":"Menunjukan prestasi dan berkarya"},{"id":"3B03","t":"Saya memikirkan dan menyiapkan cita-cita serta rencana pendidikan saya.","d":"Memiliki cita-cita dan rencana pendidikan"}]},{"k":"3C","nama":"Inisiatif","items":[{"id":"3C01","t":"Saya memberikan ide atau solusi dalam kegiatan asrama.","d":"Memberikan ide atau solusi dalam kegiatan asrama"},{"id":"3C02","t":"Saya aktif berpartisipasi tanpa menunggu instruksi.","d":"Aktif berpartisipasi tanpa menunggu instruksi"},{"id":"3C03","t":"Saya berani mengemukakan pendapat yang berbeda dengan cara yang sopan.","d":"Berani mengemukakan pendapat berbeda dengan sopan"}]},{"k":"3D","nama":"Peran dalam struktur organisasi","items":[{"id":"3D01","t":"Saya menjalankan tugas sebagai pengurus (OSIS/ketua asrama/ketua kamar) dengan baik.","d":"Menjalankan tugas sebagai pengurus OSIS / Ketua asrama / Ketua kamar dengan baik","o":1},{"id":"3D02","t":"Saya menunjukkan kreativitas dan inovasi dalam kegiatan.","d":"Menunjukan kreativitas dan inovasi dalam kegiatan","o":1},{"id":"3D03","t":"Saya mengorganisasi kegiatan dengan tertib dan efektif.","d":"Mengorganisasi kegiatan dengan tertib and efektif","o":1},{"id":"3D04","t":"Saya bersikap demokratis dan adil kepada semua anggota dalam kegiatan organisasi.","d":"Menjalin relasi secara demokratis dan adil","o":1}]}]},{"k":"4","nama":"Karakter dan Budi Pekerti","subs":[{"k":"4A","nama":"Partisipasi kegiatan sosial","items":[{"id":"4A01","t":"Saya aktif mengikuti kegiatan sosial di asrama atau masyarakat.","d":"Aktif mengikuti kegiatan sosial di asrama atau masyarakat"},{"id":"4A02","t":"Saya membantu teman dan lingkungan yang membutuhkan.","d":"Membantu teman dan lingkungan yang membutuhkan"},{"id":"4A03","t":"Saya menunjukkan kepedulian terhadap orang lain.","d":"Menunjukan kepedulian terhadap orang lain"}]},{"k":"4B","nama":"Partisipasi kegiatan spiritual / keagamaan","items":[{"id":"4B01","t":"Saya mengikuti kegiatan ibadah sesuai agama dan keyakinan saya.","d":"Mengikuti kegiatan ibadah sesuai agama dan keyakinan"},{"id":"4B02","t":"Saya konsisten dalam beribadah.","d":"Menunjukan konsistensi dalam beribadah"},{"id":"4B03","t":"Saya bersikap toleran terhadap teman yang berbeda agama.","d":"Bersikap toleran terhada teman yang berbeda agama"},{"id":"4B04","t":"Saya menjaga etika dan sopan santun dalam beribadah.","d":"Menjaga etika dan sopan santun dalam ibadah"},{"id":"4B05","t":"Saya membaca kitab suci.","d":"Membaca kitab suci"},{"id":"4B06","t":"Saya menghafal doa/ayat kitab suci.","d":"Menghafal do'a / kitab suci"}]}]}];
@@ -10500,6 +10503,11 @@ SRIT.Rapor=(function(){
   const fmt=v=>(v===null||v===undefined)?'–':String(r1(v)).replace('.',',');
   const agg=(list,j)=>{let s=0,n=0;list.forEach(it=>{const v=nilai(j,it.id);if(v!==null){s+=v;n++;}});const raw=n?s/n:null;return {n,total:list.length,raw,skor:raw===null?null:r1(raw),kat:raw===null?null:kategori(raw)};};
   function hitung(j){j=j||{};return {total:agg(ITEMS,j),ind:IND.map(I=>Object.assign({k:I.k,nama:I.nama,pendek:PENDEK[I.k]},agg(I.items,j),{subs:I.subs.map(S=>Object.assign({k:S.k,nama:S.nama},agg(S.items,j)))}))};}
+  // V1.9.72: DUA SUMBER PENILAIAN. js = jawaban SISWA (angket, pilihan 1-4 -> x25), jw = penilaian WALI ASUH (0-100).
+  // Nilai AKHIR tiap butir = rata-rata kedua sumber (bila hanya satu sumber terisi, nilai sumber itu dipakai sementara).
+  // Sub indikator / indikator / total akhir dihitung dari nilai butir akhir, sehingga selalu selaras dengan Template Nilai.
+  const gabung=(jw,js)=>{const o={_v:2};ITEMS.forEach(it=>{const a=nilai(jw,it.id),b=nilai(js,it.id),v=(a!==null&&b!==null)?(a+b)/2:(a!==null?a:b);if(v!==null)o[it.id]=v;});return o;};
+  const hitungDua=(jw,js)=>{const g=gabung(jw,js);return {wali:hitung(jw),siswa:hitung(js),akhir:hitung(g),gabung:g};};
   const tafsir=v=>butir(v).tafsir;
   const deskripsi=(it,v)=>(v===null||v===undefined||isNaN(+v))?'':it.d+': '+tafsir(+v);
   // tahun ajaran Juli-Juni: Juli-Des = Ganjil, Jan-Jun = Genap
@@ -10513,7 +10521,7 @@ SRIT.Rapor=(function(){
   const anakInfo=a=>{const km=SRIT.Repo.getById('KAMAR',a.KAMAR)||{},w=SRIT.Asuh.waliAnak(a);
     return {nama:a.NAMA||'',nis:[a.NIS,a.NISN].filter(Boolean).join(' / '),umur:umur(a.TANGGAL_LAHIR),kelas:[a.KELAS,a.JENJANG,km.NAME].filter(Boolean).join(' / '),
       wali:w?SRIT.Asuh.nama(w):'',waliId:w||'',asal:[a.DESA,a.KECAMATAN].filter(Boolean).join(', ')||a.ALAMAT||''};};
-  return {IND,ITEMS,PENDEK,SKALA,KAT,ASPEK,NARASI,kategori,butir,rentang,nilai,hitung,fmt,parse,tafsir,deskripsi,periodeDefault,periodeSebelum,periodeList,umur,tglPanjang,anakInfo};
+  return {IND,ITEMS,PENDEK,SKALA,KAT,ASPEK,NARASI,kategori,butir,rentang,nilai,hitung,gabung,hitungDua,fmt,parse,tafsir,deskripsi,periodeDefault,periodeSebelum,periodeList,umur,tglPanjang,anakInfo};
 })();
 
 SRIT.Features.penilaian={
@@ -10524,7 +10532,10 @@ SRIT.Features.penilaian={
   _scoped(){return this._isWali()&&!SRIT.Auth.isSuper()&&!SRIT.Auth.can('penilaian:MANAGE');},
   _anak(){const me=this._me(),all=SRIT.Store.read('ANAK').filter(a=>SRIT.Asuh.aktif(a));return this._scoped()?all.filter(a=>SRIT.Asuh.waliAnak(a)===me):all;},
   _inScope(a){return !this._scoped()||SRIT.Asuh.waliAnak(a)===this._me();},
-  angketOf(aid,p){return SRIT.Store.read('ANGKET_NONAK').find(r=>r.ANAK===aid&&r.PERIODE===p);},
+  angketOf(aid,p){return SRIT.Store.read('ANGKET_NONAK').find(r=>r.ANAK===aid&&r.PERIODE===p);},   // penilaian WALI ASUH
+  angketSiswaOf(aid,p){return SRIT.Store.read('ANGKET_SISWA').find(r=>r.ANAK===aid&&r.PERIODE===p);},   // angket SISWA
+  // gabungan kedua sumber untuk satu anak: {ak,as,jw,js,wali,siswa,akhir,gabung}
+  hasil(aid,p){const R=SRIT.Rapor,ak=this.angketOf(aid,p),as=this.angketSiswaOf(aid,p),jw=R.parse(ak&&ak.JAWABAN),js=R.parse(as&&as.JAWABAN);return Object.assign({ak,as,jw,js},R.hitungDua(jw,js));},
 
   render(host){
     const s=this.state;this._host=host;if(!s.periode)s.periode=SRIT.Rapor.periodeDefault();
@@ -10541,11 +10552,12 @@ SRIT.Features.penilaian={
 
   /* =========================== TAB 1: RAPOR ANAK =========================== */
   _rows(){
-    const s=this.state,ak={};
+    const s=this.state,ak={},as={};
     SRIT.Store.read('ANGKET_NONAK').forEach(r=>{if(r.PERIODE===s.periode)ak[r.ANAK]=r;});
+    SRIT.Store.read('ANGKET_SISWA').forEach(r=>{if(r.PERIODE===s.periode)as[r.ANAK]=r;});
     const q=(s.q||'').trim().toLowerCase();
     let rows=this._anak().filter(a=>(!s.jenjang||a.JENJANG===s.jenjang)&&(!s.wali||SRIT.Asuh.waliAnak(a)===s.wali)&&(!q||[a.NAMA,a.NIS,a.NISN,a.KELAS].some(v=>String(v||'').toLowerCase().indexOf(q)>=0)))
-      .map(a=>({a,ak:ak[a.ID]}));
+      .map(a=>({a,ak:ak[a.ID],as:as[a.ID]}));
     return rows.sort((x,y)=>String(x.a.NAMA||'').localeCompare(String(y.a.NAMA||''),'id'));
   },
   renderRapor(host){
@@ -10558,41 +10570,47 @@ SRIT.Features.penilaian={
       </div>
       <div class="d-flex flex-wrap gap-2 mt-2">
         <button class="btn btn-outline-primary btn-sm" id="rpCetakSemua"><i class="bi bi-printer"></i> Cetak rapor yang tampil</button>
-        <button class="btn btn-outline-secondary btn-sm" id="rpAngketKosong"><i class="bi bi-file-earmark-text"></i> Lembar penilaian kosong</button>
+        <button class="btn btn-outline-success btn-sm" id="rpSiswaKosong"><i class="bi bi-file-earmark-person"></i> Lembar angket siswa</button>
+        <button class="btn btn-outline-secondary btn-sm" id="rpAngketKosong"><i class="bi bi-file-earmark-text"></i> Lembar penilaian wali asuh</button>
       </div>
-      <div class="text-muted-2 mt-2" style="font-size:12px">Alur: wali asuh mengisi <b>nilai 0–100</b> tiap butir lewat tombol <b>Angket</b> (dikonversi ke predikat dengan rubrik) → <b>Cetak</b> Laporan Perkembangan Anak Dampingan. Asesmen personal wali asuh dikelola terpisah di menu <b>Profiling Siswa</b> (tombol Asesmen personal).${this._scoped()?' Anda hanya melihat anak asuh Anda.':''}</div></div>
+      <div class="text-muted-2 mt-2" style="font-size:12px">Alur: <b>Angket Siswa</b> (jawaban siswa, skala 1–4) + <b>Penilaian Wali</b> (nilai 0–100 dari wali asuh) → <b>Hasil akhir</b> = rata-rata keduanya per indikator → <b>Cetak</b> Laporan Perkembangan Anak Dampingan. Asesmen personal wali asuh dikelola terpisah di menu <b>Profiling Siswa</b> (tombol Asesmen personal).${this._scoped()?' Anda hanya melihat anak asuh Anda.':''}</div></div>
       <div id="rpSum" class="d-flex flex-wrap gap-2 mb-2"></div>
       <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="rpTbl"></table></div><div class="p-3 border-top" id="pnPag"></div></div>`;
     let t;$('#rpQ').oninput=e=>{clearTimeout(t);t=setTimeout(()=>{s.q=e.target.value;s.page=1;this.drawRapor();},300);};
     this._bindPeriode('rpPer',()=>this.renderRapor(host));
     $('#rpJj').onchange=e=>{s.jenjang=e.target.value;s.page=1;this.drawRapor();};
     const w=$('#rpWali');if(w)w.onchange=e=>{s.wali=e.target.value;s.page=1;this.drawRapor();};
-    $('#rpCetakSemua').onclick=()=>this.cetakRapor(this._rows().filter(r=>r.ak).map(r=>r.a.ID));
+    $('#rpCetakSemua').onclick=()=>this.cetakRapor(this._rows().filter(r=>r.ak||r.as).map(r=>r.a.ID));
+    $('#rpSiswaKosong').onclick=()=>this.cetakAngketSiswaKosong();
     $('#rpAngketKosong').onclick=()=>this.cetakAngketKosong();
     this.drawRapor();
   },
   drawRapor(){
     const s=this.state,R=SRIT.Rapor,E=SRIT.Util.esc,rows=this._rows(),canC=SRIT.Auth.can('penilaian:CREATE'),canU=SRIT.Auth.can('penilaian:UPDATE');
-    const nAk=rows.filter(r=>r.ak).length;
-    $('#rpSum').innerHTML=[['Anak',rows.length,'st-IZIN'],['Angket terisi',nAk+'/'+rows.length,'st-HADIR']].map(x=>`<span class="badge-soft ${x[2]}" style="font-size:12px">${x[0]}: <b>${x[1]}</b></span>`).join('');
+    const nAk=rows.filter(r=>r.ak).length,nAs=rows.filter(r=>r.as).length,nDua=rows.filter(r=>r.ak&&r.as).length;
+    $('#rpSum').innerHTML=[['Anak',rows.length,'st-IZIN'],['Angket siswa terisi',nAs+'/'+rows.length,'st-HADIR'],['Penilaian wali asuh terisi',nAk+'/'+rows.length,'st-HADIR'],['Lengkap (2 sumber)',nDua+'/'+rows.length,'st-IZIN']].map(x=>`<span class="badge-soft ${x[2]}" style="font-size:12px">${x[0]}: <b>${x[1]}</b></span>`).join('');
     const pages=Math.max(1,Math.ceil(rows.length/s.size));if(s.page>pages)s.page=pages;
     const show=rows.slice((s.page-1)*s.size,s.page*s.size);
-    $('#rpTbl').innerHTML=`<thead><tr><th>Anak</th><th>Wali asuh</th><th>Angket non-akademik</th><th></th></tr></thead><tbody>${
-      show.map(r=>{const a=r.a,w=SRIT.Asuh.waliAnak(a),h=r.ak?R.hitung(R.parse(r.ak.JAWABAN)):null;
+    const badge=(h,kosong)=>(h&&h.total.n)?`<span class="badge-soft ${h.total.kat.cls}">${R.fmt(h.total.skor)} · ${h.total.kat.k}</span><div class="text-muted-2" style="font-size:11px">${h.total.n}/${h.total.total} butir</div>`:`<span class="badge-soft st-BELUM">${kosong}</span>`;
+    $('#rpTbl').innerHTML=`<thead><tr><th>Anak</th><th>Wali asuh</th><th>Angket siswa</th><th>Penilaian wali asuh</th><th>Hasil akhir (rata-rata)</th><th></th></tr></thead><tbody>${
+      show.map(r=>{const a=r.a,w=SRIT.Asuh.waliAnak(a),d=R.hitungDua(R.parse(r.ak&&r.ak.JAWABAN),R.parse(r.as&&r.as.JAWABAN)),ada=!!(r.ak||r.as);
         return `<tr><td><div class="fw-semibold">${E(a.NAMA)}</div><div class="text-muted-2" style="font-size:11px">${E([a.KELAS,a.JENJANG].filter(Boolean).join(' · '))}</div></td>
         <td>${w?E(SRIT.Asuh.nama(w)):'<span class="text-muted-2">–</span>'}</td>
-        <td>${h?`<span class="badge-soft ${h.total.kat.cls}">${R.fmt(h.total.skor)} · ${h.total.kat.k}</span><div class="text-muted-2" style="font-size:11px">${h.total.n}/${h.total.total} butir</div>`:'<span class="badge-soft st-BELUM">Belum diisi</span>'}</td>
+        <td>${r.as?badge(d.siswa,'–'):'<span class="badge-soft st-BELUM">Belum diisi</span>'}</td>
+        <td>${r.ak?badge(d.wali,'–'):'<span class="badge-soft st-BELUM">Belum diisi</span>'}</td>
+        <td>${ada?badge(d.akhir,'–')+`<div class="text-muted-2" style="font-size:11px">${r.ak&&r.as?'rata-rata siswa &amp; wali asuh':'sementara: baru '+(r.as?'angket siswa':'penilaian wali asuh')}</div>`:'<span class="badge-soft st-BELUM">Belum ada</span>'}</td>
         <td class="text-end text-nowrap">
-          ${(r.ak?canU:canC)?`<button class="btn btn-sm btn-outline-primary py-0" data-act="ak" data-id="${E(a.ID)}"><i class="bi bi-ui-checks"></i> Angket</button>`:''}
-          ${r.ak?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Cetak rapor" data-act="pr" data-id="${E(a.ID)}"><i class="bi bi-printer"></i></button>`:''}
-        </td></tr>`;}).join('')||'<tr><td colspan="4"><div class="empty-state"><i class="bi bi-journal-check d-block"></i>Tidak ada anak yang cocok dengan filter.</div></td></tr>'}</tbody>`;
+          ${(r.as?canU:canC)?`<button class="btn btn-sm btn-outline-success py-0" data-act="as" data-id="${E(a.ID)}"><i class="bi bi-person-check"></i> Angket Siswa</button>`:''}
+          ${(r.ak?canU:canC)?`<button class="btn btn-sm btn-outline-primary py-0 ms-1" data-act="ak" data-id="${E(a.ID)}"><i class="bi bi-ui-checks"></i> Penilaian Wali</button>`:''}
+          ${ada?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Cetak rapor" data-act="pr" data-id="${E(a.ID)}"><i class="bi bi-printer"></i></button>`:''}
+        </td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty-state"><i class="bi bi-journal-check d-block"></i>Tidak ada anak yang cocok dengan filter.</div></td></tr>'}</tbody>`;
     $$('#rpTbl [data-act]').forEach(b=>b.onclick=()=>{const id=b.dataset.id,x=b.dataset.act;
-      if(x==='ak')this.formAngket(id);else if(x==='pr')this.cetakRapor([id]);});
+      if(x==='ak')this.formAngket(id);else if(x==='as')this.formAngketSiswa(id);else if(x==='pr')this.cetakRapor([id]);});
     $('#pnPag').innerHTML=SRIT.UI.pagination({page:s.page,pages:pages,total:rows.length});
     $$('#pnPag [data-pg]').forEach(a=>a.onclick=()=>{s.page=+a.dataset.pg;this.drawRapor();});
   },
 
-  /* =========================== FORM ANGKET NON-AKADEMIK =========================== */
+  /* =========================== FORM PENILAIAN WALI ASUH (ANGKET_NONAK) =========================== */
   formAngket(aid){
     const R=SRIT.Rapor,E=SRIT.Util.esc,a=SRIT.Repo.getById('ANAK',aid),p=this.state.periode;if(!a)return;
     if(!this._inScope(a)){SRIT.Notify('Ini bukan anak asuh Anda','warn');return;}
@@ -10601,15 +10619,15 @@ SRIT.Features.penilaian={
     const pill=v=>{if(v===undefined)return '';const b=R.butir(v);return `<span class="badge-soft ${R.kategori(v).cls}" title="${E(b.tafsir)}">${E(b.pred)}</span>`;};
     const item=it=>`<div class="ak-i" data-id="${it.id}"><div style="font-size:13px"><span class="text-muted-2">${it.id}</span> ${E(it.d)}${it.o?' <b title="Khusus pengurus; kosongkan bila bukan pengurus">*</b>':''}</div>
       <div class="ak-o"><input type="number" class="form-control form-control-sm" style="max-width:110px" min="0" max="100" step="any" inputmode="decimal" placeholder="0–100" name="${it.id}" value="${cur[it.id]===undefined?'':cur[it.id]}"><span class="ak-p" data-p="${it.id}">${pill(cur[it.id])}</span></div></div>`;
-    const m=SRIT.Modal.open({title:'Angket Non-Akademik: '+a.NAMA,size:'modal-xl',
+    const m=SRIT.Modal.open({title:'Penilaian Wali Asuh: '+a.NAMA,size:'modal-xl',
       body:`<style>.ak-i{padding:7px 0;border-bottom:1px solid var(--bs-border-color,#e5e7eb)}.ak-o{display:flex;gap:10px;align-items:center;margin-top:4px}.ak-h{font-weight:700;margin:14px 0 2px;font-size:14px}.ak-s{font-weight:600;margin:8px 0 0;font-size:13px;color:var(--bs-secondary-color,#64748b)}</style>
         <div class="row g-2 mb-2"><div class="col-6 col-md-4"><label class="form-label-sm">Anak</label><div class="fw-semibold">${E(a.NAMA)}</div><div class="text-muted-2" style="font-size:11px">${E([a.KELAS,a.JENJANG].filter(Boolean).join(' · '))}</div></div>
         <div class="col-6 col-md-4"><label class="form-label-sm">Periode</label><div class="fw-semibold">${E(p)}</div></div>
         <div class="col-12 col-md-4"><label class="form-label-sm">Tanggal pengisian</label><input type="date" class="form-control form-control-sm" id="akTgl" value="${E((ex&&ex.TANGGAL)||SRIT.Util.todayISO())}"></div></div>
         <div id="akSum" class="p-2 rounded border mb-2" style="position:sticky;top:0;z-index:5;background:var(--bs-body-bg,#fff)"></div>
-        <div class="text-muted-2 mb-1" style="font-size:12px">Wali asuh mengisi <b>nilai 0–100</b> (boleh desimal) untuk tiap perilaku berdasarkan pengamatan 1 bulan terakhir. Predikat butir muncul otomatis dari rubrik: ${R.KAT.map((k,i)=>({i,k})).reverse().map(x=>`<b>${E(R.SKALA[3-x.i].pred)}</b> (${R.rentang(x.i)})`).join(' · ')}. Butir bertanda <b>*</b> khusus pengurus (OSIS / ketua asrama / ketua kamar); kosongkan bila bukan pengurus, tidak menurunkan skor.</div>
+        <div class="text-muted-2 mb-1" style="font-size:12px">Wali asuh mengisi <b>nilai 0–100</b> (boleh desimal) untuk tiap perilaku berdasarkan pengamatan 1 bulan terakhir; nilai ini dirata-rata dengan angket siswa menjadi hasil akhir. Predikat butir muncul otomatis dari rubrik: ${R.KAT.map((k,i)=>({i,k})).reverse().map(x=>`<b>${E(R.SKALA[3-x.i].pred)}</b> (${R.rentang(x.i)})`).join(' · ')}. Butir bertanda <b>*</b> khusus pengurus (OSIS / ketua asrama / ketua kamar); kosongkan bila bukan pengurus, tidak menurunkan skor.</div>
         ${R.IND.map(I=>`<div class="ak-h">${I.k}. ${E(I.nama)}</div>${I.subs.map(S=>`<div class="ak-s">${E(S.nama)}</div>${S.items.map(item).join('')}`).join('')}`).join('')}`,
-      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="akSave"><i class="bi bi-check2-circle"></i> Simpan Angket</button>`});
+      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="akSave"><i class="bi bi-check2-circle"></i> Simpan Penilaian</button>`});
     const el=m.el;
     const sum=()=>{const h=R.hitung(cur);$('#akSum',el).innerHTML=`<div style="font-size:13px"><b>Terisi ${h.total.n}/${h.total.total}</b> · Skor total <b>${R.fmt(h.total.skor)}</b> ${h.total.kat?`<span class="badge-soft ${h.total.kat.cls}">${h.total.kat.k}</span>`:''}</div>
       <div class="d-flex flex-wrap gap-1 mt-1">${h.ind.map(i=>`<span class="badge-soft ${i.kat?i.kat.cls:'st-BELUM'}" style="font-size:11px" title="${E(i.nama)}">${E(i.pendek)}: ${R.fmt(i.skor)}</span>`).join('')}</div>`;};
@@ -10625,33 +10643,74 @@ SRIT.Features.penilaian={
       const row={ANAK:aid,NAMA_ANAK:a.NAMA,PERIODE:p,TANGGAL:$('#akTgl',el).value||SRIT.Util.todayISO(),JENJANG:a.JENJANG||'',JAWABAN:JSON.stringify(cur),SKOR:h.total.skor,KATEGORI:h.total.kat.k,TERISI:h.total.n,PENGISI:(SRIT.Auth.user||{}).NAME||'',DIUBAH_PADA:new Date().toISOString()};
       if(ex){SRIT.Repo.update('ANGKET_NONAK',ex.ID,row);SRIT.Audit.log('UPDATE','penilaian',ex.ID,null,{tabel:'ANGKET_NONAK',skor:row.SKOR});}
       else{const id=SRIT.Util.uid('ANG');SRIT.Repo.insert('ANGKET_NONAK',Object.assign({ID:id},row));SRIT.Audit.log('CREATE','penilaian',id,null,{tabel:'ANGKET_NONAK',skor:row.SKOR});}
-      SRIT.Cache.invalidate('dash');m.close();SRIT.Notify('Angket tersimpan: skor '+R.fmt(row.SKOR)+' ('+row.KATEGORI+')','ok');self.render(self._host);
+      SRIT.Cache.invalidate('dash');m.close();SRIT.Notify('Penilaian wali asuh tersimpan: skor '+R.fmt(row.SKOR)+' ('+row.KATEGORI+')','ok');self.render(self._host);
+    };
+  },
+
+  /* =========================== FORM ANGKET SISWA (jawaban siswa; dimasukkan petugas dari lembar angket) =========================== */
+  formAngketSiswa(aid){
+    const R=SRIT.Rapor,E=SRIT.Util.esc,a=SRIT.Repo.getById('ANAK',aid),p=this.state.periode;if(!a)return;
+    if(!this._inScope(a)){SRIT.Notify('Ini bukan anak asuh Anda','warn');return;}
+    const ex=this.angketSiswaOf(aid,p),old=R.parse(ex&&ex.JAWABAN),cur={},self=this;
+    R.ITEMS.forEach(it=>{const raw=old[it.id],v=+raw;if(raw!==undefined&&raw!==null&&raw!==''&&v>=1&&v<=4)cur[it.id]=Math.round(v);});   // jawaban siswa = 1..4 (tanpa _v; dibaca x25 oleh SRIT.Rapor.nilai)
+    const item=it=>`<div class="ak-i" data-id="${it.id}"><div style="font-size:13px"><span class="text-muted-2">${it.id}</span> ${E(it.t)}${it.o?' <b title="Khusus pengurus; kosongkan bila bukan pengurus">*</b>':''}</div>
+      <div class="ak-o as-o">${R.SKALA.map(x=>`<label class="as-r"><input type="radio" name="as_${it.id}" value="${x.v}" ${cur[it.id]===x.v?'checked':''}> ${E(x.l)} (${x.v})</label>`).join('')}<button type="button" class="btn btn-link btn-sm py-0" data-clr="${it.id}">kosongkan</button></div></div>`;
+    const m=SRIT.Modal.open({title:'Angket Siswa: '+a.NAMA,size:'modal-xl',
+      body:`<style>.ak-i{padding:7px 0;border-bottom:1px solid var(--bs-border-color,#e5e7eb)}.ak-o{display:flex;gap:10px;align-items:center;margin-top:4px}.as-o{flex-wrap:wrap;gap:4px 16px}.as-r{font-size:13px;cursor:pointer;margin:0;white-space:nowrap}.as-r input{margin-right:4px}.ak-h{font-weight:700;margin:14px 0 2px;font-size:14px}.ak-s{font-weight:600;margin:8px 0 0;font-size:13px;color:var(--bs-secondary-color,#64748b)}</style>
+        <div class="row g-2 mb-2"><div class="col-6 col-md-4"><label class="form-label-sm">Anak</label><div class="fw-semibold">${E(a.NAMA)}</div><div class="text-muted-2" style="font-size:11px">${E([a.KELAS,a.JENJANG].filter(Boolean).join(' · '))}</div></div>
+        <div class="col-6 col-md-4"><label class="form-label-sm">Periode</label><div class="fw-semibold">${E(p)}</div></div>
+        <div class="col-12 col-md-4"><label class="form-label-sm">Tanggal pengisian siswa</label><input type="date" class="form-control form-control-sm" id="asTgl" value="${E((ex&&ex.TANGGAL)||SRIT.Util.todayISO())}"></div></div>
+        <div id="asSum" class="p-2 rounded border mb-2" style="position:sticky;top:0;z-index:5;background:var(--bs-body-bg,#fff)"></div>
+        <div class="text-muted-2 mb-1" style="font-size:12px">Masukkan jawaban <b>siswa</b> dari lembar angket (cetak lewat tombol <b>Lembar angket siswa</b>): pilih satu jawaban tiap pernyataan, berdasarkan 1 bulan terakhir. Skala: ${R.SKALA.map(x=>E(x.l)+' = '+x.v).join(' · ')}; dikonversi ke 0–100 (×25) lalu dirata-rata dengan penilaian wali asuh. Butir bertanda <b>*</b> khusus pengurus (OSIS / ketua asrama / ketua kamar); kosongkan bila bukan pengurus, tidak menurunkan skor.</div>
+        ${R.IND.map(I=>`<div class="ak-h">${I.k}. ${E(I.nama)}</div>${I.subs.map(S=>`<div class="ak-s">${E(S.nama)}</div>${S.items.map(item).join('')}`).join('')}`).join('')}`,
+      footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-success btn-sm" id="asSave"><i class="bi bi-check2-circle"></i> Simpan Angket Siswa</button>`});
+    const el=m.el;
+    const sum=()=>{const h=R.hitung(cur);$('#asSum',el).innerHTML=`<div style="font-size:13px"><b>Terisi ${h.total.n}/${h.total.total}</b> · Skor angket siswa <b>${R.fmt(h.total.skor)}</b> ${h.total.kat?`<span class="badge-soft ${h.total.kat.cls}">${h.total.kat.k}</span>`:''}</div>
+      <div class="d-flex flex-wrap gap-1 mt-1">${h.ind.map(i=>`<span class="badge-soft ${i.kat?i.kat.cls:'st-BELUM'}" style="font-size:11px" title="${E(i.nama)}">${E(i.pendek)}: ${R.fmt(i.skor)}</span>`).join('')}</div>`;};
+    $$('input[type=radio]',el).forEach(inp=>inp.onchange=()=>{cur[inp.name.slice(3)]=+inp.value;sum();});
+    $$('[data-clr]',el).forEach(b=>b.onclick=()=>{const id=b.dataset.clr;delete cur[id];$$('input[name="as_'+id+'"]',el).forEach(x=>x.checked=false);sum();});
+    sum();
+    $('#asSave',el).onclick=()=>{
+      const h=R.hitung(cur);if(!h.total.n){SRIT.Notify('Isi minimal satu pernyataan','warn');return;}
+      const kosong=R.ITEMS.filter(it=>!it.o&&R.nilai(cur,it.id)===null).length;
+      if(kosong&&!window.confirm(kosong+' pernyataan (selain butir pengurus *) belum dijawab. Skor dihitung dari yang terjawab saja. Tetap simpan?'))return;
+      const row={ANAK:aid,NAMA_ANAK:a.NAMA,PERIODE:p,TANGGAL:$('#asTgl',el).value||SRIT.Util.todayISO(),JENJANG:a.JENJANG||'',JAWABAN:JSON.stringify(cur),SKOR:h.total.skor,KATEGORI:h.total.kat.k,TERISI:h.total.n,PENGISI:(SRIT.Auth.user||{}).NAME||'',DIUBAH_PADA:new Date().toISOString()};
+      if(ex){SRIT.Repo.update('ANGKET_SISWA',ex.ID,row);SRIT.Audit.log('UPDATE','penilaian',ex.ID,null,{tabel:'ANGKET_SISWA',skor:row.SKOR});}
+      else{const id=SRIT.Util.uid('ASW');SRIT.Repo.insert('ANGKET_SISWA',Object.assign({ID:id},row));SRIT.Audit.log('CREATE','penilaian',id,null,{tabel:'ANGKET_SISWA',skor:row.SKOR});}
+      SRIT.Cache.invalidate('dash');m.close();SRIT.Notify('Angket siswa tersimpan: skor '+R.fmt(row.SKOR)+' ('+row.KATEGORI+')','ok');self.render(self._host);
     };
   },
 
   /* =========================== TAB 2: REKAP & EKSPOR =========================== */
   _rekapRows(){
-    const s=this.state,R=SRIT.Rapor,ak={};SRIT.Store.read('ANGKET_NONAK').forEach(r=>{if(r.PERIODE===s.periode)ak[r.ANAK]=r;});
-    return this._anak().filter(a=>(!s.jenjang||a.JENJANG===s.jenjang)&&ak[a.ID]).map(a=>({a,ak:ak[a.ID],h:R.hitung(R.parse(ak[a.ID].JAWABAN))}))
+    const s=this.state,R=SRIT.Rapor,ak={},as={};
+    SRIT.Store.read('ANGKET_NONAK').forEach(r=>{if(r.PERIODE===s.periode)ak[r.ANAK]=r;});
+    SRIT.Store.read('ANGKET_SISWA').forEach(r=>{if(r.PERIODE===s.periode)as[r.ANAK]=r;});
+    return this._anak().filter(a=>(!s.jenjang||a.JENJANG===s.jenjang)&&(ak[a.ID]||as[a.ID])).map(a=>{const d=R.hitungDua(R.parse(ak[a.ID]&&ak[a.ID].JAWABAN),R.parse(as[a.ID]&&as[a.ID].JAWABAN));return {a,ak:ak[a.ID],as:as[a.ID],d,h:d.akhir};})
       .sort((x,y)=>String(x.a.NAMA||'').localeCompare(String(y.a.NAMA||''),'id'));
   },
+  _sumber(r){return (r.ak&&r.as)?'Siswa + Wali Asuh':(r.as?'Angket Siswa saja':'Wali Asuh saja');},
   renderRekap(host){
     const s=this.state,R=SRIT.Rapor,E=SRIT.Util.esc,rows=this._rekapRows(),canX=SRIT.Auth.can('penilaian:EXPORT')||SRIT.Auth.isSuper();
     const avg=l=>{const v=l.filter(x=>x!==null&&x!==undefined);return v.length?v.reduce((p,c)=>p+c,0)/v.length:null;};
-    const tot=avg(rows.map(r=>r.h.total.raw)),dist=R.KAT.map(k=>({k,n:rows.filter(r=>r.h.total.kat&&r.h.total.kat.k===k.k).length}));
+    const tot=avg(rows.map(r=>r.h.total.raw)),totS=avg(rows.map(r=>r.d.siswa.total.raw)),totW=avg(rows.map(r=>r.d.wali.total.raw)),dist=R.KAT.map(k=>({k,n:rows.filter(r=>r.h.total.kat&&r.h.total.kat.k===k.k).length}));
+    const nSatu=rows.filter(r=>!(r.ak&&r.as)).length;
     const bar=(v)=>v===null?'':`<div style="height:6px;background:#e5e7eb;border-radius:3px;min-width:90px"><div style="height:6px;width:${Math.max(0,Math.min(100,v))}%;background:var(--srit-primary,#1c6ef2);border-radius:3px"></div></div>`;
+    const sc=(get)=>[avg(rows.map(r=>get(r.d.siswa))),avg(rows.map(r=>get(r.d.wali))),avg(rows.map(r=>get(r.d.akhir)))];
+    const line=(label,v,cls,pad)=>`<tr class="${cls}"><td class="${pad?'ps-3':'fw-semibold'}">${label}</td><td class="text-end">${R.fmt(v[0])}</td><td class="text-end">${R.fmt(v[1])}</td><td class="fw-semibold text-end">${R.fmt(v[2])}</td><td style="width:110px">${bar(v[2])}</td></tr>`;
     host.innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
         <div style="min-width:170px"><label class="form-label-sm">Periode</label>${this._periodeSel('rkPer')}</div>
         <div style="min-width:110px"><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm" id="rkJj"><option value="">Semua</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${s.jenjang===j?'selected':''}>${j}</option>`).join('')}</select></div>
         ${canX?`<div class="d-flex gap-2 align-items-end"><button class="btn btn-outline-primary btn-sm" id="rkCsv" ${rows.length?'':'disabled'}><i class="bi bi-download"></i> Unduh rekap (CSV)</button><button class="btn btn-primary btn-sm" id="rkTplX" ${rows.length?'':'disabled'}><i class="bi bi-file-earmark-excel"></i> Ekspor Template Nilai (Excel)</button><button class="btn btn-outline-primary btn-sm" id="rkTpl" ${rows.length?'':'disabled'}><i class="bi bi-download"></i> Template nilai (CSV)</button></div>`:''}
-      </div><div class="text-muted-2 mt-2" style="font-size:12px">${rows.length} anak dengan angket terisi pada periode ini. Template nilai (untuk diunggah ke aplikasi Kemensos): sheet <code>Template Nilai</code> dengan kolom <code>nik, nisn, nama_siswa, {id}_nilai, {id}_deskripsi</code>; <code>_nilai</code> = nilai 0–100 yang diisi wali asuh, <code>_deskripsi</code> = detail indikator + interpretasi rubrik sesuai nilai. Mengikuti filter periode &amp; jenjang di atas.</div></div>
+      </div><div class="text-muted-2 mt-2" style="font-size:12px">${rows.length} anak dengan angket siswa dan/atau penilaian wali asuh terisi pada periode ini${nSatu?` (<b>${nSatu}</b> anak baru satu sumber: hasil akhirnya masih sementara)`:''}. <b>Hasil akhir = rata-rata angket siswa dan penilaian wali asuh</b> pada setiap butir; skor sub indikator, indikator, dan total dihitung dari nilai akhir butir. Template nilai (untuk diunggah ke aplikasi Kemensos): sheet <code>Template Nilai</code> dengan kolom <code>nik, nisn, nama_siswa, {id}_nilai, {id}_deskripsi</code>; <code>_nilai</code> = nilai akhir 0–100 (rata-rata siswa &amp; wali asuh), <code>_deskripsi</code> = detail indikator + interpretasi rubrik sesuai nilai akhir. Mengikuti filter periode &amp; jenjang di atas.</div></div>
       ${rows.length?`<div class="row g-3 mb-3"><div class="col-12 col-lg-4"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Ringkasan</div>
-        <div style="font-size:28px;font-weight:700">${R.fmt(tot)}</div><div class="text-muted-2" style="font-size:12px">rata-rata skor total (0–100)</div>
+        <div style="font-size:28px;font-weight:700">${R.fmt(tot)}</div><div class="text-muted-2" style="font-size:12px">rata-rata skor akhir (0–100)</div>
+        <div class="mt-2" style="font-size:12.5px">Angket siswa: <b>${R.fmt(totS)}</b> · Penilaian wali asuh: <b>${R.fmt(totW)}</b></div>
         <div class="mt-2 d-flex flex-wrap gap-1">${dist.map(d=>`<span class="badge-soft ${d.k.cls}">${d.k.k}: <b>${d.n}</b></span>`).join('')}</div></div></div>
-        <div class="col-12 col-lg-8"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Rata-rata per indikator &amp; sub indikator</div><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12.5px"><tbody>${R.IND.map((I,ii)=>{
-          const iv=avg(rows.map(r=>r.h.ind[ii].raw));return `<tr class="table-light"><td class="fw-semibold">${I.k}. ${E(I.nama)}</td><td class="fw-semibold text-end">${R.fmt(iv)}</td><td style="width:110px">${bar(iv)}</td></tr>`+I.subs.map((S,si)=>{const sv=avg(rows.map(r=>r.h.ind[ii].subs[si].raw));return `<tr><td class="ps-3">${E(S.nama)}</td><td class="text-end">${R.fmt(sv)}</td><td>${bar(sv)}</td></tr>`;}).join('');}).join('')}</tbody></table></div></div></div></div>
-      <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0"><thead><tr><th>Anak</th><th>Kelas</th>${R.IND.map(I=>`<th title="${E(I.nama)}">${I.k}</th>`).join('')}<th>Skor total</th><th>Kategori</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="fw-semibold">${E(r.a.NAMA)}</td><td>${E([r.a.KELAS,r.a.JENJANG].filter(Boolean).join(' · '))}</td>${r.h.ind.map(i=>`<td>${R.fmt(i.skor)}</td>`).join('')}<td class="fw-bold">${R.fmt(r.h.total.skor)}</td><td>${r.h.total.kat?`<span class="badge-soft ${r.h.total.kat.cls}">${r.h.total.kat.k}</span>`:''}</td></tr>`).join('')}</tbody></table></div></div>`
-      :'<div class="card-srit p-4"><div class="empty-state"><i class="bi bi-bar-chart-line d-block"></i>Belum ada angket terisi pada periode ini.</div></div>'}`;
+        <div class="col-12 col-lg-8"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Rata-rata per indikator &amp; sub indikator</div><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12.5px"><thead><tr><th></th><th class="text-end">Angket siswa</th><th class="text-end">Wali asuh</th><th class="text-end">Akhir</th><th></th></tr></thead><tbody>${R.IND.map((I,ii)=>
+          line(I.k+'. '+E(I.nama),sc(h=>h.ind[ii].raw),'table-light',false)+I.subs.map((S,si)=>line(E(S.nama),sc(h=>h.ind[ii].subs[si].raw),'',true)).join('')).join('')}</tbody></table></div></div></div></div>
+      <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0"><thead><tr><th>Anak</th><th>Kelas</th>${R.IND.map(I=>`<th title="Skor akhir: ${E(I.nama)}">${I.k}</th>`).join('')}<th>Siswa</th><th>Wali asuh</th><th>Skor akhir</th><th>Kategori</th><th>Sumber</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="fw-semibold">${E(r.a.NAMA)}</td><td>${E([r.a.KELAS,r.a.JENJANG].filter(Boolean).join(' · '))}</td>${r.h.ind.map(i=>`<td>${R.fmt(i.skor)}</td>`).join('')}<td>${R.fmt(r.d.siswa.total.skor)}</td><td>${R.fmt(r.d.wali.total.skor)}</td><td class="fw-bold">${R.fmt(r.h.total.skor)}</td><td>${r.h.total.kat?`<span class="badge-soft ${r.h.total.kat.cls}">${r.h.total.kat.k}</span>`:''}</td><td><span class="badge-soft ${r.ak&&r.as?'st-HADIR':'st-SAKIT'}" style="font-size:11px">${this._sumber(r)}</span></td></tr>`).join('')}</tbody></table></div><div class="text-muted-2 p-2" style="font-size:11.5px">Kolom 1–4 = skor akhir tiap indikator (rata-rata angket siswa &amp; wali asuh).</div></div>`
+      :'<div class="card-srit p-4"><div class="empty-state"><i class="bi bi-bar-chart-line d-block"></i>Belum ada angket siswa / penilaian wali asuh terisi pada periode ini.</div></div>'}`;
     this._bindPeriode('rkPer',()=>this.renderRekap(host));
     $('#rkJj').onchange=e=>{s.jenjang=e.target.value;this.renderRekap(host);};
     const c=$('#rkCsv');if(c)c.onclick=()=>this.unduhRekap(rows);
@@ -10662,25 +10721,32 @@ SRIT.Features.penilaian={
   _unduh(nama,teks){const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent('\uFEFF'+teks);a.download=nama;document.body.appendChild(a);a.click();a.remove();},
   unduhRekap(rows){
     const R=SRIT.Rapor,fn=x=>x===null||x===undefined?'':String(x).replace('.',',');
-    const head=['No','Nama','NIS','NISN','Kelas','Jenjang'].concat(R.IND.map(I=>I.nama)).concat(R.IND.reduce((l,I)=>l.concat(I.subs.map(S=>S.nama)),[])).concat(['Skor Total','Kategori','Butir terisi']);
-    const data=rows.map((r,i)=>[i+1,r.a.NAMA,r.a.NIS||'',r.a.NISN||'',r.a.KELAS||'',r.a.JENJANG||''].concat(r.h.ind.map(x=>fn(x.skor))).concat(r.h.ind.reduce((l,I)=>l.concat(I.subs.map(S=>fn(S.skor))),[])).concat([fn(r.h.total.skor),r.h.total.kat?r.h.total.kat.k:'',r.h.total.n]));
+    const head=['No','Nama','NIS','NISN','Kelas','Jenjang'];
+    R.IND.forEach(I=>{head.push(I.nama+' (Angket Siswa)');head.push(I.nama+' (Wali Asuh)');head.push(I.nama+' (Akhir)');});
+    R.IND.forEach(I=>I.subs.forEach(S=>head.push(S.nama+' (Akhir)')));
+    ['Skor Angket Siswa','Skor Wali Asuh','Skor Akhir','Kategori','Butir terisi (akhir)','Sumber'].forEach(x=>head.push(x));
+    const data=rows.map((r,i)=>{const d=r.d,row=[i+1,r.a.NAMA,r.a.NIS||'',r.a.NISN||'',r.a.KELAS||'',r.a.JENJANG||''];
+      R.IND.forEach((I,ii)=>{row.push(fn(d.siswa.ind[ii].skor));row.push(fn(d.wali.ind[ii].skor));row.push(fn(d.akhir.ind[ii].skor));});
+      R.IND.forEach((I,ii)=>I.subs.forEach((S,si)=>row.push(fn(d.akhir.ind[ii].subs[si].skor))));
+      row.push(fn(d.siswa.total.skor),fn(d.wali.total.skor),fn(d.akhir.total.skor),d.akhir.total.kat?d.akhir.total.kat.k:'',d.akhir.total.n,this._sumber(r));return row;});
     this._unduh('rekap_angket_'+this.state.periode.replace(/[^0-9A-Za-z]+/g,'_')+'.csv',this._csv([head].concat(data)));SRIT.Audit.log('EXPORT','penilaian','rekap',null,{periode:this.state.periode,jumlah:rows.length});
   },
+  // Template Nilai: nilai tiap butir = NILAI AKHIR (rata-rata angket siswa & penilaian wali asuh)
   unduhTemplate(rows){
     const R=SRIT.Rapor,head=['nik','nisn','nama_siswa'];R.ITEMS.forEach(it=>{head.push(it.id+'_nilai');head.push(it.id+'_deskripsi');});
-    const data=rows.map(r=>{const j=R.parse(r.ak.JAWABAN),row=[r.a.NIK||'',r.a.NISN||'',r.a.NAMA||''];
+    const data=rows.map(r=>{const j=r.d.gabung,row=[r.a.NIK||'',r.a.NISN||'',r.a.NAMA||''];
       R.ITEMS.forEach(it=>{const v=R.nilai(j,it.id);if(v!==null){row.push(Math.round(v*100)/100);row.push(R.deskripsi(it,v));}else{row.push('');row.push('');}});return row;});
     this._unduh('template_nilai_'+this.state.periode.replace(/[^0-9A-Za-z]+/g,'_')+'.csv',this._csv([head].concat(data)));SRIT.Audit.log('EXPORT','penilaian','template-nilai',null,{periode:this.state.periode,jumlah:rows.length});
   },
 
-  // Ekspor Excel: satu sheet "Template Nilai" (susunan kolom sama dengan sheet Template Nilai pada angket_penilaian_non_akademik.xlsx)
+  // Ekspor Excel: satu sheet "Template Nilai" (susunan kolom sama dengan sheet Template Nilai pada angket_penilaian_non_akademik.xlsx); nilai = nilai akhir
   unduhTemplateXlsx(rows){
     const R=SRIT.Rapor;
     if(typeof XLSX==='undefined'){SRIT.Notify('Pustaka Excel belum termuat; pakai unduhan CSV','err');return;}
     if(!rows.length){SRIT.Notify('Belum ada angket terisi pada periode ini','info');return;}
     const head=['nik','nisn','nama_siswa'];R.ITEMS.forEach(it=>{head.push(it.id+'_nilai');head.push(it.id+'_deskripsi');});
-    let tanpaId=0;
-    const data=rows.map(r=>{const j=R.parse(r.ak.JAWABAN),nik=String(r.a.NIK||'').trim(),nisn=String(r.a.NISN||'').trim();if(!nik||!nisn)tanpaId++;
+    let tanpaId=0,satu=0;
+    const data=rows.map(r=>{const j=r.d.gabung,nik=String(r.a.NIK||'').trim(),nisn=String(r.a.NISN||'').trim();if(!nik||!nisn)tanpaId++;if(!(r.ak&&r.as))satu++;
       const row=[nik||null,nisn||null,r.a.NAMA||null];   // NIK/NISN tetap teks (angka 0 di depan tidak hilang)
       R.ITEMS.forEach(it=>{const v=R.nilai(j,it.id);if(v!==null){row.push(Math.round(v*100)/100);row.push(R.deskripsi(it,v));}else{row.push(null);row.push(null);}});return row;});
     const ws=XLSX.utils.aoa_to_sheet([head].concat(data));
@@ -10688,17 +10754,22 @@ SRIT.Features.penilaian={
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Template Nilai');
     XLSX.writeFile(wb,'Template_Nilai_'+this.state.periode.replace(/[^0-9A-Za-z]+/g,'_')+(this.state.jenjang?'_'+this.state.jenjang:'')+'.xlsx');
     SRIT.Audit.log('EXPORT','penilaian','template-nilai-xlsx',null,{periode:this.state.periode,jenjang:this.state.jenjang||'',jumlah:rows.length});
-    SRIT.Notify(rows.length+' anak diekspor'+(tanpaId?' · '+tanpaId+' anak belum punya NIK/NISN (kolom dikosongkan)':''),tanpaId?'warn':'ok');
+    const cat=[];if(tanpaId)cat.push(tanpaId+' anak belum punya NIK/NISN (kolom dikosongkan)');if(satu)cat.push(satu+' anak baru satu sumber (siswa/wali asuh), nilai akhir masih sementara');
+    SRIT.Notify(rows.length+' anak diekspor'+(cat.length?' · '+cat.join(' · '):''),cat.length?'warn':'ok');
   },
 
   /* =========================== TAB 3: RUBRIK & PANDUAN =========================== */
   renderPanduan(host){
     const R=SRIT.Rapor,E=SRIT.Util.esc;
-    host.innerHTML=`<div class="row g-3"><div class="col-12 col-lg-6"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Konversi nilai butir (0–100) ke predikat</div><table class="table table-sm mb-0" style="font-size:13px"><thead><tr><th>Nilai</th><th>Predikat butir</th><th>Tafsir (deskripsi template nilai)</th></tr></thead><tbody>${R.KAT.map((k,i)=>({i,k})).reverse().map(x=>`<tr><td><b>${R.rentang(x.i)}</b></td><td><span class="badge-soft ${x.k.cls}">${E(R.SKALA[3-x.i].pred)}</span></td><td>${E(R.SKALA[3-x.i].tafsir)}</td></tr>`).join('')}</tbody></table>
-        <div class="text-muted-2 mt-2" style="font-size:12px">Wali asuh mengisi nilai 0–100 per butir. Skor sub indikator / indikator / total = rata-rata nilai butir terisi (0–100), butir dibobot sama. Butir kosong (mis. butir pengurus *) tidak dihitung. Data lama berskala 1–4 dibaca sebagai 25 / 50 / 75 / 100.</div></div></div>
+    host.innerHTML=`<div class="row g-3"><div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Dua sumber penilaian &amp; cara menghitung hasil akhir</div><div style="font-size:13px">
+        <b>1. Angket siswa</b>: siswa menjawab 56 pernyataan (${R.SKALA.map(x=>E(x.l)+' = '+x.v).join(' · ')}). Jawaban dikonversi ke 0–100 (×25): 4 = 100, 3 = 75, 2 = 50, 1 = 25.<br>
+        <b>2. Penilaian wali asuh</b>: wali asuh memberi nilai 0–100 untuk tiap butir berdasarkan pengamatan.<br>
+        <b>3. Hasil akhir</b> = rata-rata kedua sumber pada setiap butir; skor sub indikator, indikator, dan total dihitung dari nilai akhir butir (rata-rata butir terisi, bobot sama). Bila baru satu sumber yang terisi, nilai sumber itu dipakai sementara dan diberi tanda "sementara". Butir pengurus (*) yang dikosongkan tidak dihitung.</div></div></div>
+      <div class="col-12 col-lg-6"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Konversi nilai butir (0–100) ke predikat</div><table class="table table-sm mb-0" style="font-size:13px"><thead><tr><th>Nilai</th><th>Predikat butir</th><th>Tafsir (deskripsi template nilai)</th></tr></thead><tbody>${R.KAT.map((k,i)=>({i,k})).reverse().map(x=>`<tr><td><b>${R.rentang(x.i)}</b></td><td><span class="badge-soft ${x.k.cls}">${E(R.SKALA[3-x.i].pred)}</span></td><td>${E(R.SKALA[3-x.i].tafsir)}</td></tr>`).join('')}</tbody></table>
+        <div class="text-muted-2 mt-2" style="font-size:12px">Rubrik ini dipakai untuk nilai akhir. Data lama berskala 1–4 dibaca sebagai 25 / 50 / 75 / 100.</div></div></div>
       <div class="col-12 col-lg-6"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Kategori hasil (berlaku untuk sub indikator, indikator, dan total)</div><table class="table table-sm mb-0" style="font-size:13px"><thead><tr><th>Skor ≥</th><th>Kategori</th><th>Interpretasi</th><th>Tindak lanjut</th></tr></thead><tbody>${R.KAT.map(k=>`<tr><td><b>${k.min}</b></td><td><span class="badge-soft ${k.cls}">${k.k}</span></td><td>${E(k.tafsir)}</td><td>${E(k.tl)}</td></tr>`).join('')}</tbody></table></div></div>
       <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Isi angket: 4 indikator · 16 sub indikator · ${R.ITEMS.length} butir</div>${R.IND.map(I=>`<div class="mb-2"><div class="fw-semibold" style="font-size:13px">${I.k}. ${E(I.nama)}</div><div class="text-muted-2" style="font-size:12px">${I.subs.map(S=>E(S.nama)+' ('+S.items.length+')').join(' · ')}</div></div>`).join('')}</div></div>
-      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Cara memakai</div><ol class="mb-0" style="font-size:13px"><li>Pilih <b>periode</b> (semester) di tab Rapor Anak.</li><li>Bila perlu catat dulu di kertas, cetak <b>Lembar penilaian kosong</b>. Wali asuh memasukkan <b>nilai 0–100</b> tiap butir (pengamatan 1 bulan terakhir) lewat tombol <b>Angket</b> pada tiap anak; predikat butir terhitung otomatis dari rubrik.</li><li>Cetak <b>Laporan Perkembangan Anak Dampingan</b> (satu anak atau semua yang tampil). Tab Rekap &amp; Ekspor memuat rata-rata kelas, unduhan CSV rekap, dan <b>Ekspor Template Nilai (Excel)</b> untuk diunggah ke aplikasi Kemensos.</li></ol><div class="text-muted-2 mt-2" style="font-size:12px"><b>Asesmen personal</b> (diisi wali asuh, Draf → Final → Diketahui Kepala Sekolah) tidak lagi di menu ini: buka <b>Profiling Siswa</b>, pilih anak, lalu klik <b>Asesmen personal</b>.</div></div></div></div>`;
+      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Cara memakai</div><ol class="mb-0" style="font-size:13px"><li>Pilih <b>periode</b> (semester) di tab Rapor Anak.</li><li><b>Angket siswa</b>: cetak <b>Lembar angket siswa</b>, siswa mengisi dengan centang, lalu petugas/wali asuh memasukkan jawabannya lewat tombol <b>Angket Siswa</b> pada tiap anak.</li><li><b>Penilaian wali asuh</b>: bila perlu catat dulu di kertas (<b>Lembar penilaian wali asuh</b>), lalu masukkan <b>nilai 0–100</b> tiap butir (pengamatan 1 bulan terakhir) lewat tombol <b>Penilaian Wali</b>.</li><li>Kolom <b>Hasil akhir</b> terisi otomatis sebagai rata-rata keduanya. Cetak <b>Laporan Perkembangan Anak Dampingan</b> (menampilkan skor siswa, wali asuh, dan akhir per indikator). Tab Rekap &amp; Ekspor memuat rata-rata per indikator, unduhan CSV rekap, dan <b>Ekspor Template Nilai (Excel)</b> berisi nilai akhir untuk diunggah ke aplikasi Kemensos.</li></ol><div class="text-muted-2 mt-2" style="font-size:12px"><b>Asesmen personal</b> (diisi wali asuh, Draf → Final → Diketahui Kepala Sekolah) tidak lagi di menu ini: buka <b>Profiling Siswa</b>, pilih anak, lalu klik <b>Asesmen personal</b>.</div></div></div></div>`;
   },
 
   /* =========================== CETAK =========================== */
@@ -10716,38 +10787,53 @@ SRIT.Features.penilaian={
   },
   _nipWali(id){try{return (SRIT.Store.read('USERS').find(u=>u.ID===id)||{}).NIP||'';}catch(e){return '';}},
   halamanRapor(a,p){
-    const R=SRIT.Rapor,E=SRIT.Util.esc,info=R.anakInfo(a),ak=this.angketOf(a.ID,p),h=ak?R.hitung(R.parse(ak.JAWABAN)):null,j=R.parse(ak&&ak.JAWABAN);
+    const R=SRIT.Rapor,E=SRIT.Util.esc,info=R.anakInfo(a),d=this.hasil(a.ID,p),ak=d.ak,as=d.as,ada=!!(ak||as),h=d.akhir,j=d.gabung;
     const idr=(l,v)=>`<tr><td>${l}</td><td>:</td><td>${E(v||'')}</td></tr>`;
     const bar=v=>v===null?'':`<div class="bar"><i style="width:${Math.max(0,Math.min(100,v))}%"></i></div>`;
     let s=`<section class="pg">${SRIT.Kop.html()}<h1>LAPORAN PERKEMBANGAN ANAK DAMPINGAN</h1><div class="sub">Program Pendampingan dan Bimbingan Wali Asuh · Periode ${E(p)}</div>
       <h2>I. IDENTITAS SISWA ASUH</h2><table class="id"><tbody>${idr('Nama Lengkap',info.nama)}${idr('NIS / NISN',info.nis)}${idr('Umur',info.umur)}${idr('Kelas / Jenjang / Kamar',info.kelas)}${idr('Periode Evaluasi',p)}${idr('Wali Asuh',info.wali)}${idr('Asal Daerah',info.asal)}</tbody></table>
-      <h2>II. HASIL ANGKET PENILAIAN KARAKTER &amp; PERILAKU (NON-TES)</h2>`;
-    if(!h){s+='<div class="box">Angket non-akademik periode ini belum diisi.</div>';}
+      <h2>II. HASIL PENILAIAN KARAKTER &amp; PERILAKU (NON-TES)</h2>`;
+    if(!ada){s+='<div class="box">Angket siswa dan penilaian wali asuh periode ini belum diisi.</div>';}
     else{
-      s+=`<div class="box"><b>Skor total: ${R.fmt(h.total.skor)} (${h.total.kat.k})</b> · ${h.total.n} dari ${h.total.total} butir terjawab<br><span class="ket">${E(h.total.kat.tafsir)}. Tindak lanjut: ${E(h.total.kat.tl)}.</span></div>
-      <table class="t"><thead><tr><th style="text-align:left">Indikator / Sub indikator</th><th style="width:60px">Skor</th><th style="width:90px"> </th><th style="width:110px">Kategori</th></tr></thead><tbody>${h.ind.map(i=>`<tr class="g"><td>${i.k}. ${E(i.nama)}</td><td style="text-align:center">${R.fmt(i.skor)}</td><td>${bar(i.skor)}</td><td style="text-align:center">${i.kat?i.kat.k:'–'}</td></tr>`+i.subs.map(x=>`<tr><td style="padding-left:16px">${E(x.nama)}</td><td style="text-align:center">${R.fmt(x.skor)}</td><td>${bar(x.skor)}</td><td style="text-align:center">${x.kat?x.kat.k:'–'}</td></tr>`).join('')).join('')}</tbody></table>`;
+      const sumber=(ak&&as)?'':` <b>Catatan:</b> hasil sementara, baru ${as?'angket siswa':'penilaian wali asuh'} yang terisi.`;
+      s+=`<div class="box"><b>Skor akhir: ${R.fmt(h.total.skor)} (${h.total.kat.k})</b> · ${h.total.n} dari ${h.total.total} butir terjawab<br><span class="ket">Skor akhir adalah rata-rata <b>angket siswa</b> (${R.fmt(d.siswa.total.skor)}) dan <b>penilaian wali asuh</b> (${R.fmt(d.wali.total.skor)}) pada setiap butir. ${E(h.total.kat.tafsir)}. Tindak lanjut: ${E(h.total.kat.tl)}.${sumber}</span></div>
+      <table class="t"><thead><tr><th style="text-align:left">Indikator / Sub indikator</th><th style="width:52px">Angket Siswa</th><th style="width:52px">Wali Asuh</th><th style="width:52px">Skor Akhir</th><th style="width:70px"> </th><th style="width:100px">Kategori</th></tr></thead><tbody>${h.ind.map((i,ii)=>`<tr class="g"><td>${i.k}. ${E(i.nama)}</td><td style="text-align:center">${R.fmt(d.siswa.ind[ii].skor)}</td><td style="text-align:center">${R.fmt(d.wali.ind[ii].skor)}</td><td style="text-align:center">${R.fmt(i.skor)}</td><td>${bar(i.skor)}</td><td style="text-align:center">${i.kat?i.kat.k:'–'}</td></tr>`+i.subs.map((x,si)=>`<tr><td style="padding-left:16px">${E(x.nama)}</td><td style="text-align:center">${R.fmt(d.siswa.ind[ii].subs[si].skor)}</td><td style="text-align:center">${R.fmt(d.wali.ind[ii].subs[si].skor)}</td><td style="text-align:center">${R.fmt(x.skor)}</td><td>${bar(x.skor)}</td><td style="text-align:center">${x.kat?x.kat.k:'–'}</td></tr>`).join('')).join('')}
+        <tr class="g"><td>TOTAL</td><td style="text-align:center">${R.fmt(d.siswa.total.skor)}</td><td style="text-align:center">${R.fmt(d.wali.total.skor)}</td><td style="text-align:center">${R.fmt(h.total.skor)}</td><td>${bar(h.total.skor)}</td><td style="text-align:center">${h.total.kat.k}</td></tr></tbody></table>`;
       const nv=it=>R.nilai(j,it.id),perlu=R.ITEMS.filter(it=>nv(it)!==null&&nv(it)<R.KAT[2].min),kuat=R.ITEMS.filter(it=>nv(it)!==null&&nv(it)>=R.KAT[3].min);
       if(kuat.length)s+=`<div class="ket" style="margin-top:6px"><b>Sangat baik / konsisten:</b> ${kuat.slice(0,8).map(it=>E(it.d)).join('; ')}${kuat.length>8?' dan '+(kuat.length-8)+' lainnya':''}.</div>`;
       if(perlu.length)s+=`<div class="ket" style="margin-top:4px"><b>Perlu pembiasaan / pembinaan:</b> ${perlu.slice(0,10).map(it=>E(it.d)+' ('+R.butir(nv(it)).pred+')').join('; ')}${perlu.length>10?' dan '+(perlu.length-10)+' lainnya':''}.</div>`;
     }
-    s+=`<div class="nar">${E(R.NARASI)}</div>${this._ttd(info.wali,this._nipWali(info.waliId),(ak&&ak.TANGGAL)||SRIT.Util.todayISO())}</section>`;
+    s+=`<div class="nar">${E(R.NARASI)}</div>${this._ttd(info.wali,this._nipWali(info.waliId),(ak&&ak.TANGGAL)||(as&&as.TANGGAL)||SRIT.Util.todayISO())}</section>`;
     return s;
   },
   cetakRapor(ids){
-    if(!ids.length){SRIT.Notify('Belum ada rapor yang bisa dicetak (angket masih kosong)','info');return;}
+    if(!ids.length){SRIT.Notify('Belum ada rapor yang bisa dicetak (angket siswa & penilaian wali asuh masih kosong)','info');return;}
     if(ids.length>60&&!window.confirm('Mencetak '+ids.length+' rapor sekaligus. Lanjutkan?'))return;
     const w=this._buka();if(!w)return;const p=this.state.periode;
     const html=ids.map(id=>SRIT.Repo.getById('ANAK',id)).filter(Boolean).map(a=>this.halamanRapor(a,p)).join('');
     SRIT.Audit.log('PRINT','penilaian','rapor',null,{periode:p,jumlah:ids.length});this._tulis(w,'Laporan Perkembangan Anak Dampingan '+p,html);
   },
+  // Lembar angket SISWA (sesuai Angket_Non-Akademik.PDF): siswa mencentang Selalu / Sering / Kadang-kadang / Tidak Pernah
+  cetakAngketSiswaKosong(){
+    const R=SRIT.Rapor,E=SRIT.Util.esc,w=this._buka();if(!w)return;let no=0;
+    const ck='<td style="text-align:center"><span class="ck"></span></td>';
+    const kol=R.SKALA.map(x=>`<th style="width:58px">${E(x.l).replace('Kadang-kadang','Kadang-<br>kadang').replace('Tidak Pernah','Tidak<br>Pernah')}<br>(${x.v})</th>`).join('');
+    const head=`<tr><th style="width:26px">No</th><th style="width:42px">Kode</th><th>Pernyataan</th>${kol}</tr>`;
+    const body=R.IND.map(I=>`<tr class="g"><td colspan="7">${I.k}. ${E(I.nama.toUpperCase())}</td></tr>`+I.subs.map(S=>`<tr><td colspan="7" style="font-style:italic;background:#f6f6f6">${E(S.nama)}</td></tr>`+S.items.map(it=>{no++;return `<tr><td style="text-align:center">${no}</td><td style="text-align:center">${it.id}</td><td>${E(it.t)}${it.o?' *':''}</td>${ck}${ck}${ck}${ck}</tr>`;}).join('')).join('')).join('');
+    this._tulis(w,'Angket Siswa Non-Akademik',`<style>tr{page-break-inside:avoid}</style><section class="pg">${SRIT.Kop.html()}<h1>ANGKET PENILAIAN KARAKTER &amp; PERILAKU SISWA (NON-TES)</h1><div class="sub">Periode ......................................</div>
+      <table class="id" style="margin:8px 0"><tbody><tr><td style="width:60%">Nama : ......................................................</td><td style="width:40%">Kelas : ....................</td></tr><tr><td>NIK / NISN : ..............................................</td><td>Tanggal : ..................</td></tr></tbody></table>
+      <div class="box" style="font-size:9.5pt">Petunjuk: Bacalah setiap pernyataan, lalu beri tanda centang (✓) pada satu kolom yang paling sesuai dengan dirimu dalam 1 bulan terakhir. Jawablah dengan jujur; angket ini bukan tes dan tidak ada jawaban benar/salah. (*) Khusus pengurus OSIS/ketua asrama/ketua kamar; kosongkan bila bukan pengurus.</div>
+      <table class="t"><thead>${head}</thead><tbody>${body}</tbody></table></section>`);
+  },
+  // Lembar penilaian WALI ASUH (nilai 0-100 per butir)
   cetakAngketKosong(){
     const R=SRIT.Rapor,E=SRIT.Util.esc,w=this._buka();if(!w)return;let no=0;
     const head=`<tr><th style="width:28px">No</th><th style="width:44px">Kode</th><th>Perilaku yang dinilai</th><th style="width:90px">Nilai<br>(0–100)</th><th style="width:90px">Predikat</th></tr>`;
     const body=R.IND.map(I=>`<tr class="g"><td colspan="5">${I.k}. ${E(I.nama.toUpperCase())}</td></tr>`+I.subs.map(S=>`<tr><td colspan="5" style="font-style:italic;background:#f6f6f6">${E(S.nama)}</td></tr>`+S.items.map(it=>{no++;return `<tr><td style="text-align:center">${no}</td><td style="text-align:center">${it.id}</td><td>${E(it.d)}${it.o?' *':''}</td><td></td><td></td></tr>`;}).join('')).join('')).join('');
     const rub=R.KAT.map((k,i)=>({i,k})).reverse().map(x=>`<tr><td style="text-align:center">${R.rentang(x.i)}</td><td style="text-align:center"><b>${E(R.SKALA[3-x.i].pred)}</b></td><td>${E(R.SKALA[3-x.i].tafsir)}</td></tr>`).join('');
-    this._tulis(w,'Lembar Penilaian Non-Akademik',`<section class="pg">${SRIT.Kop.html()}<h1>LEMBAR PENILAIAN KARAKTER &amp; PERILAKU SISWA (NON-TES)</h1><div class="sub">Diisi oleh Wali Asuh · Periode ......................................</div>
+    this._tulis(w,'Lembar Penilaian Wali Asuh Non-Akademik',`<section class="pg">${SRIT.Kop.html()}<h1>LEMBAR PENILAIAN KARAKTER &amp; PERILAKU SISWA (NON-TES)</h1><div class="sub">Penilaian Wali Asuh · Periode ......................................</div>
       <table class="id" style="margin:8px 0"><tbody><tr><td style="width:60%">Nama : ......................................................</td><td style="width:40%">Kelas : ....................</td></tr><tr><td>NIK / NISN : ..............................................</td><td>Tanggal : ..................</td></tr><tr><td colspan="2">Wali Asuh : ..............................................</td></tr></tbody></table>
-      <div class="box" style="font-size:9.5pt">Petunjuk: Nilailah setiap perilaku anak berdasarkan pengamatan 1 bulan terakhir dengan <b>angka 0–100</b> pada kolom Nilai (boleh desimal); predikat ditentukan dengan rubrik di bawah. (*) Khusus pengurus OSIS/ketua asrama/ketua kamar; kosongkan bila bukan pengurus.</div>
+      <div class="box" style="font-size:9.5pt">Petunjuk: Nilailah setiap perilaku anak berdasarkan pengamatan 1 bulan terakhir dengan <b>angka 0–100</b> pada kolom Nilai (boleh desimal); predikat ditentukan dengan rubrik di bawah. (*) Khusus pengurus OSIS/ketua asrama/ketua kamar; kosongkan bila bukan pengurus. Nilai ini dirata-rata dengan angket siswa untuk menjadi hasil akhir.</div>
       <table class="t"><thead>${head}</thead><tbody>${body}</tbody></table>
       <h2>Rubrik konversi nilai</h2><table class="t"><thead><tr><th style="width:90px">Nilai</th><th style="width:110px">Predikat</th><th>Tafsir</th></tr></thead><tbody>${rub}</tbody></table></section>`);
   }
@@ -10840,7 +10926,7 @@ SRIT.Asesmen={
       if(f.t==='pilih')return `<div class="col-12 col-md-6"><label class="form-label-sm">${E(f.l)}</label><select class="form-select form-select-sm" name="${n}"><option value="">– pilih –</option>${f.o.map(o=>`<option ${v===o?'selected':''}>${E(o)}</option>`).join('')}</select></div>`;
       if(f.t==='multi'){const set=v.split(',').map(x=>x.trim()).filter(Boolean);return `<div class="col-12 col-md-6"><label class="form-label-sm">${E(f.l)}</label><div class="d-flex flex-wrap gap-2">${f.o.map(o=>`<label style="font-size:13px"><input type="checkbox" name="${n}" value="${E(o)}" ${set.indexOf(o)>=0?'checked':''}> ${E(o)}</label>`).join('')}</div></div>`;}
       return `<div class="col-12"><div class="d-flex justify-content-between align-items-end"><label class="form-label-sm mb-1">${E(f.l)}</label>${f.sys==='pelanggaran'?'<button type="button" class="btn btn-sm btn-outline-secondary py-0" id="asPel"><i class="bi bi-arrow-down-circle"></i> Ambil dari catatan pelanggaran</button>':''}</div><textarea class="form-control form-control-sm" rows="2" name="${n}">${E(v)}</textarea></div>`;};
-    const hk=R.hitung(R.parse((SRIT.Features.penilaian.angketOf(aid,p)||{}).JAWABAN)),ketAkt=hk.total.n?`Skor angket ${R.fmt(hk.total.skor)} (${hk.total.kat.k}) · ${hk.ind.map(i=>E(i.pendek)+' '+R.fmt(i.skor)).join(' · ')}`:'Angket non-akademik periode ini belum diisi.';
+    const hk=SRIT.Features.penilaian.hasil(aid,p).akhir,ketAkt=hk.total.n?`Skor akhir angket siswa & wali asuh ${R.fmt(hk.total.skor)} (${hk.total.kat.k}) · ${hk.ind.map(i=>E(i.pendek)+' '+R.fmt(i.skor)).join(' · ')}`:'Angket siswa / penilaian wali asuh periode ini belum diisi.';
     const m=SRIT.Modal.open({title:'Asesmen Personal: '+a.NAMA,size:'modal-xl',
       body:`<form id="asForm" onsubmit="return false">
         <div class="alert alert-info py-2" style="font-size:12px;margin-bottom:10px"><i class="bi bi-info-circle"></i> Diisi individual oleh Wali Asuh untuk setiap siswa asuh. Hasilnya menjadi bahan utama Rapat Koordinasi Wali Asuh. ${E(ketAkt)}</div>
