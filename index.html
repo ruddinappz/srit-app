@@ -1655,16 +1655,87 @@ SRIT.Approval=(function(){
     // status awal izin baru: selalu MENUNGGU persetujuan wali asuh anak tsb / wali asrama (server menentukan hal yang sama)
     izinNew(){const s=this.stamp();return {STATUS:'MENUNGGU',PENGAJU:s.id,PENGAJU_NAMA:s.name};},
     // keputusan (setuju/tolak) atas izin, kegiatan, atau program
+    // ---- POP-UP KONFIRMASI untuk setiap perubahan status (izin, izin keluar, kegiatan, program) ----
+    // opt:{title,icon,tone:'success|danger|primary|warning',html,ok,input:{label,required,requiredMsg,placeholder},onOk(teks)}
+    konfirmasi(opt){
+      const E=SRIT.Util.esc,tone=opt.tone||'primary';
+      const m=SRIT.Modal.open({title:opt.title,
+        body:`<div class="d-flex gap-3 align-items-start"><div class="text-${tone}" style="font-size:32px;line-height:1"><i class="bi ${opt.icon||'bi-question-circle'}"></i></div><div style="font-size:14px;min-width:0">${opt.html}</div></div>
+          ${opt.input?`<div class="mt-3"><label class="form-label-sm">${E(opt.input.label)}${opt.input.required?' <span class="text-danger">*</span>':''}</label><textarea class="form-control form-control-sm" id="kfIn" rows="2" placeholder="${E(opt.input.placeholder||'')}"></textarea></div>`:''}`,
+        footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-${tone} btn-sm" id="kfOk">${E(opt.ok||'Ya, lanjutkan')}</button>`});
+      const ta=$('#kfIn',m.el);if(ta)setTimeout(()=>ta.focus(),200);
+      $('#kfOk',m.el).onclick=()=>{
+        let v='';if(opt.input){v=(($('#kfIn',m.el)||{}).value||'').trim();if(opt.input.required&&!v){SRIT.Notify(opt.input.requiredMsg||'Isi keterangan terlebih dahulu','warn');return;}}
+        m.close();opt.onOk(v);};
+      return m;
+    },
+    // ringkasan satu baris pengajuan untuk isi pop-up
+    ringkas(rec){const f=SRIT.Util.fmtDateShort,jam=(x)=>x?' '+String(x).slice(0,5):'';
+      const nm=rec.NAMA_ANAK||rec.NAMA||rec.NAME||rec.JUDUL||'';
+      if(rec.KEMBALI!==undefined&&rec.TANGGAL)return nm+' · berangkat '+f(String(rec.TANGGAL).slice(0,10))+jam(rec.JAM_BERANGKAT)+' · kembali '+f(String(rec.KEMBALI).slice(0,10))+jam(rec.JAM_KEMBALI);
+      if(rec.JAM_BERANGKAT&&rec.TANGGAL)return nm+' · '+f(String(rec.TANGGAL).slice(0,10))+' · '+String(rec.JAM_BERANGKAT).slice(0,5)+'–'+String(rec.JAM_KEMBALI||'').slice(0,5);
+      return nm+(rec.TANGGAL?' · '+f(String(rec.TANGGAL).slice(0,10)):'');},
+    // keputusan (setuju/tolak) atas izin, kegiatan, atau program — selalu lewat pop-up konfirmasi
     decide(table,mod,rec,status,reload,label){
-      let why='';
-      if(status==='DITOLAK'){why=this.ask('Alasan penolakan (wajib diisi):');if(!why){if(why!==null)SRIT.Notify('Alasan penolakan wajib diisi','warn');return;}}
-      const s=this.stamp();
-      SRIT.Repo.update(table,rec.ID,{STATUS:status,DISETUJUI_OLEH:s.id,DISETUJUI_NAMA:s.name,DISETUJUI_PADA:s.at,CATATAN_APPROVAL:why});
-      SRIT.Audit.log('UPDATE',mod,rec.ID,{STATUS:rec.STATUS},{STATUS:status});SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
-      SRIT.Notify((label||'Pengajuan')+(status==='DITOLAK'?' ditolak':' disetujui'),'ok');if(reload)reload();},
-    sahkan(rec,reload){const s=this.stamp();
-      SRIT.Repo.update('IZIN',rec.ID,{PENGESAHAN:'SAH',PENGESAH_NAMA:s.name,PENGESAH_PADA:s.at});
-      SRIT.Audit.log('UPDATE','izin',rec.ID,{PENGESAHAN:'MENUNGGU'},{PENGESAHAN:'SAH'});SRIT.Notify('Izin darurat disahkan','ok');if(reload)reload();},
+      const E=SRIT.Util.esc,tolak=status==='DITOLAK',lb=label||'Pengajuan',self=this;
+      this.konfirmasi({title:(tolak?'Tolak ':'Setujui ')+lb,icon:tolak?'bi-x-octagon':'bi-check2-circle',tone:tolak?'danger':'success',ok:tolak?'Ya, tolak':'Ya, setujui',
+        html:`<div class="fw-semibold mb-1">${E(this.ringkas(rec))}</div><div>${tolak?lb+' ini akan <b>ditolak</b> dan alasannya tercatat.':lb+' ini akan <b>disetujui</b>.'}</div><div class="text-muted-2 mt-2" style="font-size:12px">Status: <b>${E(rec.STATUS||'')}</b> → <b>${status}</b></div>`,
+        input:tolak?{label:'Alasan penolakan',required:true,requiredMsg:'Alasan penolakan wajib diisi',placeholder:'Tulis alasan penolakan'}:null,
+        onOk:why=>{
+          const s=self.stamp();
+          SRIT.Repo.update(table,rec.ID,{STATUS:status,DISETUJUI_OLEH:s.id,DISETUJUI_NAMA:s.name,DISETUJUI_PADA:s.at,CATATAN_APPROVAL:why});
+          SRIT.Audit.log('UPDATE',mod,rec.ID,{STATUS:rec.STATUS},{STATUS:status});SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');
+          SRIT.Notify(lb+(tolak?' ditolak':' disetujui'),'ok');if(reload)reload();}});
+    },
+    // perubahan status lanjutan (Berangkat / Kembali / Selesai / dll.) — pop-up konfirmasi
+    setStatus(table,mod,rec,status,reload,label){
+      const E=SRIT.Util.esc,lb=label||'Izin';
+      const I={BERANGKAT:{t:'Konfirmasi Berangkat',i:'bi-box-arrow-right',c:'primary',ok:'Ya, sudah berangkat',p:'Anak ditandai <b>sudah BERANGKAT</b> (keluar dari asrama).'},
+        SELESAI:{t:'Konfirmasi Kembali',i:'bi-box-arrow-in-left',c:'success',ok:'Ya, sudah kembali',p:'Anak ditandai <b>sudah KEMBALI</b> ke asrama dan izin dinyatakan <b>SELESAI</b>.'},
+        KEMBALI:{t:'Konfirmasi Kembali',i:'bi-box-arrow-in-left',c:'success',ok:'Ya, sudah kembali',p:'Anak ditandai <b>sudah KEMBALI</b> ke asrama.'},
+        TERLAMBAT:{t:'Tandai Terlambat',i:'bi-alarm',c:'warning',ok:'Ya, tandai terlambat',p:'Anak ditandai <b>TERLAMBAT</b> kembali.'}}[status]||{t:'Ubah Status',i:'bi-arrow-repeat',c:'primary',ok:'Ya, ubah',p:'Status diubah menjadi <b>'+status+'</b>.'};
+      this.konfirmasi({title:I.t,icon:I.i,tone:I.c,ok:I.ok,
+        html:`<div class="fw-semibold mb-1">${E(this.ringkas(rec))}</div><div>${I.p}</div><div class="text-muted-2 mt-2" style="font-size:12px">${E(lb)} · Status: <b>${E(rec.STATUS||'')}</b> → <b>${status}</b></div>`,
+        onOk:()=>{SRIT.Repo.update(table,rec.ID,{STATUS:status});SRIT.Audit.log('UPDATE',mod,rec.ID,{STATUS:rec.STATUS},{STATUS:status});
+          SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');SRIT.Notify('Status: '+status,'ok');if(reload)reload();}});
+    },
+    // KOREKSI STATUS oleh SUPER ADMIN (mis. salah klik Berangkat/Selesai): status apa pun boleh dituju, alasan wajib, tercatat di audit
+    koreksiStatus(table,mod,rec,reload,o){
+      if(!SRIT.Auth.isSuper()){SRIT.Notify('Hanya Super Admin yang dapat mengoreksi status','warn');return;}
+      const E=SRIT.Util.esc,list=o.statuses,self=this,lb=o.label||'Izin';
+      const dampak={MENUNGGU:'Persetujuan dihapus; pengajuan kembali menunggu wali asuh anak / wali asrama.',DISETUJUI:'Dianggap sudah disetujui dan anak belum berangkat.',DITOLAK:'Pengajuan ditolak; alasan di bawah menjadi catatan penolakan.',
+        BERANGKAT:'Anak dianggap sedang berada di luar asrama.',KEMBALI:'Anak dianggap sudah kembali.',TERLAMBAT:'Anak dianggap terlambat kembali.',SELESAI:'Izin dinyatakan selesai (anak sudah kembali).'};
+      const m=SRIT.Modal.open({title:'Koreksi Status ('+lb+')',
+        body:`<div class="alert alert-warning py-2" style="font-size:12px"><i class="bi bi-shield-lock"></i> Khusus Super Admin, untuk memperbaiki salah klik. Koreksi dicatat di audit beserta alasannya.</div>
+          <div class="fw-semibold mb-1">${E(this.ringkas(rec))}</div>
+          <div class="mb-2" style="font-size:13px">Status sekarang: <b>${E(rec.STATUS||'')}</b></div>
+          <label class="form-label-sm">Ubah menjadi</label><select class="form-select form-select-sm" id="ksSt">${list.map(s=>`<option value="${s}" ${s===rec.STATUS?'disabled':''}>${s}</option>`).join('')}</select>
+          <div class="text-muted-2 mt-1" id="ksInfo" style="font-size:12px"></div>
+          <label class="form-label-sm mt-2">Alasan koreksi <span class="text-danger">*</span></label><textarea class="form-control form-control-sm" id="ksWhy" rows="2" placeholder="Contoh: salah klik Berangkat, anak belum keluar"></textarea>`,
+        footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-warning btn-sm" id="ksOk">Simpan Koreksi</button>`});
+      const sel=$('#ksSt',m.el),first=list.find(s=>s!==rec.STATUS);if(first)sel.value=first;
+      const info=()=>{$('#ksInfo',m.el).textContent=dampak[sel.value]||'';};sel.onchange=info;info();
+      $('#ksOk',m.el).onclick=()=>{
+        const nu=sel.value,why=($('#ksWhy',m.el).value||'').trim();
+        if(!nu||nu===rec.STATUS){SRIT.Notify('Pilih status yang berbeda','warn');return;}
+        if(!why){SRIT.Notify('Alasan koreksi wajib diisi','warn');return;}
+        m.close();
+        self.konfirmasi({title:'Yakin koreksi status?',icon:'bi-exclamation-triangle',tone:'warning',ok:'Ya, koreksi',
+          html:`<div class="fw-semibold mb-1">${E(self.ringkas(rec))}</div><div>Status <b>${E(rec.STATUS||'')}</b> diubah menjadi <b>${nu}</b>.</div><div class="text-muted-2 mt-1" style="font-size:12px">${E(dampak[nu]||'')}<br>Alasan: ${E(why)}</div>`,
+          onOk:()=>{
+            const ch={STATUS:nu};if(nu==='DITOLAK')ch.CATATAN_APPROVAL=why;
+            SRIT.Repo.update(table,rec.ID,ch);
+            SRIT.Audit.log('UPDATE',mod,rec.ID,{STATUS:rec.STATUS},{STATUS:nu,KOREKSI_SUPERADMIN:'YA',ALASAN:why});
+            SRIT.Cache.invalidate('dash');SRIT.Cache.invalidate('livetv');SRIT.Notify('Status dikoreksi: '+nu,'ok');if(reload)reload();}});
+      };
+    },
+    sahkan(rec,reload){
+      const E=SRIT.Util.esc,self=this;
+      this.konfirmasi({title:'Sahkan Izin Darurat',icon:'bi-patch-check',tone:'success',ok:'Ya, sahkan',html:`<div class="fw-semibold mb-1">${E(this.ringkas(rec))}</div><div>Izin darurat ini akan <b>disahkan</b>.</div>`,
+        onOk:()=>{const s=self.stamp();
+          SRIT.Repo.update('IZIN',rec.ID,{PENGESAHAN:'SAH',PENGESAH_NAMA:s.name,PENGESAH_PADA:s.at});
+          SRIT.Audit.log('UPDATE','izin',rec.ID,{PENGESAHAN:'MENUNGGU'},{PENGESAHAN:'SAH'});SRIT.Notify('Izin darurat disahkan','ok');if(reload)reload();}});
+    },
     // keterangan persetujuan di sel tabel
     badge(r){const esc=SRIT.Util.esc;
       if(r.STATUS==='USULAN')return `<div><span class="badge-soft st-SAKIT" style="font-size:10px">Usulan · menunggu ${esc(this.roleName(R.USULAN))}</span></div>`;
@@ -2014,6 +2085,14 @@ SRIT.Asuh={
   // kelompok utama wali (ID) — yang paling banyak anggotanya di antara kelompok aktif wali itu; '' bila belum ada (server membuatnya saat anak pertama didistribusikan)
   kelompokWali(waliId){if(!waliId)return '';const S=SRIT.Store,ks=S.read('KELOMPOK_ASUH').filter(k=>k.WALI_ASUH===waliId&&k.STATUS!=='NONAKTIF');if(!ks.length)return '';
     if(ks.length===1)return ks[0].ID;const an=S.read('ANAK');return ks.map(k=>({id:k.ID,n:an.filter(a=>a.KELOMPOK===k.ID).length})).sort((x,y)=>y.n-x.n||String(x.id).localeCompare(String(y.id)))[0].id;},
+  // Jenjang wali asuh yang sedang login = jenjang anak asuhnya (otomatis; server juga menyimpannya di data wali). [] bila bukan wali asuh / belum punya anak asuh dan jenjang wali kosong.
+  jenjangSaya(){const me=(SRIT.Auth.user||{}).ID;if(!me||!SRIT.Store.read('WALI_ASUH').some(w=>w.ID===me))return [];
+    const cnt={};SRIT.Store.read('ANAK').forEach(a=>{if(this.aktif(a)&&this.waliAnak(a)===me&&a.JENJANG)cnt[a.JENJANG]=(cnt[a.JENJANG]||0)+1;});
+    let js=Object.keys(cnt).sort((x,y)=>cnt[y]-cnt[x]||x.localeCompare(y));
+    if(!js.length){const w=SRIT.Repo.getById('WALI_ASUH',me)||{};if(w.JENJANG)js=[w.JENJANG];}
+    return js;},
+  // Pembatasan tampilan per jenjang hanya untuk akun yang peran UTAMA-nya Wali Asuh (bukan Super Admin / pemegang izin Kelola). [] = tanpa pembatasan.
+  batasJenjang(modul){const u=SRIT.Auth.user||{};if(u.ROLE!=='WALI_ASUH'||SRIT.Auth.isSuper()||SRIT.Auth.can(modul+':MANAGE'))return [];return this.jenjangSaya();},
   anggotaKelompok(waliId){return SRIT.Store.read('ANAK').filter(a=>this.aktif(a)&&this.waliAnak(a)===waliId).length;},
   // periksa: anak dengan >1 wali berbeda (data anak / kelompok / pemetaan) dan duplikat pemetaan
   audit(){
@@ -2740,7 +2819,11 @@ SRIT.Features.anak={
 SRIT.Features.absensi={
   state:{date:SRIT.Util.todayISO(),keg:'',kgQ:'',kgSrc:'',page:1,size:25,search:'',jenjang:'',jk:'',asrama:'',kelas:'',dirty:{},tab:'manual',log:[]},
   _qr:{stream:null,raf:null,last:'',lastTime:0},
+  // Wali asuh (peran utama) hanya melihat kegiatan jenjang anak asuhnya (+ kegiatan untuk SEMUA jenjang); jenjang lain tidak tercampur.
+  _jj(){return SRIT.Asuh.batasJenjang('absensi');},
+  _sesiOk(s){const j=this._jj();return !j.length||!s.jenjang||s.jenjang==='SEMUA'||j.indexOf(s.jenjang)>=0;},
   render(host){SRIT.UI.setPage('Absensi','Absensi');
+    {const j=this._jj();if(j.length===1&&!this.state._jjInit){this.state.jenjang=j[0];this.state._jjInit=true;}}
     const asrama=SRIT.Store.read('ASRAMA');
     const kelasList=[...new Set(SRIT.Store.read('ANAK').map(a=>a.KELAS).filter(Boolean))].sort();
     host.innerHTML=`
@@ -2884,13 +2967,13 @@ SRIT.Features.absensi={
   // kegiatan hari ini yang TANPA absensi tidak muncul di pilihan sesi; beri tahu jumlahnya dan sediakan daftar (+ aktifkan absensi bila berhak)
   _hiddenNote(){
     const box=$('#abHidden');if(!box)return;
-    const hid=SRIT.Api.getSessionsForDate(this.state.date,true).filter(s=>!s.absensi);
+    const hid=SRIT.Api.getSessionsForDate(this.state.date,true).filter(s=>!s.absensi&&this._sesiOk(s));
     if(!hid.length){box.innerHTML='';return;}
     box.innerHTML=`<span class="text-muted-2" style="font-size:12px"><i class="bi bi-eye-slash"></i> ${hid.length} kegiatan <b>tanpa absensi</b> tidak ditampilkan di pilihan sesi. <a class="pointer" id="abHidLihat" style="text-decoration:underline">Lihat daftar</a></span>`;
     $('#abHidLihat').onclick=()=>this._hiddenList();
   },
   _hiddenList(){
-    const E=SRIT.Util.esc,hid=SRIT.Api.getSessionsForDate(this.state.date,true).filter(s=>!s.absensi);
+    const E=SRIT.Util.esc,hid=SRIT.Api.getSessionsForDate(this.state.date,true).filter(s=>!s.absensi&&this._sesiOk(s));
     const can=s=>SRIT.Auth.can((s.source==='JADWAL'?'jadwal':'kegiatan')+':UPDATE');
     const m=SRIT.Modal.open({title:'Kegiatan tanpa absensi - '+SRIT.Util.fmtDateShort(this.state.date),body:`<div class="text-muted-2 mb-2" style="font-size:12px">Kegiatan ini hanya jadwal, tidak muncul di pilihan sesi absensi dan tidak dihitung di rekap kehadiran.</div>
       <table class="table table-sm table-srit mb-0"><tbody>${hid.map(s=>`<tr><td class="text-nowrap">${E(s.jamMulai||'')}-${E(s.jamSelesai||'')}</td><td><b>${E(s.nama)}</b><div class="text-muted-2" style="font-size:11px">${s.source==='JADWAL'?'Jadwal rutin (berlaku tiap pekan)':'Kegiatan khusus'}${s.jenjang!=='SEMUA'?' &middot; '+E(s.jenjang):''}</div></td><td class="text-end">${can(s)?`<button class="btn btn-sm btn-outline-primary py-0" data-on="${E(s.source)}|${E(s.id)}">Pakai absensi</button>`:''}</td></tr>`).join('')}</tbody></table>`,
@@ -2900,10 +2983,10 @@ SRIT.Features.absensi={
       SRIT.Repo.update(src==='JADWAL'?'JADWAL':'KEGIATAN',id,{ABSENSI:'YA'});SRIT.Notify('Kegiatan kini memakai absensi','ok');m.close();this.buildSessions();});
   },
   buildSessions(){
-    const allSes=SRIT.Api.getSessionsForDate(this.state.date);
+    const allSes=SRIT.Api.getSessionsForDate(this.state.date).filter(s=>this._sesiOk(s));
     const kq=String(this.state.kgQ||'').trim().toLowerCase(),ks=this.state.kgSrc;
     const sessions=allSes.filter(s=>(!ks||s.source===ks)&&(!kq||String(s.nama||'').toLowerCase().indexOf(kq)>=0));
-    const nEl=$('#abKegN');if(nEl)nEl.textContent=(kq||ks)?'\u00b7 '+sessions.length+' dari '+allSes.length+' sesi':'';
+    const nEl=$('#abKegN');if(nEl)nEl.textContent=((kq||ks)?'\u00b7 '+sessions.length+' dari '+allSes.length+' sesi':'')+(this._jj().length?' \u00b7 jenjang '+this._jj().join('/'):'');
     $('#abHari').textContent='('+SRIT.Util.hariOf(this.state.date)+')';
     this._hiddenNote();
     const sel=$('#abKeg');
@@ -8698,8 +8781,9 @@ regFeature('izin',{monitor:{date:'TANGGAL',dateEnd:'KEMBALI',anak:'ANAK'},title:
     {id:'setuju',label:'Setujui',icon:'bi-check-lg',cls:'btn-outline-success',show:r=>r.STATUS==='MENUNGGU'&&SRIT.Approval.canIzinAnak(r),run:function(rec,reload){SRIT.Approval.decide('IZIN','izin',rec,'DISETUJUI',reload,'Izin');}},
     {id:'tolak',label:'Tolak',icon:'bi-x-lg',cls:'btn-outline-danger',show:r=>r.STATUS==='MENUNGGU'&&SRIT.Approval.canIzinAnak(r),run:function(rec,reload){SRIT.Approval.decide('IZIN','izin',rec,'DITOLAK',reload,'Izin');}},
     {id:'sahkan',label:'Sahkan (izin darurat lama)',icon:'bi-patch-check',cls:'btn-outline-warning',show:r=>r.PENGESAHAN==='MENUNGGU'&&SRIT.Approval.canSah(r),run:function(rec,reload){SRIT.Approval.sahkan(rec,reload);}},
-    {id:'berangkat',label:'Berangkat',icon:'bi-box-arrow-right',cls:'btn-outline-primary',show:r=>r.STATUS==='DISETUJUI',run:_setStatus('IZIN','STATUS','BERANGKAT')},
-    {id:'kembali',label:'Konfirmasi Kembali',icon:'bi-box-arrow-in-left',cls:'btn-outline-info',show:r=>r.STATUS==='BERANGKAT'||r.STATUS==='TERLAMBAT',run:_setStatus('IZIN','STATUS','SELESAI')}
+    {id:'berangkat',label:'Berangkat',icon:'bi-box-arrow-right',cls:'btn-outline-primary',show:r=>r.STATUS==='DISETUJUI',run:function(rec,reload){SRIT.Approval.setStatus('IZIN','izin',rec,'BERANGKAT',reload,'Izin & Kepulangan');}},
+    {id:'kembali',label:'Konfirmasi Kembali',icon:'bi-box-arrow-in-left',cls:'btn-outline-info',show:r=>r.STATUS==='BERANGKAT'||r.STATUS==='TERLAMBAT',run:function(rec,reload){SRIT.Approval.setStatus('IZIN','izin',rec,'SELESAI',reload,'Izin & Kepulangan');}},
+    {id:'koreksi',label:'Koreksi Status (Super Admin)',icon:'bi-shield-lock',cls:'btn-outline-warning',show:r=>SRIT.Auth.isSuper(),run:function(rec,reload){SRIT.Approval.koreksiStatus('IZIN','izin',rec,reload,{label:'Izin & Kepulangan',statuses:['MENUNGGU','DISETUJUI','DITOLAK','BERANGKAT','KEMBALI','TERLAMBAT','SELESAI']});}}
   ],
   onCreate:d=>{d.NAMA_ANAK=(SRIT.Repo.getById('ANAK',d.ANAK)||{}).NAMA||d.NAMA_ANAK||'';},
   fields:[{k:'ANAK',label:'Anak',type:'select',col:12,options:anakOpts},{k:'JENIS',label:'Jenis',type:'select',options:rec=>_izJenis(rec&&rec.JENIS).map(v=>({v,t:v}))},{k:'TANGGAL',label:'Tgl Berangkat',type:'date',default:SRIT.Util.todayISO()},{k:'KEMBALI',label:'Tgl Kembali',type:'date',default:SRIT.Util.todayISO()},{k:'TUJUAN',label:'Tujuan'},{k:'PENJEMPUT',label:'Penjemput'},{k:'ALASAN',label:'Alasan',type:'textarea',col:12},{k:'STATUS',label:'Status',type:'select',options:['MENUNGGU','DISETUJUI','DITOLAK','BERANGKAT','KEMBALI','TERLAMBAT','SELESAI'].map(v=>({v,t:v}))}]});
@@ -8878,8 +8962,9 @@ regFeature('izin-keluar',{monitor:{date:'TANGGAL',anak:'ANAK'},title:'Izin Kelua
     {id:'cetak',label:'Cetak Surat Izin Keluar',icon:'bi-printer',cls:'btn-outline-dark',run:function(rec){SRIT.Features['izin-keluar'].cetak(rec);}},
     {id:'setuju',label:'Setujui',icon:'bi-check-lg',cls:'btn-outline-success',show:r=>r.STATUS==='MENUNGGU'&&SRIT.Approval.canIzinAnak(r,'izin-keluar:APPROVE'),run:function(rec,reload){SRIT.Approval.decide('IZIN_KELUAR','izin-keluar',rec,'DISETUJUI',reload,'Izin keluar');}},
     {id:'tolak',label:'Tolak',icon:'bi-x-lg',cls:'btn-outline-danger',show:r=>r.STATUS==='MENUNGGU'&&SRIT.Approval.canIzinAnak(r,'izin-keluar:APPROVE'),run:function(rec,reload){SRIT.Approval.decide('IZIN_KELUAR','izin-keluar',rec,'DITOLAK',reload,'Izin keluar');}},
-    {id:'berangkat',label:'Berangkat',icon:'bi-box-arrow-right',cls:'btn-outline-primary',show:r=>r.STATUS==='DISETUJUI',run:_ikSet('BERANGKAT')},
-    {id:'kembali',label:'Konfirmasi Kembali',icon:'bi-box-arrow-in-left',cls:'btn-outline-info',show:r=>r.STATUS==='BERANGKAT',run:_ikSet('SELESAI')}
+    {id:'berangkat',label:'Berangkat',icon:'bi-box-arrow-right',cls:'btn-outline-primary',show:r=>r.STATUS==='DISETUJUI',run:function(rec,reload){SRIT.Approval.setStatus('IZIN_KELUAR','izin-keluar',rec,'BERANGKAT',reload,'Izin Keluar');}},
+    {id:'kembali',label:'Konfirmasi Kembali',icon:'bi-box-arrow-in-left',cls:'btn-outline-info',show:r=>r.STATUS==='BERANGKAT',run:function(rec,reload){SRIT.Approval.setStatus('IZIN_KELUAR','izin-keluar',rec,'SELESAI',reload,'Izin Keluar');}},
+    {id:'koreksi',label:'Koreksi Status (Super Admin)',icon:'bi-shield-lock',cls:'btn-outline-warning',show:r=>SRIT.Auth.isSuper(),run:function(rec,reload){SRIT.Approval.koreksiStatus('IZIN_KELUAR','izin-keluar',rec,reload,{label:'Izin Keluar',statuses:['MENUNGGU','DISETUJUI','DITOLAK','BERANGKAT','SELESAI']});}}
   ],
   onCreate:d=>{d.NAMA_ANAK=(SRIT.Repo.getById('ANAK',d.ANAK)||{}).NAMA||d.NAMA_ANAK||'';},
   fields:[{k:'ANAK',label:'Anak',type:'select',col:12,options:anakOpts},{k:'TANGGAL',label:'Tanggal',type:'date',default:SRIT.Util.todayISO()},{k:'JAM_BERANGKAT',label:'Jam Berangkat',type:'time'},{k:'JAM_KEMBALI',label:'Jam Pulang',type:'time'},{k:'TUJUAN',label:'Tujuan'},{k:'ALASAN',label:'Alasan',type:'textarea',col:12}]});
@@ -10247,11 +10332,12 @@ SRIT.Features.penghuni={
 //# sourceURL=View_Penilaian.html
 // =====================================================================================================================
 // RAPOR PERKEMBANGAN ANAK  (V1.9.59 - dirombak total; menggantikan Rapor Asrama Permensos 34 indikator & Penilaian Cepat 8 aspek)
-//  1) ANGKET PENILAIAN KARAKTER & PERILAKU (NON-TES): 56 butir, 4 indikator, 16 sub indikator, skala 1-4 (Selalu/Sering/Kadang-kadang/Tidak Pernah),
-//     skor 0-100 = jumlah skor / (butir terjawab x 4) x 100, kategori: 0 Perlu Pembinaan | 56 Cukup | 71 Baik | 86 Sangat Baik.   -> tabel ANGKET_NONAK
-//  2) ASESMEN PERSONAL SISWA ASUH (diisi Wali Asuh): identitas, riwayat kesehatan, kebiasaan khusus, 6 aspek + RTL.            -> tabel ASESMEN_PERSONAL
-//  3) LAPORAN PERKEMBANGAN ANAK DAMPINGAN (cetak): gabungan 1 + 2, ditandatangani Wali Asuh dan Kepala SRT 1 Jombang.
-//  Alur: Angket -> Asesmen (Draf) -> Finalkan (Wali Asuh) -> Diketahui (Kepala Sekolah; dijaga server oleh apGuardRapor_) -> Cetak.
+//  1) ANGKET PENILAIAN KARAKTER & PERILAKU (NON-TES): 56 butir, 4 indikator, 16 sub indikator. V1.9.64: nilai tiap butir DIISI WALI ASUH dalam rasio 0-100
+//     lalu dikonversi dengan rubrik (batas kategori KAT: 0 Perlu Pembinaan | 56 Cukup | 71 Baik | 86 Sangat Baik) menjadi predikat butir (Kurang/Cukup/Baik/Sangat Baik) + deskripsi.
+//     Skor sub indikator / indikator / total = rata-rata nilai butir terisi (0-100).  -> tabel ANGKET_NONAK (JAWABAN = JSON {_v:2, id:nilai}; data lama tanpa _v = skala 1-4, dibaca x25)
+//  2) (V1.9.63) ASESMEN PERSONAL SISWA ASUH tidak lagi bagian rapor: dipindah ke menu Profiling Siswa (tombol "Asesmen personal"), kode di SRIT.Asesmen (View_Profiling.html), tabel tetap ASESMEN_PERSONAL.
+//  3) LAPORAN PERKEMBANGAN ANAK DAMPINGAN (cetak): identitas + hasil angket, ditandatangani Wali Asuh dan Kepala SRT 1 Jombang.
+//  Alur rapor: Angket -> Cetak.  Alur asesmen (di Profiling): Draf -> Finalkan (Wali Asuh) -> Diketahui (Kepala Sekolah; dijaga server oleh apGuardRapor_).
 // Data lama (RAPOR_ASRAMA, PENILAIAN) TIDAK dihapus; hanya tidak dipakai menu ini lagi.
 // =====================================================================================================================
 SRIT.Rapor=(function(){
@@ -10270,6 +10356,13 @@ SRIT.Rapor=(function(){
     {min:71,k:'Baik',cls:'st-IZIN',tafsir:'Perilaku sudah konsisten pada sebagian besar aspek',tl:'Pertahankan dan perkuat'},
     {min:86,k:'Sangat Baik',cls:'st-HADIR',tafsir:'Perilaku konsisten dan menjadi kebiasaan',tl:'Jadikan teladan / beri peran lebih'}];
   const kategori=s=>{let r=KAT[0];KAT.forEach(x=>{if(s>=x.min)r=x;});return r;};
+  // KONVERSI RUBRIK (V1.9.64): nilai butir 0-100 -> predikat butir. Pita nilai mengikuti KAT (indeks sejajar):
+  //   Perlu Pembinaan -> Kurang | Cukup -> Cukup | Baik -> Baik | Sangat Baik -> Sangat Baik   (SKALA[3..0] = tafsir dari Rubrik Penilaian)
+  const butir=v=>SKALA[3-KAT.indexOf(kategori(v))];
+  const rentang=i=>i>=KAT.length-1?(KAT[i].min+' – 100'):(KAT[i].min+' – <'+KAT[i+1].min);
+  // nilai butir id pada jawaban j: 0-100 atau null. Format baru {_v:2} = 0-100; data lama (tanpa _v) = skala 1-4 dikonversi x25 (4=100, 3=75, 2=50, 1=25)
+  const nilai=(j,id)=>{const raw=j?j[id]:undefined;if(raw===undefined||raw===null||raw==='')return null;const v=+raw;if(isNaN(v))return null;
+    if(j._v===2)return (v>=0&&v<=100)?v:null;return (v>=1&&v<=4)?v/4*100:null;};
   // 6 aspek Asesmen Personal (Instrumen Asesmen Personal Siswa Asuh). t: pilih (satu pilihan) | multi (boleh lebih dari satu) | kosong = uraian
   const ASPEK=[
     {k:'a1',no:1,nama:'Kedekatan Emosional',f:[
@@ -10302,10 +10395,10 @@ SRIT.Rapor=(function(){
   const parse=v=>{try{const o=JSON.parse(v||'{}');return (o&&typeof o==='object')?o:{};}catch(e){return {};}};
   const r1=v=>Math.round(v*10)/10;
   const fmt=v=>(v===null||v===undefined)?'–':String(r1(v)).replace('.',',');
-  const agg=(list,j)=>{let s=0,n=0;list.forEach(it=>{const v=+j[it.id];if(v>=1&&v<=4){s+=v;n++;}});const raw=n?s/(n*4)*100:null;return {n,total:list.length,raw,skor:raw===null?null:r1(raw),kat:raw===null?null:kategori(raw)};};
+  const agg=(list,j)=>{let s=0,n=0;list.forEach(it=>{const v=nilai(j,it.id);if(v!==null){s+=v;n++;}});const raw=n?s/n:null;return {n,total:list.length,raw,skor:raw===null?null:r1(raw),kat:raw===null?null:kategori(raw)};};
   function hitung(j){j=j||{};return {total:agg(ITEMS,j),ind:IND.map(I=>Object.assign({k:I.k,nama:I.nama,pendek:PENDEK[I.k]},agg(I.items,j),{subs:I.subs.map(S=>Object.assign({k:S.k,nama:S.nama},agg(S.items,j)))}))};}
-  const tafsir=v=>(SKALA.find(x=>x.v===+v)||{}).tafsir||'';
-  const deskripsi=(it,v)=>tafsir(v)?it.d+': '+tafsir(v):'';
+  const tafsir=v=>butir(v).tafsir;
+  const deskripsi=(it,v)=>(v===null||v===undefined||isNaN(+v))?'':it.d+': '+tafsir(+v);
   // tahun ajaran Juli-Juni: Juli-Des = Ganjil, Jan-Jun = Genap
   const periodeDefault=()=>{const d=new Date(),y=d.getFullYear(),m=d.getMonth()+1;return m>=7?(y+'/'+(y+1)+' Ganjil'):((y-1)+'/'+y+' Genap');};
   const periodeSebelum=p=>{const m=/^(\d{4})\/(\d{4}) (Ganjil|Genap)$/.exec(p||'');if(!m)return '';const a=+m[1];return m[3]==='Genap'?(a+'/'+(a+1)+' Ganjil'):((a-1)+'/'+a+' Genap');};
@@ -10317,11 +10410,11 @@ SRIT.Rapor=(function(){
   const anakInfo=a=>{const km=SRIT.Repo.getById('KAMAR',a.KAMAR)||{},w=SRIT.Asuh.waliAnak(a);
     return {nama:a.NAMA||'',nis:[a.NIS,a.NISN].filter(Boolean).join(' / '),umur:umur(a.TANGGAL_LAHIR),kelas:[a.KELAS,a.JENJANG,km.NAME].filter(Boolean).join(' / '),
       wali:w?SRIT.Asuh.nama(w):'',waliId:w||'',asal:[a.DESA,a.KECAMATAN].filter(Boolean).join(', ')||a.ALAMAT||''};};
-  return {IND,ITEMS,PENDEK,SKALA,KAT,ASPEK,NARASI,kategori,hitung,fmt,parse,tafsir,deskripsi,periodeDefault,periodeSebelum,periodeList,umur,tglPanjang,anakInfo};
+  return {IND,ITEMS,PENDEK,SKALA,KAT,ASPEK,NARASI,kategori,butir,rentang,nilai,hitung,fmt,parse,tafsir,deskripsi,periodeDefault,periodeSebelum,periodeList,umur,tglPanjang,anakInfo};
 })();
 
 SRIT.Features.penilaian={
-  state:{tab:'rapor',q:'',jenjang:'',wali:'',status:'',periode:'',page:1,size:20},
+  state:{tab:'rapor',q:'',jenjang:'',wali:'',periode:'',page:1,size:20},
   // ---------- siapa saya? Wali asuh hanya melihat anak asuhnya sendiri (kecuali Super Admin / pemegang izin Kelola) ----------
   _me(){return (SRIT.Auth.user||{}).ID||'';},
   _isWali(){const id=this._me();return !!id&&SRIT.Store.read('WALI_ASUH').some(w=>w.ID===id);},
@@ -10329,9 +10422,6 @@ SRIT.Features.penilaian={
   _anak(){const me=this._me(),all=SRIT.Store.read('ANAK').filter(a=>SRIT.Asuh.aktif(a));return this._scoped()?all.filter(a=>SRIT.Asuh.waliAnak(a)===me):all;},
   _inScope(a){return !this._scoped()||SRIT.Asuh.waliAnak(a)===this._me();},
   angketOf(aid,p){return SRIT.Store.read('ANGKET_NONAK').find(r=>r.ANAK===aid&&r.PERIODE===p);},
-  asesmenOf(aid,p){return SRIT.Store.read('ASESMEN_PERSONAL').find(r=>r.ANAK===aid&&r.PERIODE===p);},
-  _stBadge(s){return {DRAF:'st-SAKIT',FINAL:'st-IZIN',DIKETAHUI:'st-HADIR'}[s]||'st-BELUM';},
-  _stLabel(s){return {DRAF:'Draf',FINAL:'Final',DIKETAHUI:'Diketahui'}[s]||'Belum diisi';},
 
   render(host){
     const s=this.state;this._host=host;if(!s.periode)s.periode=SRIT.Rapor.periodeDefault();
@@ -10348,112 +10438,87 @@ SRIT.Features.penilaian={
 
   /* =========================== TAB 1: RAPOR ANAK =========================== */
   _rows(){
-    const s=this.state,R=SRIT.Rapor,ak={},as={};
+    const s=this.state,ak={};
     SRIT.Store.read('ANGKET_NONAK').forEach(r=>{if(r.PERIODE===s.periode)ak[r.ANAK]=r;});
-    SRIT.Store.read('ASESMEN_PERSONAL').forEach(r=>{if(r.PERIODE===s.periode)as[r.ANAK]=r;});
     const q=(s.q||'').trim().toLowerCase();
     let rows=this._anak().filter(a=>(!s.jenjang||a.JENJANG===s.jenjang)&&(!s.wali||SRIT.Asuh.waliAnak(a)===s.wali)&&(!q||[a.NAMA,a.NIS,a.NISN,a.KELAS].some(v=>String(v||'').toLowerCase().indexOf(q)>=0)))
-      .map(a=>({a,ak:ak[a.ID],as:as[a.ID]}));
-    if(s.status)rows=rows.filter(r=>s.status==='BELUM'?!r.as:(r.as&&r.as.STATUS===s.status));
+      .map(a=>({a,ak:ak[a.ID]}));
     return rows.sort((x,y)=>String(x.a.NAMA||'').localeCompare(String(y.a.NAMA||''),'id'));
   },
   renderRapor(host){
-    const s=this.state,E=SRIT.Util.esc,canK=SRIT.Approval.canRapor(),wali=SRIT.Store.read('WALI_ASUH').slice().sort((x,y)=>String(x.NAME||'').localeCompare(String(y.NAME||''),'id'));
+    const s=this.state,E=SRIT.Util.esc,wali=SRIT.Store.read('WALI_ASUH').slice().sort((x,y)=>String(x.NAME||'').localeCompare(String(y.NAME||''),'id'));
     host.innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
         <div style="flex:1;min-width:170px"><label class="form-label-sm">Cari anak</label><input class="form-control form-control-sm" id="rpQ" placeholder="Nama / NIS / kelas" value="${E(s.q)}"></div>
         <div style="min-width:170px"><label class="form-label-sm">Periode</label>${this._periodeSel('rpPer')}</div>
         <div style="min-width:110px"><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm" id="rpJj"><option value="">Semua</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${s.jenjang===j?'selected':''}>${j}</option>`).join('')}</select></div>
         ${this._scoped()?'':`<div style="min-width:170px"><label class="form-label-sm">Wali asuh</label><select class="form-select form-select-sm" id="rpWali"><option value="">Semua</option>${wali.map(w=>`<option value="${E(w.ID)}" ${s.wali===w.ID?'selected':''}>${E(w.NAME)}</option>`).join('')}</select></div>`}
-        <div style="min-width:150px"><label class="form-label-sm">Status asesmen</label><select class="form-select form-select-sm" id="rpSt"><option value="">Semua</option>${[['BELUM','Belum diisi'],['DRAF','Draf'],['FINAL','Final'],['DIKETAHUI','Diketahui']].map(x=>`<option value="${x[0]}" ${s.status===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select></div>
       </div>
       <div class="d-flex flex-wrap gap-2 mt-2">
         <button class="btn btn-outline-primary btn-sm" id="rpCetakSemua"><i class="bi bi-printer"></i> Cetak rapor yang tampil</button>
-        <button class="btn btn-outline-secondary btn-sm" id="rpAngketKosong"><i class="bi bi-file-earmark-text"></i> Angket kosong (untuk siswa)</button>
-        <button class="btn btn-outline-secondary btn-sm" id="rpAsesmenKosong"><i class="bi bi-file-earmark-text"></i> Formulir asesmen kosong</button>
-        ${canK?'<button class="btn btn-outline-success btn-sm" id="rpKnow"><i class="bi bi-patch-check"></i> Ketahui semua yang final</button>':''}
+        <button class="btn btn-outline-secondary btn-sm" id="rpAngketKosong"><i class="bi bi-file-earmark-text"></i> Lembar penilaian kosong</button>
       </div>
-      <div class="text-muted-2 mt-2" style="font-size:12px">Alur: <b>Angket</b> (skor 1–4 dari jawaban siswa) → <b>Asesmen</b> oleh wali asuh (Draf → Final) → <b>Diketahui</b> Kepala Sekolah → <b>Cetak</b> Laporan Perkembangan Anak Dampingan.${this._scoped()?' Anda hanya melihat anak asuh Anda.':''}</div></div>
+      <div class="text-muted-2 mt-2" style="font-size:12px">Alur: wali asuh mengisi <b>nilai 0–100</b> tiap butir lewat tombol <b>Angket</b> (dikonversi ke predikat dengan rubrik) → <b>Cetak</b> Laporan Perkembangan Anak Dampingan. Asesmen personal wali asuh dikelola terpisah di menu <b>Profiling Siswa</b> (tombol Asesmen personal).${this._scoped()?' Anda hanya melihat anak asuh Anda.':''}</div></div>
       <div id="rpSum" class="d-flex flex-wrap gap-2 mb-2"></div>
       <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="rpTbl"></table></div><div class="p-3 border-top" id="pnPag"></div></div>`;
     let t;$('#rpQ').oninput=e=>{clearTimeout(t);t=setTimeout(()=>{s.q=e.target.value;s.page=1;this.drawRapor();},300);};
     this._bindPeriode('rpPer',()=>this.renderRapor(host));
     $('#rpJj').onchange=e=>{s.jenjang=e.target.value;s.page=1;this.drawRapor();};
     const w=$('#rpWali');if(w)w.onchange=e=>{s.wali=e.target.value;s.page=1;this.drawRapor();};
-    $('#rpSt').onchange=e=>{s.status=e.target.value;s.page=1;this.drawRapor();};
-    $('#rpCetakSemua').onclick=()=>this.cetakRapor(this._rows().filter(r=>r.ak||r.as).map(r=>r.a.ID));
+    $('#rpCetakSemua').onclick=()=>this.cetakRapor(this._rows().filter(r=>r.ak).map(r=>r.a.ID));
     $('#rpAngketKosong').onclick=()=>this.cetakAngketKosong();
-    $('#rpAsesmenKosong').onclick=()=>this.cetakAsesmenKosong();
-    const k=$('#rpKnow');if(k)k.onclick=()=>this.ketahuiSemua();
     this.drawRapor();
   },
   drawRapor(){
-    const s=this.state,R=SRIT.Rapor,E=SRIT.Util.esc,rows=this._rows(),canC=SRIT.Auth.can('penilaian:CREATE'),canU=SRIT.Auth.can('penilaian:UPDATE'),canK=SRIT.Approval.canRapor();
-    const nAk=rows.filter(r=>r.ak).length,nFin=rows.filter(r=>r.as&&(r.as.STATUS==='FINAL'||r.as.STATUS==='DIKETAHUI')).length,nKn=rows.filter(r=>r.as&&r.as.STATUS==='DIKETAHUI').length;
-    $('#rpSum').innerHTML=[['Anak',rows.length,'st-IZIN'],['Angket terisi',nAk+'/'+rows.length,'st-HADIR'],['Asesmen final',nFin+'/'+rows.length,'st-IZIN'],['Diketahui',nKn+'/'+rows.length,'st-HADIR']].map(x=>`<span class="badge-soft ${x[2]}" style="font-size:12px">${x[0]}: <b>${x[1]}</b></span>`).join('');
+    const s=this.state,R=SRIT.Rapor,E=SRIT.Util.esc,rows=this._rows(),canC=SRIT.Auth.can('penilaian:CREATE'),canU=SRIT.Auth.can('penilaian:UPDATE');
+    const nAk=rows.filter(r=>r.ak).length;
+    $('#rpSum').innerHTML=[['Anak',rows.length,'st-IZIN'],['Angket terisi',nAk+'/'+rows.length,'st-HADIR']].map(x=>`<span class="badge-soft ${x[2]}" style="font-size:12px">${x[0]}: <b>${x[1]}</b></span>`).join('');
     const pages=Math.max(1,Math.ceil(rows.length/s.size));if(s.page>pages)s.page=pages;
     const show=rows.slice((s.page-1)*s.size,s.page*s.size);
-    $('#rpTbl').innerHTML=`<thead><tr><th>Anak</th><th>Wali asuh</th><th>Angket non-akademik</th><th>Asesmen personal</th><th></th></tr></thead><tbody>${
-      show.map(r=>{const a=r.a,w=SRIT.Asuh.waliAnak(a),h=r.ak?R.hitung(R.parse(r.ak.JAWABAN)):null,st=r.as?r.as.STATUS||'DRAF':'';
-        const lock=st==='DIKETAHUI'&&!canK;
+    $('#rpTbl').innerHTML=`<thead><tr><th>Anak</th><th>Wali asuh</th><th>Angket non-akademik</th><th></th></tr></thead><tbody>${
+      show.map(r=>{const a=r.a,w=SRIT.Asuh.waliAnak(a),h=r.ak?R.hitung(R.parse(r.ak.JAWABAN)):null;
         return `<tr><td><div class="fw-semibold">${E(a.NAMA)}</div><div class="text-muted-2" style="font-size:11px">${E([a.KELAS,a.JENJANG].filter(Boolean).join(' · '))}</div></td>
         <td>${w?E(SRIT.Asuh.nama(w)):'<span class="text-muted-2">–</span>'}</td>
         <td>${h?`<span class="badge-soft ${h.total.kat.cls}">${R.fmt(h.total.skor)} · ${h.total.kat.k}</span><div class="text-muted-2" style="font-size:11px">${h.total.n}/${h.total.total} butir</div>`:'<span class="badge-soft st-BELUM">Belum diisi</span>'}</td>
-        <td><span class="badge-soft ${this._stBadge(st)}">${this._stLabel(st)}</span>${r.as&&r.as.STATUS==='DIKETAHUI'&&r.as.DIKETAHUI_OLEH?`<div class="text-muted-2" style="font-size:10px"><i class="bi bi-patch-check-fill text-success"></i> ${E(r.as.DIKETAHUI_OLEH)}</div>`:''}</td>
         <td class="text-end text-nowrap">
           ${(r.ak?canU:canC)?`<button class="btn btn-sm btn-outline-primary py-0" data-act="ak" data-id="${E(a.ID)}"><i class="bi bi-ui-checks"></i> Angket</button>`:''}
-          ${(r.as?canU:canC)&&!lock?`<button class="btn btn-sm btn-outline-primary py-0 ms-1" data-act="as" data-id="${E(a.ID)}"><i class="bi bi-person-lines-fill"></i> Asesmen</button>`:''}
-          ${(r.ak||r.as)?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Cetak rapor" data-act="pr" data-id="${E(a.ID)}"><i class="bi bi-printer"></i></button>`:''}
-          ${st==='FINAL'&&canK?`<button class="btn btn-sm btn-outline-success py-0 ms-1" title="Ketahui (Kepala Sekolah)" data-act="kn" data-id="${E(r.as.ID)}"><i class="bi bi-patch-check"></i></button>`:''}
-          ${st==='DIKETAHUI'&&canK?`<button class="btn btn-sm btn-outline-warning py-0 ms-1" title="Buka kunci" data-act="bk" data-id="${E(r.as.ID)}"><i class="bi bi-unlock"></i></button>`:''}
-        </td></tr>`;}).join('')||'<tr><td colspan="5"><div class="empty-state"><i class="bi bi-journal-check d-block"></i>Tidak ada anak yang cocok dengan filter.</div></td></tr>'}</tbody>`;
+          ${r.ak?`<button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Cetak rapor" data-act="pr" data-id="${E(a.ID)}"><i class="bi bi-printer"></i></button>`:''}
+        </td></tr>`;}).join('')||'<tr><td colspan="4"><div class="empty-state"><i class="bi bi-journal-check d-block"></i>Tidak ada anak yang cocok dengan filter.</div></td></tr>'}</tbody>`;
     $$('#rpTbl [data-act]').forEach(b=>b.onclick=()=>{const id=b.dataset.id,x=b.dataset.act;
-      if(x==='ak')this.formAngket(id);else if(x==='as')this.formAsesmen(id);else if(x==='pr')this.cetakRapor([id]);else if(x==='kn')this.ketahui(id);else this.bukaKunci(id);});
+      if(x==='ak')this.formAngket(id);else if(x==='pr')this.cetakRapor([id]);});
     $('#pnPag').innerHTML=SRIT.UI.pagination({page:s.page,pages:pages,total:rows.length});
     $$('#pnPag [data-pg]').forEach(a=>a.onclick=()=>{s.page=+a.dataset.pg;this.drawRapor();});
-  },
-  ketahui(id){
-    const p=SRIT.Repo.getById('ASESMEN_PERSONAL',id);if(!p||p.STATUS!=='FINAL')return;
-    const st=SRIT.Approval.stamp();SRIT.Repo.update('ASESMEN_PERSONAL',id,{STATUS:'DIKETAHUI',DIKETAHUI_OLEH:st.name,DIKETAHUI_PADA:st.at});
-    SRIT.Audit.log('UPDATE','penilaian',id,{STATUS:'FINAL'},{STATUS:'DIKETAHUI'});SRIT.Cache.invalidate('dash');SRIT.Notify('Rapor diketahui','ok');this.drawRapor();
-  },
-  ketahuiSemua(){
-    const rows=this._rows().filter(r=>r.as&&r.as.STATUS==='FINAL');
-    if(!rows.length){SRIT.Notify('Tidak ada rapor final yang menunggu','info');return;}
-    if(!window.confirm('Tandai '+rows.length+' rapor final periode '+this.state.periode+' sebagai diketahui? Rapor akan dikunci dari perubahan wali asuh.'))return;
-    const st=SRIT.Approval.stamp();rows.forEach(r=>SRIT.Repo.update('ASESMEN_PERSONAL',r.as.ID,{STATUS:'DIKETAHUI',DIKETAHUI_OLEH:st.name,DIKETAHUI_PADA:st.at}));
-    SRIT.Audit.log('UPDATE','penilaian','bulk',null,{STATUS:'DIKETAHUI',JUMLAH:rows.length});SRIT.Cache.invalidate('dash');SRIT.Notify(rows.length+' rapor diketahui','ok');this.drawRapor();
-  },
-  bukaKunci(id){
-    if(!window.confirm('Buka kunci rapor ini? Statusnya kembali FINAL dan perlu diketahui ulang.'))return;
-    SRIT.Repo.update('ASESMEN_PERSONAL',id,{STATUS:'FINAL',DIKETAHUI_OLEH:'',DIKETAHUI_PADA:''});SRIT.Audit.log('UPDATE','penilaian',id,{STATUS:'DIKETAHUI'},{STATUS:'FINAL'});this.drawRapor();
   },
 
   /* =========================== FORM ANGKET NON-AKADEMIK =========================== */
   formAngket(aid){
     const R=SRIT.Rapor,E=SRIT.Util.esc,a=SRIT.Repo.getById('ANAK',aid),p=this.state.periode;if(!a)return;
     if(!this._inScope(a)){SRIT.Notify('Ini bukan anak asuh Anda','warn');return;}
-    const ex=this.angketOf(aid,p),cur=Object.assign({},R.parse(ex&&ex.JAWABAN)),self=this;
-    const item=it=>`<div class="ak-i" data-id="${it.id}"><div style="font-size:13px"><span class="text-muted-2">${it.id}</span> ${E(it.t)}${it.o?' <b title="Khusus pengurus; kosongkan bila bukan pengurus">*</b>':''}</div>
-      <div class="ak-o">${R.SKALA.map(x=>`<label><input type="radio" name="${it.id}" value="${x.v}" ${+cur[it.id]===x.v?'checked':''}><span>${x.l} (${x.v})</span></label>`).join('')}<button type="button" class="btn btn-link btn-sm p-0 ms-1" data-clr="${it.id}" title="Kosongkan jawaban"><i class="bi bi-x-circle"></i></button></div></div>`;
+    const ex=this.angketOf(aid,p),old=R.parse(ex&&ex.JAWABAN),cur={_v:2},self=this;
+    R.ITEMS.forEach(it=>{const v=R.nilai(old,it.id);if(v!==null)cur[it.id]=Math.round(v*100)/100;});   // data lama (1-4) otomatis tampil sebagai 25/50/75/100
+    const pill=v=>{if(v===undefined)return '';const b=R.butir(v);return `<span class="badge-soft ${R.kategori(v).cls}" title="${E(b.tafsir)}">${E(b.pred)}</span>`;};
+    const item=it=>`<div class="ak-i" data-id="${it.id}"><div style="font-size:13px"><span class="text-muted-2">${it.id}</span> ${E(it.d)}${it.o?' <b title="Khusus pengurus; kosongkan bila bukan pengurus">*</b>':''}</div>
+      <div class="ak-o"><input type="number" class="form-control form-control-sm" style="max-width:110px" min="0" max="100" step="any" inputmode="decimal" placeholder="0–100" name="${it.id}" value="${cur[it.id]===undefined?'':cur[it.id]}"><span class="ak-p" data-p="${it.id}">${pill(cur[it.id])}</span></div></div>`;
     const m=SRIT.Modal.open({title:'Angket Non-Akademik: '+a.NAMA,size:'modal-xl',
-      body:`<style>.ak-i{padding:7px 0;border-bottom:1px solid var(--bs-border-color,#e5e7eb)}.ak-o{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;align-items:center}.ak-o label{position:relative;cursor:pointer;margin:0}.ak-o input{position:absolute;opacity:0;pointer-events:none}.ak-o span{display:inline-block;padding:3px 11px;border:1px solid var(--bs-border-color,#cbd5e1);border-radius:14px;font-size:12px}.ak-o input:checked+span{background:var(--srit-primary,#1c6ef2);color:#fff;border-color:transparent}.ak-h{font-weight:700;margin:14px 0 2px;font-size:14px}.ak-s{font-weight:600;margin:8px 0 0;font-size:13px;color:var(--bs-secondary-color,#64748b)}</style>
+      body:`<style>.ak-i{padding:7px 0;border-bottom:1px solid var(--bs-border-color,#e5e7eb)}.ak-o{display:flex;gap:10px;align-items:center;margin-top:4px}.ak-h{font-weight:700;margin:14px 0 2px;font-size:14px}.ak-s{font-weight:600;margin:8px 0 0;font-size:13px;color:var(--bs-secondary-color,#64748b)}</style>
         <div class="row g-2 mb-2"><div class="col-6 col-md-4"><label class="form-label-sm">Anak</label><div class="fw-semibold">${E(a.NAMA)}</div><div class="text-muted-2" style="font-size:11px">${E([a.KELAS,a.JENJANG].filter(Boolean).join(' · '))}</div></div>
         <div class="col-6 col-md-4"><label class="form-label-sm">Periode</label><div class="fw-semibold">${E(p)}</div></div>
         <div class="col-12 col-md-4"><label class="form-label-sm">Tanggal pengisian</label><input type="date" class="form-control form-control-sm" id="akTgl" value="${E((ex&&ex.TANGGAL)||SRIT.Util.todayISO())}"></div></div>
         <div id="akSum" class="p-2 rounded border mb-2" style="position:sticky;top:0;z-index:5;background:var(--bs-body-bg,#fff)"></div>
-        <div class="text-muted-2 mb-1" style="font-size:12px">Pilih satu jawaban yang paling sesuai dengan keadaan anak dalam 1 bulan terakhir: <b>Selalu (4)</b>, <b>Sering (3)</b>, <b>Kadang-kadang (2)</b>, <b>Tidak Pernah (1)</b>. Butir bertanda <b>*</b> khusus pengurus (OSIS / ketua asrama / ketua kamar); kosongkan bila bukan pengurus, tidak menurunkan skor.</div>
+        <div class="text-muted-2 mb-1" style="font-size:12px">Wali asuh mengisi <b>nilai 0–100</b> (boleh desimal) untuk tiap perilaku berdasarkan pengamatan 1 bulan terakhir. Predikat butir muncul otomatis dari rubrik: ${R.KAT.map((k,i)=>({i,k})).reverse().map(x=>`<b>${E(R.SKALA[3-x.i].pred)}</b> (${R.rentang(x.i)})`).join(' · ')}. Butir bertanda <b>*</b> khusus pengurus (OSIS / ketua asrama / ketua kamar); kosongkan bila bukan pengurus, tidak menurunkan skor.</div>
         ${R.IND.map(I=>`<div class="ak-h">${I.k}. ${E(I.nama)}</div>${I.subs.map(S=>`<div class="ak-s">${E(S.nama)}</div>${S.items.map(item).join('')}`).join('')}`).join('')}`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary btn-sm" id="akSave"><i class="bi bi-check2-circle"></i> Simpan Angket</button>`});
     const el=m.el;
     const sum=()=>{const h=R.hitung(cur);$('#akSum',el).innerHTML=`<div style="font-size:13px"><b>Terisi ${h.total.n}/${h.total.total}</b> · Skor total <b>${R.fmt(h.total.skor)}</b> ${h.total.kat?`<span class="badge-soft ${h.total.kat.cls}">${h.total.kat.k}</span>`:''}</div>
       <div class="d-flex flex-wrap gap-1 mt-1">${h.ind.map(i=>`<span class="badge-soft ${i.kat?i.kat.cls:'st-BELUM'}" style="font-size:11px" title="${E(i.nama)}">${E(i.pendek)}: ${R.fmt(i.skor)}</span>`).join('')}</div>`;};
-    $$('input[type=radio]',el).forEach(r=>r.onchange=()=>{cur[r.name]=+r.value;sum();});
-    $$('[data-clr]',el).forEach(b=>b.onclick=()=>{const id=b.dataset.clr;delete cur[id];$$('input[name="'+id+'"]',el).forEach(r=>{r.checked=false;});sum();});
+    $$('input[type=number]',el).forEach(inp=>inp.oninput=()=>{const id=inp.name,s=inp.value.trim(),v=s===''?NaN:+s,ok=s===''||(v>=0&&v<=100);
+      inp.classList.toggle('is-invalid',!ok);if(s===''||!ok)delete cur[id];else cur[id]=v;
+      $('[data-p="'+id+'"]',el).innerHTML=(s===''||!ok)?'':pill(v);sum();});
     sum();
     $('#akSave',el).onclick=()=>{
+      if($$('.is-invalid',el).length){SRIT.Notify('Ada nilai di luar rentang 0–100, perbaiki dulu','warn');return;}
       const h=R.hitung(cur);if(!h.total.n){SRIT.Notify('Isi minimal satu butir','warn');return;}
-      const kosong=R.ITEMS.filter(it=>!it.o&&!(cur[it.id]>=1)).length;
-      if(kosong&&!window.confirm(kosong+' butir (selain butir pengurus *) belum dijawab. Skor dihitung dari butir yang terjawab saja. Tetap simpan?'))return;
+      const kosong=R.ITEMS.filter(it=>!it.o&&R.nilai(cur,it.id)===null).length;
+      if(kosong&&!window.confirm(kosong+' butir (selain butir pengurus *) belum dinilai. Skor dihitung dari butir yang terisi saja. Tetap simpan?'))return;
       const row={ANAK:aid,NAMA_ANAK:a.NAMA,PERIODE:p,TANGGAL:$('#akTgl',el).value||SRIT.Util.todayISO(),JENJANG:a.JENJANG||'',JAWABAN:JSON.stringify(cur),SKOR:h.total.skor,KATEGORI:h.total.kat.k,TERISI:h.total.n,PENGISI:(SRIT.Auth.user||{}).NAME||'',DIUBAH_PADA:new Date().toISOString()};
       if(ex){SRIT.Repo.update('ANGKET_NONAK',ex.ID,row);SRIT.Audit.log('UPDATE','penilaian',ex.ID,null,{tabel:'ANGKET_NONAK',skor:row.SKOR});}
       else{const id=SRIT.Util.uid('ANG');SRIT.Repo.insert('ANGKET_NONAK',Object.assign({ID:id},row));SRIT.Audit.log('CREATE','penilaian',id,null,{tabel:'ANGKET_NONAK',skor:row.SKOR});}
@@ -10461,11 +10526,210 @@ SRIT.Features.penilaian={
     };
   },
 
-  /* =========================== FORM ASESMEN PERSONAL (Wali Asuh) =========================== */
-  formAsesmen(aid){
-    const R=SRIT.Rapor,E=SRIT.Util.esc,a=SRIT.Repo.getById('ANAK',aid),p=this.state.periode,self=this;if(!a)return;
-    if(!this._inScope(a)){SRIT.Notify('Ini bukan anak asuh Anda','warn');return;}
-    const ex=this.asesmenOf(aid,p);
+  /* =========================== TAB 2: REKAP & EKSPOR =========================== */
+  _rekapRows(){
+    const s=this.state,R=SRIT.Rapor,ak={};SRIT.Store.read('ANGKET_NONAK').forEach(r=>{if(r.PERIODE===s.periode)ak[r.ANAK]=r;});
+    return this._anak().filter(a=>(!s.jenjang||a.JENJANG===s.jenjang)&&ak[a.ID]).map(a=>({a,ak:ak[a.ID],h:R.hitung(R.parse(ak[a.ID].JAWABAN))}))
+      .sort((x,y)=>String(x.a.NAMA||'').localeCompare(String(y.a.NAMA||''),'id'));
+  },
+  renderRekap(host){
+    const s=this.state,R=SRIT.Rapor,E=SRIT.Util.esc,rows=this._rekapRows(),canX=SRIT.Auth.can('penilaian:EXPORT')||SRIT.Auth.isSuper();
+    const avg=l=>{const v=l.filter(x=>x!==null&&x!==undefined);return v.length?v.reduce((p,c)=>p+c,0)/v.length:null;};
+    const tot=avg(rows.map(r=>r.h.total.raw)),dist=R.KAT.map(k=>({k,n:rows.filter(r=>r.h.total.kat&&r.h.total.kat.k===k.k).length}));
+    const bar=(v)=>v===null?'':`<div style="height:6px;background:#e5e7eb;border-radius:3px;min-width:90px"><div style="height:6px;width:${Math.max(0,Math.min(100,v))}%;background:var(--srit-primary,#1c6ef2);border-radius:3px"></div></div>`;
+    host.innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
+        <div style="min-width:170px"><label class="form-label-sm">Periode</label>${this._periodeSel('rkPer')}</div>
+        <div style="min-width:110px"><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm" id="rkJj"><option value="">Semua</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${s.jenjang===j?'selected':''}>${j}</option>`).join('')}</select></div>
+        ${canX?`<div class="d-flex gap-2 align-items-end"><button class="btn btn-outline-primary btn-sm" id="rkCsv" ${rows.length?'':'disabled'}><i class="bi bi-download"></i> Unduh rekap (CSV)</button><button class="btn btn-primary btn-sm" id="rkTplX" ${rows.length?'':'disabled'}><i class="bi bi-file-earmark-excel"></i> Ekspor Template Nilai (Excel)</button><button class="btn btn-outline-primary btn-sm" id="rkTpl" ${rows.length?'':'disabled'}><i class="bi bi-download"></i> Template nilai (CSV)</button></div>`:''}
+      </div><div class="text-muted-2 mt-2" style="font-size:12px">${rows.length} anak dengan angket terisi pada periode ini. Template nilai (untuk diunggah ke aplikasi Kemensos): sheet <code>Template Nilai</code> dengan kolom <code>nik, nisn, nama_siswa, {id}_nilai, {id}_deskripsi</code>; <code>_nilai</code> = nilai 0–100 yang diisi wali asuh, <code>_deskripsi</code> = detail indikator + interpretasi rubrik sesuai nilai. Mengikuti filter periode &amp; jenjang di atas.</div></div>
+      ${rows.length?`<div class="row g-3 mb-3"><div class="col-12 col-lg-4"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Ringkasan</div>
+        <div style="font-size:28px;font-weight:700">${R.fmt(tot)}</div><div class="text-muted-2" style="font-size:12px">rata-rata skor total (0–100)</div>
+        <div class="mt-2 d-flex flex-wrap gap-1">${dist.map(d=>`<span class="badge-soft ${d.k.cls}">${d.k.k}: <b>${d.n}</b></span>`).join('')}</div></div></div>
+        <div class="col-12 col-lg-8"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Rata-rata per indikator &amp; sub indikator</div><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12.5px"><tbody>${R.IND.map((I,ii)=>{
+          const iv=avg(rows.map(r=>r.h.ind[ii].raw));return `<tr class="table-light"><td class="fw-semibold">${I.k}. ${E(I.nama)}</td><td class="fw-semibold text-end">${R.fmt(iv)}</td><td style="width:110px">${bar(iv)}</td></tr>`+I.subs.map((S,si)=>{const sv=avg(rows.map(r=>r.h.ind[ii].subs[si].raw));return `<tr><td class="ps-3">${E(S.nama)}</td><td class="text-end">${R.fmt(sv)}</td><td>${bar(sv)}</td></tr>`;}).join('');}).join('')}</tbody></table></div></div></div></div>
+      <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0"><thead><tr><th>Anak</th><th>Kelas</th>${R.IND.map(I=>`<th title="${E(I.nama)}">${I.k}</th>`).join('')}<th>Skor total</th><th>Kategori</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="fw-semibold">${E(r.a.NAMA)}</td><td>${E([r.a.KELAS,r.a.JENJANG].filter(Boolean).join(' · '))}</td>${r.h.ind.map(i=>`<td>${R.fmt(i.skor)}</td>`).join('')}<td class="fw-bold">${R.fmt(r.h.total.skor)}</td><td>${r.h.total.kat?`<span class="badge-soft ${r.h.total.kat.cls}">${r.h.total.kat.k}</span>`:''}</td></tr>`).join('')}</tbody></table></div></div>`
+      :'<div class="card-srit p-4"><div class="empty-state"><i class="bi bi-bar-chart-line d-block"></i>Belum ada angket terisi pada periode ini.</div></div>'}`;
+    this._bindPeriode('rkPer',()=>this.renderRekap(host));
+    $('#rkJj').onchange=e=>{s.jenjang=e.target.value;this.renderRekap(host);};
+    const c=$('#rkCsv');if(c)c.onclick=()=>this.unduhRekap(rows);
+    const t=$('#rkTpl');if(t)t.onclick=()=>this.unduhTemplate(rows);
+    const tx=$('#rkTplX');if(tx)tx.onclick=()=>this.unduhTemplateXlsx(rows);
+  },
+  _csv(rows){return rows.map(r=>r.map(c=>{c=(c===null||c===undefined)?'':String(c);return /[",\n\r]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(',')).join('\r\n');},
+  _unduh(nama,teks){const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent('\uFEFF'+teks);a.download=nama;document.body.appendChild(a);a.click();a.remove();},
+  unduhRekap(rows){
+    const R=SRIT.Rapor,fn=x=>x===null||x===undefined?'':String(x).replace('.',',');
+    const head=['No','Nama','NIS','NISN','Kelas','Jenjang'].concat(R.IND.map(I=>I.nama)).concat(R.IND.reduce((l,I)=>l.concat(I.subs.map(S=>S.nama)),[])).concat(['Skor Total','Kategori','Butir terisi']);
+    const data=rows.map((r,i)=>[i+1,r.a.NAMA,r.a.NIS||'',r.a.NISN||'',r.a.KELAS||'',r.a.JENJANG||''].concat(r.h.ind.map(x=>fn(x.skor))).concat(r.h.ind.reduce((l,I)=>l.concat(I.subs.map(S=>fn(S.skor))),[])).concat([fn(r.h.total.skor),r.h.total.kat?r.h.total.kat.k:'',r.h.total.n]));
+    this._unduh('rekap_angket_'+this.state.periode.replace(/[^0-9A-Za-z]+/g,'_')+'.csv',this._csv([head].concat(data)));SRIT.Audit.log('EXPORT','penilaian','rekap',null,{periode:this.state.periode,jumlah:rows.length});
+  },
+  unduhTemplate(rows){
+    const R=SRIT.Rapor,head=['nik','nisn','nama_siswa'];R.ITEMS.forEach(it=>{head.push(it.id+'_nilai');head.push(it.id+'_deskripsi');});
+    const data=rows.map(r=>{const j=R.parse(r.ak.JAWABAN),row=[r.a.NIK||'',r.a.NISN||'',r.a.NAMA||''];
+      R.ITEMS.forEach(it=>{const v=R.nilai(j,it.id);if(v!==null){row.push(Math.round(v*100)/100);row.push(R.deskripsi(it,v));}else{row.push('');row.push('');}});return row;});
+    this._unduh('template_nilai_'+this.state.periode.replace(/[^0-9A-Za-z]+/g,'_')+'.csv',this._csv([head].concat(data)));SRIT.Audit.log('EXPORT','penilaian','template-nilai',null,{periode:this.state.periode,jumlah:rows.length});
+  },
+
+  // Ekspor Excel: satu sheet "Template Nilai" (susunan kolom sama dengan sheet Template Nilai pada angket_penilaian_non_akademik.xlsx)
+  unduhTemplateXlsx(rows){
+    const R=SRIT.Rapor;
+    if(typeof XLSX==='undefined'){SRIT.Notify('Pustaka Excel belum termuat; pakai unduhan CSV','err');return;}
+    if(!rows.length){SRIT.Notify('Belum ada angket terisi pada periode ini','info');return;}
+    const head=['nik','nisn','nama_siswa'];R.ITEMS.forEach(it=>{head.push(it.id+'_nilai');head.push(it.id+'_deskripsi');});
+    let tanpaId=0;
+    const data=rows.map(r=>{const j=R.parse(r.ak.JAWABAN),nik=String(r.a.NIK||'').trim(),nisn=String(r.a.NISN||'').trim();if(!nik||!nisn)tanpaId++;
+      const row=[nik||null,nisn||null,r.a.NAMA||null];   // NIK/NISN tetap teks (angka 0 di depan tidak hilang)
+      R.ITEMS.forEach(it=>{const v=R.nilai(j,it.id);if(v!==null){row.push(Math.round(v*100)/100);row.push(R.deskripsi(it,v));}else{row.push(null);row.push(null);}});return row;});
+    const ws=XLSX.utils.aoa_to_sheet([head].concat(data));
+    ws['!cols']=[{wch:18},{wch:13},{wch:30}].concat(R.ITEMS.reduce(l=>l.concat([{wch:11},{wch:58}]),[]));
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Template Nilai');
+    XLSX.writeFile(wb,'Template_Nilai_'+this.state.periode.replace(/[^0-9A-Za-z]+/g,'_')+(this.state.jenjang?'_'+this.state.jenjang:'')+'.xlsx');
+    SRIT.Audit.log('EXPORT','penilaian','template-nilai-xlsx',null,{periode:this.state.periode,jenjang:this.state.jenjang||'',jumlah:rows.length});
+    SRIT.Notify(rows.length+' anak diekspor'+(tanpaId?' · '+tanpaId+' anak belum punya NIK/NISN (kolom dikosongkan)':''),tanpaId?'warn':'ok');
+  },
+
+  /* =========================== TAB 3: RUBRIK & PANDUAN =========================== */
+  renderPanduan(host){
+    const R=SRIT.Rapor,E=SRIT.Util.esc;
+    host.innerHTML=`<div class="row g-3"><div class="col-12 col-lg-6"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Konversi nilai butir (0–100) ke predikat</div><table class="table table-sm mb-0" style="font-size:13px"><thead><tr><th>Nilai</th><th>Predikat butir</th><th>Tafsir (deskripsi template nilai)</th></tr></thead><tbody>${R.KAT.map((k,i)=>({i,k})).reverse().map(x=>`<tr><td><b>${R.rentang(x.i)}</b></td><td><span class="badge-soft ${x.k.cls}">${E(R.SKALA[3-x.i].pred)}</span></td><td>${E(R.SKALA[3-x.i].tafsir)}</td></tr>`).join('')}</tbody></table>
+        <div class="text-muted-2 mt-2" style="font-size:12px">Wali asuh mengisi nilai 0–100 per butir. Skor sub indikator / indikator / total = rata-rata nilai butir terisi (0–100), butir dibobot sama. Butir kosong (mis. butir pengurus *) tidak dihitung. Data lama berskala 1–4 dibaca sebagai 25 / 50 / 75 / 100.</div></div></div>
+      <div class="col-12 col-lg-6"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Kategori hasil (berlaku untuk sub indikator, indikator, dan total)</div><table class="table table-sm mb-0" style="font-size:13px"><thead><tr><th>Skor ≥</th><th>Kategori</th><th>Interpretasi</th><th>Tindak lanjut</th></tr></thead><tbody>${R.KAT.map(k=>`<tr><td><b>${k.min}</b></td><td><span class="badge-soft ${k.cls}">${k.k}</span></td><td>${E(k.tafsir)}</td><td>${E(k.tl)}</td></tr>`).join('')}</tbody></table></div></div>
+      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Isi angket: 4 indikator · 16 sub indikator · ${R.ITEMS.length} butir</div>${R.IND.map(I=>`<div class="mb-2"><div class="fw-semibold" style="font-size:13px">${I.k}. ${E(I.nama)}</div><div class="text-muted-2" style="font-size:12px">${I.subs.map(S=>E(S.nama)+' ('+S.items.length+')').join(' · ')}</div></div>`).join('')}</div></div>
+      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Cara memakai</div><ol class="mb-0" style="font-size:13px"><li>Pilih <b>periode</b> (semester) di tab Rapor Anak.</li><li>Bila perlu catat dulu di kertas, cetak <b>Lembar penilaian kosong</b>. Wali asuh memasukkan <b>nilai 0–100</b> tiap butir (pengamatan 1 bulan terakhir) lewat tombol <b>Angket</b> pada tiap anak; predikat butir terhitung otomatis dari rubrik.</li><li>Cetak <b>Laporan Perkembangan Anak Dampingan</b> (satu anak atau semua yang tampil). Tab Rekap &amp; Ekspor memuat rata-rata kelas, unduhan CSV rekap, dan <b>Ekspor Template Nilai (Excel)</b> untuk diunggah ke aplikasi Kemensos.</li></ol><div class="text-muted-2 mt-2" style="font-size:12px"><b>Asesmen personal</b> (diisi wali asuh, Draf → Final → Diketahui Kepala Sekolah) tidak lagi di menu ini: buka <b>Profiling Siswa</b>, pilih anak, lalu klik <b>Asesmen personal</b>.</div></div></div></div>`;
+  },
+
+  /* =========================== CETAK =========================== */
+  _css(){return `<style>@page{size:A4;margin:14mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;color:#000;margin:0}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}
+    h1{font-size:13pt;text-align:center;margin:6px 0 2px;letter-spacing:.3px}.sub{text-align:center;font-size:10pt;margin-bottom:8px}h2{font-size:11pt;margin:12px 0 4px}
+    table{border-collapse:collapse;width:100%}.t td,.t th{border:1px solid #000;padding:3px 6px;vertical-align:top;font-size:10pt}.t th{background:#e6e6e6;text-align:center}.t .g{background:#f1f1f1;font-weight:700}
+    .id td{border:0;padding:1px 4px;font-size:10.5pt;vertical-align:top}.id td:first-child{width:34%;white-space:nowrap}.id td:nth-child(2){width:12px}
+    .bar{height:7px;background:#ddd;min-width:70px}.bar i{display:block;height:7px;background:#333}.ttd{display:flex;justify-content:space-between;margin-top:20px;font-size:10.5pt;page-break-inside:avoid}.ttd div{width:46%;text-align:center}
+    .box{border:1px solid #000;padding:6px 8px;font-size:10pt;margin:6px 0}.ket{font-size:9pt;color:#222}.nar{text-align:justify;margin-top:10px;font-size:10.5pt;line-height:1.4}.pre{white-space:pre-line}.ck{display:inline-block;width:12px;height:12px;border:1px solid #000;vertical-align:middle}</style>`;},
+  _buka(){const w=window.open('','_blank');if(!w){SRIT.Notify('Popup diblokir, izinkan popup untuk mencetak','err');return null;}w.document.write('<p style="font-family:sans-serif;padding:20px">Menyiapkan cetakan…</p>');return w;},
+  _tulis(w,judul,isi){w.document.open();w.document.write('<html><head><meta charset="utf-8"><title>'+SRIT.Util.esc(judul)+'</title>'+this._css()+'</head><body>'+isi+'<script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script></body></html>');w.document.close();},
+  _ttd(namaWali,nipWali,tgl){
+    const K=SRIT.Kepsek,E=SRIT.Util.esc,kn=K.nama()||'Andik Minarto, S.Pd',kp=K.nip();
+    return `<div class="ttd"><div>Mengetahui,<br>Kepala SRT 1 Jombang<br><br><br><br><b><u>${E(kn)}</u></b><br>NIP. ${E(kp||'………………………')}</div><div>Jombang, ${tgl?E(SRIT.Rapor.tglPanjang(tgl)):'……………… 2026'}<br>Wali Asuh<br><br><br><br><b><u>${E(namaWali||'…………………………………')}</u></b><br>NIP. ${E(nipWali||'………………………')}</div></div>`;
+  },
+  _nipWali(id){try{return (SRIT.Store.read('USERS').find(u=>u.ID===id)||{}).NIP||'';}catch(e){return '';}},
+  halamanRapor(a,p){
+    const R=SRIT.Rapor,E=SRIT.Util.esc,info=R.anakInfo(a),ak=this.angketOf(a.ID,p),h=ak?R.hitung(R.parse(ak.JAWABAN)):null,j=R.parse(ak&&ak.JAWABAN);
+    const idr=(l,v)=>`<tr><td>${l}</td><td>:</td><td>${E(v||'')}</td></tr>`;
+    const bar=v=>v===null?'':`<div class="bar"><i style="width:${Math.max(0,Math.min(100,v))}%"></i></div>`;
+    let s=`<section class="pg">${SRIT.Kop.html()}<h1>LAPORAN PERKEMBANGAN ANAK DAMPINGAN</h1><div class="sub">Program Pendampingan dan Bimbingan Wali Asuh · Periode ${E(p)}</div>
+      <h2>I. IDENTITAS SISWA ASUH</h2><table class="id"><tbody>${idr('Nama Lengkap',info.nama)}${idr('NIS / NISN',info.nis)}${idr('Umur',info.umur)}${idr('Kelas / Jenjang / Kamar',info.kelas)}${idr('Periode Evaluasi',p)}${idr('Wali Asuh',info.wali)}${idr('Asal Daerah',info.asal)}</tbody></table>
+      <h2>II. HASIL ANGKET PENILAIAN KARAKTER &amp; PERILAKU (NON-TES)</h2>`;
+    if(!h){s+='<div class="box">Angket non-akademik periode ini belum diisi.</div>';}
+    else{
+      s+=`<div class="box"><b>Skor total: ${R.fmt(h.total.skor)} (${h.total.kat.k})</b> · ${h.total.n} dari ${h.total.total} butir terjawab<br><span class="ket">${E(h.total.kat.tafsir)}. Tindak lanjut: ${E(h.total.kat.tl)}.</span></div>
+      <table class="t"><thead><tr><th style="text-align:left">Indikator / Sub indikator</th><th style="width:60px">Skor</th><th style="width:90px"> </th><th style="width:110px">Kategori</th></tr></thead><tbody>${h.ind.map(i=>`<tr class="g"><td>${i.k}. ${E(i.nama)}</td><td style="text-align:center">${R.fmt(i.skor)}</td><td>${bar(i.skor)}</td><td style="text-align:center">${i.kat?i.kat.k:'–'}</td></tr>`+i.subs.map(x=>`<tr><td style="padding-left:16px">${E(x.nama)}</td><td style="text-align:center">${R.fmt(x.skor)}</td><td>${bar(x.skor)}</td><td style="text-align:center">${x.kat?x.kat.k:'–'}</td></tr>`).join('')).join('')}</tbody></table>`;
+      const nv=it=>R.nilai(j,it.id),perlu=R.ITEMS.filter(it=>nv(it)!==null&&nv(it)<R.KAT[2].min),kuat=R.ITEMS.filter(it=>nv(it)!==null&&nv(it)>=R.KAT[3].min);
+      if(kuat.length)s+=`<div class="ket" style="margin-top:6px"><b>Sangat baik / konsisten:</b> ${kuat.slice(0,8).map(it=>E(it.d)).join('; ')}${kuat.length>8?' dan '+(kuat.length-8)+' lainnya':''}.</div>`;
+      if(perlu.length)s+=`<div class="ket" style="margin-top:4px"><b>Perlu pembiasaan / pembinaan:</b> ${perlu.slice(0,10).map(it=>E(it.d)+' ('+R.butir(nv(it)).pred+')').join('; ')}${perlu.length>10?' dan '+(perlu.length-10)+' lainnya':''}.</div>`;
+    }
+    s+=`<div class="nar">${E(R.NARASI)}</div>${this._ttd(info.wali,this._nipWali(info.waliId),(ak&&ak.TANGGAL)||SRIT.Util.todayISO())}</section>`;
+    return s;
+  },
+  cetakRapor(ids){
+    if(!ids.length){SRIT.Notify('Belum ada rapor yang bisa dicetak (angket masih kosong)','info');return;}
+    if(ids.length>60&&!window.confirm('Mencetak '+ids.length+' rapor sekaligus. Lanjutkan?'))return;
+    const w=this._buka();if(!w)return;const p=this.state.periode;
+    const html=ids.map(id=>SRIT.Repo.getById('ANAK',id)).filter(Boolean).map(a=>this.halamanRapor(a,p)).join('');
+    SRIT.Audit.log('PRINT','penilaian','rapor',null,{periode:p,jumlah:ids.length});this._tulis(w,'Laporan Perkembangan Anak Dampingan '+p,html);
+  },
+  cetakAngketKosong(){
+    const R=SRIT.Rapor,E=SRIT.Util.esc,w=this._buka();if(!w)return;let no=0;
+    const head=`<tr><th style="width:28px">No</th><th style="width:44px">Kode</th><th>Perilaku yang dinilai</th><th style="width:90px">Nilai<br>(0–100)</th><th style="width:90px">Predikat</th></tr>`;
+    const body=R.IND.map(I=>`<tr class="g"><td colspan="5">${I.k}. ${E(I.nama.toUpperCase())}</td></tr>`+I.subs.map(S=>`<tr><td colspan="5" style="font-style:italic;background:#f6f6f6">${E(S.nama)}</td></tr>`+S.items.map(it=>{no++;return `<tr><td style="text-align:center">${no}</td><td style="text-align:center">${it.id}</td><td>${E(it.d)}${it.o?' *':''}</td><td></td><td></td></tr>`;}).join('')).join('')).join('');
+    const rub=R.KAT.map((k,i)=>({i,k})).reverse().map(x=>`<tr><td style="text-align:center">${R.rentang(x.i)}</td><td style="text-align:center"><b>${E(R.SKALA[3-x.i].pred)}</b></td><td>${E(R.SKALA[3-x.i].tafsir)}</td></tr>`).join('');
+    this._tulis(w,'Lembar Penilaian Non-Akademik',`<section class="pg">${SRIT.Kop.html()}<h1>LEMBAR PENILAIAN KARAKTER &amp; PERILAKU SISWA (NON-TES)</h1><div class="sub">Diisi oleh Wali Asuh · Periode ......................................</div>
+      <table class="id" style="margin:8px 0"><tbody><tr><td style="width:60%">Nama : ......................................................</td><td style="width:40%">Kelas : ....................</td></tr><tr><td>NIK / NISN : ..............................................</td><td>Tanggal : ..................</td></tr><tr><td colspan="2">Wali Asuh : ..............................................</td></tr></tbody></table>
+      <div class="box" style="font-size:9.5pt">Petunjuk: Nilailah setiap perilaku anak berdasarkan pengamatan 1 bulan terakhir dengan <b>angka 0–100</b> pada kolom Nilai (boleh desimal); predikat ditentukan dengan rubrik di bawah. (*) Khusus pengurus OSIS/ketua asrama/ketua kamar; kosongkan bila bukan pengurus.</div>
+      <table class="t"><thead>${head}</thead><tbody>${body}</tbody></table>
+      <h2>Rubrik konversi nilai</h2><table class="t"><thead><tr><th style="width:90px">Nilai</th><th style="width:110px">Predikat</th><th>Tafsir</th></tr></thead><tbody>${rub}</tbody></table></section>`);
+  }
+};
+</script>
+
+
+<script>__srit.n('View_Profiling')</script>
+<script>
+//# sourceURL=View_Profiling.html
+// ---------- PROFILING SISWA ----------
+// Perkembangan & seluruh catatan satu anak per Bulan / Tribulan / Semester / Tahun Ajaran (TA = Juli–Juni).
+// Absensi: server (apiProfilAbsen, 1 panggilan per anak per TA, dicache di browser). Layanan lain: cermin tabel (SRIT.Store).
+// ---------- ASESMEN PERSONAL SISWA ASUH (V1.9.63) ----------
+// Dulu bagian Rapor Perkembangan Anak (menu Penilaian & Rapor); sekarang berdiri sendiri dan dibuka dari Profiling Siswa
+// lewat tombol "Asesmen personal". Tabel tetap ASESMEN_PERSONAL (data lama aman). Alur: Draf -> Final (wali asuh) -> Diketahui (Kepala Sekolah).
+// Pembatasan wali asuh (hanya anak asuh sendiri) memakai SRIT.Features.penilaian._inScope; izin tetap modul "penilaian".
+SRIT.Asesmen={
+  _lastP:'',
+  of(aid,p){return SRIT.Store.read('ASESMEN_PERSONAL').find(r=>r.ANAK===aid&&r.PERIODE===p);},
+  stBadge(s){return {DRAF:'st-SAKIT',FINAL:'st-IZIN',DIKETAHUI:'st-HADIR'}[s]||'st-BELUM';},
+  stLabel(s){return {DRAF:'Draf',FINAL:'Final',DIKETAHUI:'Diketahui'}[s]||'Belum diisi';},
+  periodeList(p){const l=SRIT.Rapor.periodeList();if(p&&l.indexOf(p)<0)l.unshift(p);return l;},
+  // tutup modal lebih dulu, baru jalankan fn (menghindari dua modal Bootstrap bertumpuk)
+  _after(m,fn){m.el.addEventListener('hidden.bs.modal',fn,{once:true});m.close();},
+
+  /* ---- jendela utama: pilih periode, lihat status, isi / cetak / ketahui ---- */
+  hub(aid,p){
+    const A=this,R=SRIT.Rapor,E=SRIT.Util.esc,a=SRIT.Repo.getById('ANAK',aid);if(!a)return;
+    if(!SRIT.Features.penilaian._inScope(a)){SRIT.Notify('Ini bukan anak asuh Anda','warn');return;}
+    let cur=p||A._lastP||R.periodeDefault();
+    const m=SRIT.Modal.open({title:'Asesmen Personal: '+E(a.NAMA),size:'modal-lg',body:'<div id="ahBody"></div>',footer:'<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Tutup</button>'});
+    const el=m.el;
+    const draw=()=>{
+      A._lastP=cur;
+      const ex=A.of(aid,cur),st=ex?(ex.STATUS||'DRAF'):'',canK=SRIT.Approval.canRapor(),canW=SRIT.Auth.can(ex?'penilaian:UPDATE':'penilaian:CREATE'),lock=st==='DIKETAHUI'&&!canK;
+      const nFinal=SRIT.Store.read('ASESMEN_PERSONAL').filter(r=>r.PERIODE===cur&&r.STATUS==='FINAL').length;
+      $('#ahBody',el).innerHTML=`<div class="row g-2 align-items-end mb-2">
+          <div class="col-12 col-md-5"><label class="form-label-sm">Periode</label><select class="form-select form-select-sm" id="ahPer">${A.periodeList(cur).map(x=>`<option ${x===cur?'selected':''}>${E(x)}</option>`).join('')}<option value="__baru">+ Periode lain…</option></select></div>
+          <div class="col-12 col-md-7"><label class="form-label-sm">Status asesmen</label><div><span class="badge-soft ${A.stBadge(st)}" style="font-size:13px">${A.stLabel(st)}</span>
+            ${ex?`<span class="text-muted-2 ms-2" style="font-size:12px">${ex.TANGGAL?SRIT.Util.fmtDateShort(String(ex.TANGGAL).slice(0,10)):''}${ex.PENILAI?' · '+E(ex.PENILAI):''}</span>`:''}
+            ${st==='DIKETAHUI'&&ex.DIKETAHUI_OLEH?`<div class="text-muted-2" style="font-size:11px"><i class="bi bi-patch-check-fill text-success"></i> Diketahui ${E(ex.DIKETAHUI_OLEH)}</div>`:''}</div></div></div>
+        ${lock?'<div class="alert alert-warning py-2" style="font-size:12px">Asesmen ini sudah diketahui Kepala Sekolah dan dikunci dari perubahan wali asuh.</div>':''}
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          ${canW&&!lock?`<button class="btn btn-primary btn-sm" id="ahEdit"><i class="bi bi-person-lines-fill"></i> ${ex?'Ubah asesmen':'Isi asesmen'}</button>`:''}
+          ${ex?'<button class="btn btn-outline-secondary btn-sm" id="ahPrint"><i class="bi bi-printer"></i> Cetak asesmen</button>':''}
+          ${st==='FINAL'&&canK?'<button class="btn btn-outline-success btn-sm" id="ahKn"><i class="bi bi-patch-check"></i> Ketahui</button>':''}
+          ${st==='DIKETAHUI'&&canK?'<button class="btn btn-outline-warning btn-sm" id="ahBk"><i class="bi bi-unlock"></i> Buka kunci</button>':''}
+          <button class="btn btn-outline-secondary btn-sm" id="ahBlank"><i class="bi bi-file-earmark-text"></i> Formulir kosong</button>
+          ${canK&&nFinal?`<button class="btn btn-outline-success btn-sm" id="ahKnAll"><i class="bi bi-patch-check"></i> Ketahui semua yang final (${nFinal})</button>`:''}
+        </div>
+        <div class="text-muted-2" style="font-size:12px">Asesmen personal berdiri sendiri, terpisah dari Rapor Perkembangan Anak. Alur: <b>Draf</b> → <b>Final</b> (wali asuh) → <b>Diketahui</b> (Kepala Sekolah). Berisi identitas, riwayat kesehatan, kebiasaan khusus, dan 6 aspek asesmen.</div>`;
+      $('#ahPer',el).onchange=e=>{let v=e.target.value;if(v==='__baru'){v=(window.prompt('Tulis periode, contoh: 2026/2027 Ganjil',cur)||'').trim();if(!v){e.target.value=cur;return;}}cur=v;draw();};
+      const b=id=>$('#'+id,el);
+      if(b('ahEdit'))b('ahEdit').onclick=()=>A._after(m,()=>A.form(aid,cur));
+      if(b('ahPrint'))b('ahPrint').onclick=()=>A.cetak(aid,cur);
+      if(b('ahKn'))b('ahKn').onclick=()=>{A.ketahui(ex.ID);draw();};
+      if(b('ahBk'))b('ahBk').onclick=()=>{A.bukaKunci(ex.ID);draw();};
+      if(b('ahBlank'))b('ahBlank').onclick=()=>A.cetakKosong();
+      if(b('ahKnAll'))b('ahKnAll').onclick=()=>{A.ketahuiSemua(cur);draw();};
+    };
+    draw();
+  },
+  ketahui(id){
+    const p=SRIT.Repo.getById('ASESMEN_PERSONAL',id);if(!p||p.STATUS!=='FINAL')return;
+    const st=SRIT.Approval.stamp();SRIT.Repo.update('ASESMEN_PERSONAL',id,{STATUS:'DIKETAHUI',DIKETAHUI_OLEH:st.name,DIKETAHUI_PADA:st.at});
+    SRIT.Audit.log('UPDATE','penilaian',id,{STATUS:'FINAL'},{STATUS:'DIKETAHUI'});SRIT.Cache.invalidate('dash');SRIT.Notify('Asesmen diketahui','ok');
+  },
+  ketahuiSemua(p){
+    const rows=SRIT.Store.read('ASESMEN_PERSONAL').filter(r=>r.PERIODE===p&&r.STATUS==='FINAL');
+    if(!rows.length){SRIT.Notify('Tidak ada asesmen final yang menunggu','info');return;}
+    if(!window.confirm('Tandai '+rows.length+' asesmen final periode '+p+' sebagai diketahui? Asesmen akan dikunci dari perubahan wali asuh.'))return;
+    const st=SRIT.Approval.stamp();rows.forEach(r=>SRIT.Repo.update('ASESMEN_PERSONAL',r.ID,{STATUS:'DIKETAHUI',DIKETAHUI_OLEH:st.name,DIKETAHUI_PADA:st.at}));
+    SRIT.Audit.log('UPDATE','penilaian','bulk',null,{STATUS:'DIKETAHUI',JUMLAH:rows.length,tabel:'ASESMEN_PERSONAL'});SRIT.Cache.invalidate('dash');SRIT.Notify(rows.length+' asesmen diketahui','ok');
+  },
+  bukaKunci(id){
+    if(!window.confirm('Buka kunci asesmen ini? Statusnya kembali FINAL dan perlu diketahui ulang.'))return;
+    SRIT.Repo.update('ASESMEN_PERSONAL',id,{STATUS:'FINAL',DIKETAHUI_OLEH:'',DIKETAHUI_PADA:''});SRIT.Audit.log('UPDATE','penilaian',id,{STATUS:'DIKETAHUI'},{STATUS:'FINAL'});SRIT.Notify('Kunci dibuka','ok');
+  },
+
+  /* ---- formulir isian (dipindah dari View_Penilaian) ---- */
+  form(aid,p){
+    const R=SRIT.Rapor,E=SRIT.Util.esc,a=SRIT.Repo.getById('ANAK',aid),A=this;if(!a)return;
+    if(!SRIT.Features.penilaian._inScope(a)){SRIT.Notify('Ini bukan anak asuh Anda','warn');return;}
+    const ex=A.of(aid,p);
     if(ex&&ex.STATUS==='DIKETAHUI'&&!SRIT.Approval.canRapor()){SRIT.Notify('Rapor sudah diketahui Kepala Sekolah dan dikunci','warn');return;}
     const info=R.anakInfo(a),asp=R.parse(ex&&ex.ASPEK),canK=SRIT.Approval.canRapor();
     const val=(A,f)=>((asp[A.k]||{})[f.k])||'';
@@ -10473,7 +10737,7 @@ SRIT.Features.penilaian={
       if(f.t==='pilih')return `<div class="col-12 col-md-6"><label class="form-label-sm">${E(f.l)}</label><select class="form-select form-select-sm" name="${n}"><option value="">– pilih –</option>${f.o.map(o=>`<option ${v===o?'selected':''}>${E(o)}</option>`).join('')}</select></div>`;
       if(f.t==='multi'){const set=v.split(',').map(x=>x.trim()).filter(Boolean);return `<div class="col-12 col-md-6"><label class="form-label-sm">${E(f.l)}</label><div class="d-flex flex-wrap gap-2">${f.o.map(o=>`<label style="font-size:13px"><input type="checkbox" name="${n}" value="${E(o)}" ${set.indexOf(o)>=0?'checked':''}> ${E(o)}</label>`).join('')}</div></div>`;}
       return `<div class="col-12"><div class="d-flex justify-content-between align-items-end"><label class="form-label-sm mb-1">${E(f.l)}</label>${f.sys==='pelanggaran'?'<button type="button" class="btn btn-sm btn-outline-secondary py-0" id="asPel"><i class="bi bi-arrow-down-circle"></i> Ambil dari catatan pelanggaran</button>':''}</div><textarea class="form-control form-control-sm" rows="2" name="${n}">${E(v)}</textarea></div>`;};
-    const hk=R.hitung(R.parse((this.angketOf(aid,p)||{}).JAWABAN)),ketAkt=hk.total.n?`Skor angket ${R.fmt(hk.total.skor)} (${hk.total.kat.k}) · ${hk.ind.map(i=>E(i.pendek)+' '+R.fmt(i.skor)).join(' · ')}`:'Angket non-akademik periode ini belum diisi.';
+    const hk=R.hitung(R.parse((SRIT.Features.penilaian.angketOf(aid,p)||{}).JAWABAN)),ketAkt=hk.total.n?`Skor angket ${R.fmt(hk.total.skor)} (${hk.total.kat.k}) · ${hk.ind.map(i=>E(i.pendek)+' '+R.fmt(i.skor)).join(' · ')}`:'Angket non-akademik periode ini belum diisi.';
     const m=SRIT.Modal.open({title:'Asesmen Personal: '+a.NAMA,size:'modal-xl',
       body:`<form id="asForm" onsubmit="return false">
         <div class="alert alert-info py-2" style="font-size:12px;margin-bottom:10px"><i class="bi bi-info-circle"></i> Diisi individual oleh Wali Asuh untuk setiap siswa asuh. Hasilnya menjadi bahan utama Rapat Koordinasi Wali Asuh. ${E(ketAkt)}</div>
@@ -10492,9 +10756,10 @@ SRIT.Features.penilaian={
         </div>
         ${R.ASPEK.map(A=>`<div class="mt-3 p-2 rounded border"><div class="fw-bold mb-1">${A.no}. ${E(A.nama)}</div><div class="row g-2">${A.f.map(f=>fld(A,f)).join('')}
           <div class="col-12"><label class="form-label-sm">Catatan detail</label><textarea class="form-control form-control-sm" rows="3" name="${A.k}__catatan">${E(((asp[A.k]||{}).catatan)||'')}</textarea></div></div></div>`).join('')}
-        <div class="text-muted-2 mt-2" style="font-size:12px">Penilai: ${E((SRIT.Auth.user||{}).NAME||'')} · Status sekarang: <b>${this._stLabel(ex&&ex.STATUS)}</b>${ex&&ex.STATUS==='DIKETAHUI'&&canK?' (menyimpan akan membuka kunci; perlu diketahui ulang)':''}</div></form>`,
+        <div class="text-muted-2 mt-2" style="font-size:12px">Penilai: ${E((SRIT.Auth.user||{}).NAME||'')} · Status sekarang: <b>${A.stLabel(ex&&ex.STATUS)}</b>${ex&&ex.STATUS==='DIKETAHUI'&&canK?' (menyimpan akan membuka kunci; perlu diketahui ulang)':''}</div></form>`,
       footer:`<button class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-outline-primary btn-sm" id="asDraf">Simpan Draf</button><button class="btn btn-primary btn-sm" id="asFinal"><i class="bi bi-check2-circle"></i> Finalkan</button>`});
     const el=m.el;
+    el.addEventListener('hidden.bs.modal',()=>A.hub(aid,p),{once:true});
     const collect=()=>{const o={};R.ASPEK.forEach(A=>{o[A.k]={};A.f.forEach(f=>{const n=A.k+'__'+f.k;
       if(f.t==='multi')o[A.k][f.k]=$$('[name="'+n+'"]:checked',el).map(x=>x.value).join(', ');
       else o[A.k][f.k]=((($('[name="'+n+'"]',el)||{}).value)||'').trim();});
@@ -10519,140 +10784,44 @@ SRIT.Features.penilaian={
         RIWAYAT_KESEHATAN:fv('RIWAYAT_KESEHATAN'),KEBIASAAN_KHUSUS:fv('KEBIASAAN_KHUSUS'),ASPEK:JSON.stringify(o),STATUS:status,PENILAI:(SRIT.Auth.user||{}).NAME||'',DIUBAH_PADA:new Date().toISOString()};
       if(ex){SRIT.Repo.update('ASESMEN_PERSONAL',ex.ID,row);SRIT.Audit.log('UPDATE','penilaian',ex.ID,{STATUS:ex.STATUS},{STATUS:status,tabel:'ASESMEN_PERSONAL'});}
       else{const id=SRIT.Util.uid('ASP');SRIT.Repo.insert('ASESMEN_PERSONAL',Object.assign({ID:id},row));SRIT.Audit.log('CREATE','penilaian',id,null,{STATUS:status,tabel:'ASESMEN_PERSONAL'});}
-      SRIT.Cache.invalidate('dash');m.close();SRIT.Notify(status==='FINAL'?'Asesmen difinalkan':'Draf asesmen tersimpan','ok');self.render(self._host);
+      SRIT.Cache.invalidate('dash');m.close();SRIT.Notify(status==='FINAL'?'Asesmen difinalkan':'Draf asesmen tersimpan','ok');
     };
     $('#asDraf',el).onclick=()=>simpan('DRAF');$('#asFinal',el).onclick=()=>simpan('FINAL');
   },
 
-  /* =========================== TAB 2: REKAP & EKSPOR =========================== */
-  _rekapRows(){
-    const s=this.state,R=SRIT.Rapor,ak={};SRIT.Store.read('ANGKET_NONAK').forEach(r=>{if(r.PERIODE===s.periode)ak[r.ANAK]=r;});
-    return this._anak().filter(a=>(!s.jenjang||a.JENJANG===s.jenjang)&&ak[a.ID]).map(a=>({a,ak:ak[a.ID],h:R.hitung(R.parse(ak[a.ID].JAWABAN))}))
-      .sort((x,y)=>String(x.a.NAMA||'').localeCompare(String(y.a.NAMA||''),'id'));
-  },
-  renderRekap(host){
-    const s=this.state,R=SRIT.Rapor,E=SRIT.Util.esc,rows=this._rekapRows(),canX=SRIT.Auth.can('penilaian:EXPORT')||SRIT.Auth.isSuper();
-    const avg=l=>{const v=l.filter(x=>x!==null&&x!==undefined);return v.length?v.reduce((p,c)=>p+c,0)/v.length:null;};
-    const tot=avg(rows.map(r=>r.h.total.raw)),dist=R.KAT.map(k=>({k,n:rows.filter(r=>r.h.total.kat&&r.h.total.kat.k===k.k).length}));
-    const bar=(v)=>v===null?'':`<div style="height:6px;background:#e5e7eb;border-radius:3px;min-width:90px"><div style="height:6px;width:${Math.max(0,Math.min(100,v))}%;background:var(--srit-primary,#1c6ef2);border-radius:3px"></div></div>`;
-    host.innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
-        <div style="min-width:170px"><label class="form-label-sm">Periode</label>${this._periodeSel('rkPer')}</div>
-        <div style="min-width:110px"><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm" id="rkJj"><option value="">Semua</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${s.jenjang===j?'selected':''}>${j}</option>`).join('')}</select></div>
-        ${canX?`<div class="d-flex gap-2 align-items-end"><button class="btn btn-outline-primary btn-sm" id="rkCsv" ${rows.length?'':'disabled'}><i class="bi bi-download"></i> Unduh rekap (CSV)</button><button class="btn btn-outline-primary btn-sm" id="rkTpl" ${rows.length?'':'disabled'}><i class="bi bi-download"></i> Unduh template nilai (CSV)</button></div>`:''}
-      </div><div class="text-muted-2 mt-2" style="font-size:12px">${rows.length} anak dengan angket terisi pada periode ini. Template nilai: kolom <code>nik, nisn, nama_siswa, {id}_nilai, {id}_deskripsi</code> (nilai 0–100 per butir).</div></div>
-      ${rows.length?`<div class="row g-3 mb-3"><div class="col-12 col-lg-4"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Ringkasan</div>
-        <div style="font-size:28px;font-weight:700">${R.fmt(tot)}</div><div class="text-muted-2" style="font-size:12px">rata-rata skor total (0–100)</div>
-        <div class="mt-2 d-flex flex-wrap gap-1">${dist.map(d=>`<span class="badge-soft ${d.k.cls}">${d.k.k}: <b>${d.n}</b></span>`).join('')}</div></div></div>
-        <div class="col-12 col-lg-8"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Rata-rata per indikator &amp; sub indikator</div><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12.5px"><tbody>${R.IND.map((I,ii)=>{
-          const iv=avg(rows.map(r=>r.h.ind[ii].raw));return `<tr class="table-light"><td class="fw-semibold">${I.k}. ${E(I.nama)}</td><td class="fw-semibold text-end">${R.fmt(iv)}</td><td style="width:110px">${bar(iv)}</td></tr>`+I.subs.map((S,si)=>{const sv=avg(rows.map(r=>r.h.ind[ii].subs[si].raw));return `<tr><td class="ps-3">${E(S.nama)}</td><td class="text-end">${R.fmt(sv)}</td><td>${bar(sv)}</td></tr>`;}).join('');}).join('')}</tbody></table></div></div></div></div>
-      <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0"><thead><tr><th>Anak</th><th>Kelas</th>${R.IND.map(I=>`<th title="${E(I.nama)}">${I.k}</th>`).join('')}<th>Skor total</th><th>Kategori</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="fw-semibold">${E(r.a.NAMA)}</td><td>${E([r.a.KELAS,r.a.JENJANG].filter(Boolean).join(' · '))}</td>${r.h.ind.map(i=>`<td>${R.fmt(i.skor)}</td>`).join('')}<td class="fw-bold">${R.fmt(r.h.total.skor)}</td><td>${r.h.total.kat?`<span class="badge-soft ${r.h.total.kat.cls}">${r.h.total.kat.k}</span>`:''}</td></tr>`).join('')}</tbody></table></div></div>`
-      :'<div class="card-srit p-4"><div class="empty-state"><i class="bi bi-bar-chart-line d-block"></i>Belum ada angket terisi pada periode ini.</div></div>'}`;
-    this._bindPeriode('rkPer',()=>this.renderRekap(host));
-    $('#rkJj').onchange=e=>{s.jenjang=e.target.value;this.renderRekap(host);};
-    const c=$('#rkCsv');if(c)c.onclick=()=>this.unduhRekap(rows);
-    const t=$('#rkTpl');if(t)t.onclick=()=>this.unduhTemplate(rows);
-  },
-  _csv(rows){return rows.map(r=>r.map(c=>{c=(c===null||c===undefined)?'':String(c);return /[",\n\r]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(',')).join('\r\n');},
-  _unduh(nama,teks){const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent('\uFEFF'+teks);a.download=nama;document.body.appendChild(a);a.click();a.remove();},
-  unduhRekap(rows){
-    const R=SRIT.Rapor,fn=x=>x===null||x===undefined?'':String(x).replace('.',',');
-    const head=['No','Nama','NIS','NISN','Kelas','Jenjang'].concat(R.IND.map(I=>I.nama)).concat(R.IND.reduce((l,I)=>l.concat(I.subs.map(S=>S.nama)),[])).concat(['Skor Total','Kategori','Butir terisi']);
-    const data=rows.map((r,i)=>[i+1,r.a.NAMA,r.a.NIS||'',r.a.NISN||'',r.a.KELAS||'',r.a.JENJANG||''].concat(r.h.ind.map(x=>fn(x.skor))).concat(r.h.ind.reduce((l,I)=>l.concat(I.subs.map(S=>fn(S.skor))),[])).concat([fn(r.h.total.skor),r.h.total.kat?r.h.total.kat.k:'',r.h.total.n]));
-    this._unduh('rekap_angket_'+this.state.periode.replace(/[^0-9A-Za-z]+/g,'_')+'.csv',this._csv([head].concat(data)));SRIT.Audit.log('EXPORT','penilaian','rekap',null,{periode:this.state.periode,jumlah:rows.length});
-  },
-  unduhTemplate(rows){
-    const R=SRIT.Rapor,head=['nik','nisn','nama_siswa'];R.ITEMS.forEach(it=>{head.push(it.id+'_nilai');head.push(it.id+'_deskripsi');});
-    const data=rows.map(r=>{const j=R.parse(r.ak.JAWABAN),row=[r.a.NIK||'',r.a.NISN||'',r.a.NAMA||''];
-      R.ITEMS.forEach(it=>{const v=+j[it.id];if(v>=1&&v<=4){row.push(v/4*100);row.push(R.deskripsi(it,v));}else{row.push('');row.push('');}});return row;});
-    this._unduh('template_nilai_'+this.state.periode.replace(/[^0-9A-Za-z]+/g,'_')+'.csv',this._csv([head].concat(data)));SRIT.Audit.log('EXPORT','penilaian','template-nilai',null,{periode:this.state.periode,jumlah:rows.length});
-  },
-
-  /* =========================== TAB 3: RUBRIK & PANDUAN =========================== */
-  renderPanduan(host){
-    const R=SRIT.Rapor,E=SRIT.Util.esc;
-    host.innerHTML=`<div class="row g-3"><div class="col-12 col-lg-6"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Skala jawaban (skor per butir)</div><table class="table table-sm mb-0" style="font-size:13px"><thead><tr><th>Skor</th><th>Pilihan</th><th>Predikat</th><th>Tafsir (deskripsi template nilai)</th></tr></thead><tbody>${R.SKALA.map(x=>`<tr><td><b>${x.v}</b></td><td>${x.l}</td><td>${x.pred}</td><td>${E(x.tafsir)}</td></tr>`).join('')}</tbody></table>
-        <div class="text-muted-2 mt-2" style="font-size:12px">Skor sub indikator / indikator / total = jumlah skor butir ÷ (butir terjawab × 4) × 100. Butir kosong (mis. butir pengurus *) tidak dihitung. Skor terendah yang mungkin 25.</div></div></div>
-      <div class="col-12 col-lg-6"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Kategori hasil (berlaku untuk sub indikator, indikator, dan total)</div><table class="table table-sm mb-0" style="font-size:13px"><thead><tr><th>Skor ≥</th><th>Kategori</th><th>Interpretasi</th><th>Tindak lanjut</th></tr></thead><tbody>${R.KAT.map(k=>`<tr><td><b>${k.min}</b></td><td><span class="badge-soft ${k.cls}">${k.k}</span></td><td>${E(k.tafsir)}</td><td>${E(k.tl)}</td></tr>`).join('')}</tbody></table></div></div>
-      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Isi angket: 4 indikator · 16 sub indikator · ${R.ITEMS.length} butir</div>${R.IND.map(I=>`<div class="mb-2"><div class="fw-semibold" style="font-size:13px">${I.k}. ${E(I.nama)}</div><div class="text-muted-2" style="font-size:12px">${I.subs.map(S=>E(S.nama)+' ('+S.items.length+')').join(' · ')}</div></div>`).join('')}</div></div>
-      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Cara memakai</div><ol class="mb-0" style="font-size:13px"><li>Pilih <b>periode</b> (semester) di tab Rapor Anak.</li><li>Cetak <b>Angket kosong</b> untuk dibagikan ke siswa (jawaban dalam 1 bulan terakhir), lalu masukkan jawabannya lewat tombol <b>Angket</b> pada tiap anak.</li><li>Wali asuh mengisi <b>Asesmen</b> personal tiap anak asuh (6 aspek + riwayat kesehatan + kebiasaan khusus), simpan sebagai Draf, lalu <b>Finalkan</b>.</li><li>Kepala Sekolah menandai <b>Diketahui</b>; rapor yang diketahui dikunci dari perubahan wali asuh.</li><li>Cetak <b>Laporan Perkembangan Anak Dampingan</b> (satu anak atau semua yang tampil). Tab Rekap &amp; Ekspor memuat rata-rata kelas dan unduhan CSV (rekap &amp; template nilai).</li></ol></div></div></div>`;
-  },
-
-  /* =========================== CETAK =========================== */
-  _css(){return `<style>@page{size:A4;margin:14mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;color:#000;margin:0}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}
-    h1{font-size:13pt;text-align:center;margin:6px 0 2px;letter-spacing:.3px}.sub{text-align:center;font-size:10pt;margin-bottom:8px}h2{font-size:11pt;margin:12px 0 4px}
-    table{border-collapse:collapse;width:100%}.t td,.t th{border:1px solid #000;padding:3px 6px;vertical-align:top;font-size:10pt}.t th{background:#e6e6e6;text-align:center}.t .g{background:#f1f1f1;font-weight:700}
-    .id td{border:0;padding:1px 4px;font-size:10.5pt;vertical-align:top}.id td:first-child{width:34%;white-space:nowrap}.id td:nth-child(2){width:12px}
-    .bar{height:7px;background:#ddd;min-width:70px}.bar i{display:block;height:7px;background:#333}.ttd{display:flex;justify-content:space-between;margin-top:20px;font-size:10.5pt;page-break-inside:avoid}.ttd div{width:46%;text-align:center}
-    .box{border:1px solid #000;padding:6px 8px;font-size:10pt;margin:6px 0}.ket{font-size:9pt;color:#222}.nar{text-align:justify;margin-top:10px;font-size:10.5pt;line-height:1.4}.pre{white-space:pre-line}.ck{display:inline-block;width:12px;height:12px;border:1px solid #000;vertical-align:middle}</style>`;},
-  _buka(){const w=window.open('','_blank');if(!w){SRIT.Notify('Popup diblokir, izinkan popup untuk mencetak','err');return null;}w.document.write('<p style="font-family:sans-serif;padding:20px">Menyiapkan cetakan…</p>');return w;},
-  _tulis(w,judul,isi){w.document.open();w.document.write('<html><head><meta charset="utf-8"><title>'+SRIT.Util.esc(judul)+'</title>'+this._css()+'</head><body>'+isi+'<script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script></body></html>');w.document.close();},
-  _ttd(namaWali,nipWali,tgl){
-    const K=SRIT.Kepsek,E=SRIT.Util.esc,kn=K.nama()||'Andik Minarto, S.Pd',kp=K.nip();
-    return `<div class="ttd"><div>Mengetahui,<br>Kepala SRT 1 Jombang<br><br><br><br><b><u>${E(kn)}</u></b><br>NIP. ${E(kp||'………………………')}</div><div>Jombang, ${tgl?E(SRIT.Rapor.tglPanjang(tgl)):'……………… 2026'}<br>Wali Asuh<br><br><br><br><b><u>${E(namaWali||'…………………………………')}</u></b><br>NIP. ${E(nipWali||'………………………')}</div></div>`;
-  },
-  _nipWali(id){try{return (SRIT.Store.read('USERS').find(u=>u.ID===id)||{}).NIP||'';}catch(e){return '';}},
-  halamanRapor(a,p){
-    const R=SRIT.Rapor,E=SRIT.Util.esc,info=R.anakInfo(a),ak=this.angketOf(a.ID,p),as=this.asesmenOf(a.ID,p),asp=R.parse(as&&as.ASPEK),h=ak?R.hitung(R.parse(ak.JAWABAN)):null,j=R.parse(ak&&ak.JAWABAN);
+  /* ---- cetak asesmen satu anak ---- */
+  halaman(a,p){
+    const P=SRIT.Features.penilaian,R=SRIT.Rapor,E=SRIT.Util.esc,info=R.anakInfo(a),as=this.of(a.ID,p),asp=R.parse(as&&as.ASPEK);
     const idr=(l,v)=>`<tr><td>${l}</td><td>:</td><td>${E(v||'')}</td></tr>`;
-    const bar=v=>v===null?'':`<div class="bar"><i style="width:${Math.max(0,Math.min(100,v))}%"></i></div>`;
-    let s=`<section class="pg">${SRIT.Kop.html()}<h1>LAPORAN PERKEMBANGAN ANAK DAMPINGAN</h1><div class="sub">Program Pendampingan dan Bimbingan Wali Asuh · Periode ${E(p)}</div>
-      <h2>I. IDENTITAS SISWA ASUH</h2><table class="id"><tbody>${idr('Nama Lengkap',info.nama)}${idr('Nama Panggilan',as&&as.PANGGILAN)}${idr('NIS / NISN',info.nis)}${idr('Umur',info.umur)}${idr('Kelas / Jenjang / Kamar',info.kelas)}${idr('Periode Evaluasi',p)}${idr('Wali Asuh',(as&&as.NAMA_WALI)||info.wali)}${idr('Asal Daerah',(as&&as.ASAL_DAERAH)||info.asal)}</tbody></table>
-      <table class="t" style="margin-top:6px"><tbody><tr><td style="width:30%"><b>Riwayat Kesehatan:</b><div class="ket">(alergi, asma, sering sakit apa, dll)</div></td><td class="pre">${E((as&&as.RIWAYAT_KESEHATAN)||'')}</td></tr><tr><td><b>Kebiasaan Khusus:</b><div class="ket">(ngompol, takut gelap, dll)</div></td><td class="pre">${E((as&&as.KEBIASAAN_KHUSUS)||'')}</td></tr></tbody></table>
-      <h2>II. HASIL ANGKET PENILAIAN KARAKTER &amp; PERILAKU (NON-TES)</h2>`;
-    if(!h){s+='<div class="box">Angket non-akademik periode ini belum diisi.</div>';}
-    else{
-      s+=`<div class="box"><b>Skor total: ${R.fmt(h.total.skor)} (${h.total.kat.k})</b> · ${h.total.n} dari ${h.total.total} butir terjawab<br><span class="ket">${E(h.total.kat.tafsir)}. Tindak lanjut: ${E(h.total.kat.tl)}.</span></div>
-      <table class="t"><thead><tr><th style="text-align:left">Indikator / Sub indikator</th><th style="width:60px">Skor</th><th style="width:90px"> </th><th style="width:110px">Kategori</th></tr></thead><tbody>${h.ind.map(i=>`<tr class="g"><td>${i.k}. ${E(i.nama)}</td><td style="text-align:center">${R.fmt(i.skor)}</td><td>${bar(i.skor)}</td><td style="text-align:center">${i.kat?i.kat.k:'–'}</td></tr>`+i.subs.map(x=>`<tr><td style="padding-left:16px">${E(x.nama)}</td><td style="text-align:center">${R.fmt(x.skor)}</td><td>${bar(x.skor)}</td><td style="text-align:center">${x.kat?x.kat.k:'–'}</td></tr>`).join('')).join('')}</tbody></table>`;
-      const perlu=R.ITEMS.filter(it=>+j[it.id]>=1&&+j[it.id]<=2),kuat=R.ITEMS.filter(it=>+j[it.id]===4);
-      if(kuat.length)s+=`<div class="ket" style="margin-top:6px"><b>Selalu dilakukan:</b> ${kuat.slice(0,8).map(it=>E(it.d)).join('; ')}${kuat.length>8?' dan '+(kuat.length-8)+' lainnya':''}.</div>`;
-      if(perlu.length)s+=`<div class="ket" style="margin-top:4px"><b>Perlu pembiasaan / pembinaan:</b> ${perlu.slice(0,10).map(it=>E(it.d)+' ('+(+j[it.id]===1?'tidak pernah':'kadang-kadang')+')').join('; ')}${perlu.length>10?' dan '+(perlu.length-10)+' lainnya':''}.</div>`;
-    }
-    s+=`<h2>III. ASESMEN PERSONAL OLEH WALI ASUH</h2>`;
-    if(!as)s+='<div class="box">Asesmen personal periode ini belum diisi.</div>';
-    else s+=`<table class="t"><thead><tr><th style="width:28px">No</th><th style="width:26%">Aspek Asesmen</th><th>Deskripsi / Catatan Wali Asuh</th></tr></thead><tbody>${R.ASPEK.map(A=>{const d=asp[A.k]||{};
-      const lines=A.f.map(f=>d[f.k]?`<div><b>${E(f.l)}:</b> <span class="pre">${E(d[f.k])}</span></div>`:'').join('')+(d.catatan?`<div style="margin-top:3px"><b>Catatan detail:</b> <span class="pre">${E(d.catatan)}</span></div>`:'');
-      return `<tr><td style="text-align:center"><b>${A.no}</b></td><td><b>${E(A.nama)}</b></td><td>${lines||'<span class="ket">–</span>'}</td></tr>`;}).join('')}</tbody></table>`;
-    s+=`<div class="nar">${E(R.NARASI)}</div>${this._ttd((as&&as.NAMA_WALI)||info.wali,this._nipWali((as&&as.WALI_ASUH)||info.waliId),(as&&as.TANGGAL)||SRIT.Util.todayISO())}</section>`;
-    return s;
+    return `<section class="pg">${SRIT.Kop.html()}<h1>ASESMEN PERSONAL SISWA ASUH</h1><div class="sub">Program Pendampingan dan Bimbingan Wali Asuh · Periode ${E(p)}</div>
+      <h2>I. IDENTITAS SISWA ASUH</h2><table class="id"><tbody>${idr('Nama Lengkap',info.nama)}${idr('Nama Panggilan',as.PANGGILAN)}${idr('NIS / NISN',info.nis)}${idr('Umur',info.umur)}${idr('Kelas / Jenjang / Kamar',info.kelas)}${idr('Periode Evaluasi',p)}${idr('Wali Asuh',as.NAMA_WALI||info.wali)}${idr('Asal Daerah',as.ASAL_DAERAH||info.asal)}</tbody></table>
+      <table class="t" style="margin-top:6px"><tbody><tr><td style="width:30%"><b>Riwayat Kesehatan:</b><div class="ket">(alergi, asma, sering sakit apa, dll)</div></td><td class="pre">${E(as.RIWAYAT_KESEHATAN||'')}</td></tr><tr><td><b>Kebiasaan Khusus:</b><div class="ket">(ngompol, takut gelap, dll)</div></td><td class="pre">${E(as.KEBIASAAN_KHUSUS||'')}</td></tr></tbody></table>
+      <h2>II. ASESMEN PERSONAL OLEH WALI ASUH</h2><table class="t"><thead><tr><th style="width:28px">No</th><th style="width:26%">Aspek Asesmen</th><th>Deskripsi / Catatan Wali Asuh</th></tr></thead><tbody>${R.ASPEK.map(A=>{const d=asp[A.k]||{};
+        const lines=A.f.map(f=>d[f.k]?`<div><b>${E(f.l)}:</b> <span class="pre">${E(d[f.k])}</span></div>`:'').join('')+(d.catatan?`<div style="margin-top:3px"><b>Catatan detail:</b> <span class="pre">${E(d.catatan)}</span></div>`:'');
+        return `<tr><td style="text-align:center"><b>${A.no}</b></td><td><b>${E(A.nama)}</b></td><td>${lines||'<span class="ket">–</span>'}</td></tr>`;}).join('')}</tbody></table>
+      ${P._ttd(as.NAMA_WALI||info.wali,P._nipWali(as.WALI_ASUH||info.waliId),as.TANGGAL||SRIT.Util.todayISO())}</section>`;
   },
-  cetakRapor(ids){
-    if(!ids.length){SRIT.Notify('Belum ada rapor yang bisa dicetak (angket/asesmen masih kosong)','info');return;}
-    if(ids.length>60&&!window.confirm('Mencetak '+ids.length+' rapor sekaligus. Lanjutkan?'))return;
-    const w=this._buka();if(!w)return;const p=this.state.periode;
-    const html=ids.map(id=>SRIT.Repo.getById('ANAK',id)).filter(Boolean).map(a=>this.halamanRapor(a,p)).join('');
-    SRIT.Audit.log('PRINT','penilaian','rapor',null,{periode:p,jumlah:ids.length});this._tulis(w,'Laporan Perkembangan Anak Dampingan '+p,html);
+  cetak(aid,p){
+    const P=SRIT.Features.penilaian,a=SRIT.Repo.getById('ANAK',aid),as=this.of(aid,p);
+    if(!a||!as){SRIT.Notify('Asesmen periode ini belum diisi','info');return;}
+    const w=P._buka();if(!w)return;
+    SRIT.Audit.log('PRINT','penilaian',as.ID,null,{tabel:'ASESMEN_PERSONAL',periode:p});
+    P._tulis(w,'Asesmen Personal '+a.NAMA+' '+p,this.halaman(a,p));
   },
-  cetakAngketKosong(){
-    const R=SRIT.Rapor,E=SRIT.Util.esc,w=this._buka();if(!w)return;let no=0;
-    const head=`<tr><th style="width:28px">No</th><th style="width:44px">Kode</th><th>Pernyataan</th>${R.SKALA.map(x=>`<th style="width:58px">${x.l}<br>(${x.v})</th>`).join('')}</tr>`;
-    const body=R.IND.map(I=>`<tr class="g"><td colspan="7">${I.k}. ${E(I.nama.toUpperCase())}</td></tr>`+I.subs.map(S=>`<tr><td colspan="7" style="font-style:italic;background:#f6f6f6">${E(S.nama)}</td></tr>`+S.items.map(it=>{no++;return `<tr><td style="text-align:center">${no}</td><td style="text-align:center">${it.id}</td><td>${E(it.t)}${it.o?' *':''}</td>${R.SKALA.map(()=>'<td style="text-align:center"><span class="ck"></span></td>').join('')}</tr>`;}).join('')).join('')).join('');
-    this._tulis(w,'Angket Non-Akademik',`<section class="pg">${SRIT.Kop.html()}<h1>ANGKET PENILAIAN KARAKTER &amp; PERILAKU SISWA (NON-TES)</h1>
-      <table class="id" style="margin:8px 0"><tbody><tr><td style="width:60%">Nama : ......................................................</td><td style="width:40%">Kelas : ....................</td></tr><tr><td>NIK / NISN : ..............................................</td><td>Tanggal : ..................</td></tr></tbody></table>
-      <div class="box" style="font-size:9.5pt">Petunjuk: Bacalah setiap pernyataan, lalu beri tanda centang (✓) pada satu kolom yang paling sesuai dengan dirimu dalam 1 bulan terakhir. Jawablah dengan jujur; angket ini bukan tes dan tidak ada jawaban benar/salah. (*) Khusus pengurus OSIS/ketua asrama/ketua kamar; kosongkan bila bukan pengurus.</div>
-      <table class="t"><thead>${head}</thead><tbody>${body}</tbody></table></section>`);
-  },
-  cetakAsesmenKosong(){
-    const R=SRIT.Rapor,E=SRIT.Util.esc,w=this._buka();if(!w)return;
+  cetakKosong(){
+    const R=SRIT.Rapor,E=SRIT.Util.esc,w=SRIT.Features.penilaian._buka();if(!w)return;
     const dots=n=>'.'.repeat(n);
     const idl=['Nama Lengkap','Nama Panggilan','NIS / NISN','Umur','Kelas / Jenjang / Kamar','Periode Evaluasi','Wali Asuh','Asal Daerah'].map(l=>`<tr><td>${l}</td><td>:</td><td>${dots(60)}</td></tr>`).join('');
     const rows=R.ASPEK.map(A=>`<tr><td style="text-align:center"><b>${A.no}</b></td><td><b>${E(A.nama)}</b></td><td>${A.f.map(f=>'• '+E(f.l)+(f.o?' ('+f.o.map(E).join(' / ')+')':'')).join('<br>')}<br><br><b>Catatan Detail:</b><br><br><br></td></tr>`).join('');
-    this._tulis(w,'Instrumen Asesmen Personal Siswa Asuh',`<section class="pg">${SRIT.Kop.html()}<h1>INSTRUMEN ASESMEN PERSONAL SISWA ASUH</h1>
+    SRIT.Features.penilaian._tulis(w,'Instrumen Asesmen Personal Siswa Asuh',`<section class="pg">${SRIT.Kop.html()}<h1>INSTRUMEN ASESMEN PERSONAL SISWA ASUH</h1>
       <div class="box" style="font-size:9.5pt"><b>Petunjuk Pengisian:</b> 1. Format asesmen ini diisi secara individual oleh Wali Asuh untuk setiap siswa asuh. 2. Asesmen mencakup kedekatan emosional, perkembangan, rekam kasus, potensi, keluarga &amp; lingkungan, serta rencana tindak lanjut. 3. Hasil asesmen ini akan menjadi bahan utama pada Rapat Koordinasi Wali Asuh mendatang.</div>
       <div class="sub" style="font-style:italic">Program Pendampingan dan Bimbingan Wali Asuh</div><h2>I. IDENTITAS SISWA ASUH</h2><table class="id"><tbody>${idl}</tbody></table>
       <table class="t" style="margin-top:6px"><tbody><tr><td style="width:30%"><b>Riwayat Kesehatan:</b><div class="ket">(alergi, asma, sering sakit apa, timbilen berulang, dll)</div></td><td><br><br></td></tr><tr><td><b>Kebiasaan Khusus:</b><div class="ket">(ngompol, takut gelap, dll)</div></td><td><br><br></td></tr></tbody></table>
       <h2>II. FORMULIR ASESMEN PERSONAL</h2><table class="t"><thead><tr><th style="width:28px">No</th><th style="width:26%">Aspek Asesmen</th><th>Deskripsi / Catatan Wali Asuh</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="nar">${E(R.NARASI)}</div>${this._ttd('','','')}</section>`);
+      <div class="nar">${E(R.NARASI)}</div>${SRIT.Features.penilaian._ttd('','','')}</section>`);
   }
 };
-</script>
 
-
-<script>__srit.n('View_Profiling')</script>
-<script>
-//# sourceURL=View_Profiling.html
-// ---------- PROFILING SISWA ----------
-// Perkembangan & seluruh catatan satu anak per Bulan / Tribulan / Semester / Tahun Ajaran (TA = Juli–Juni).
-// Absensi: server (apiProfilAbsen, 1 panggilan per anak per TA, dicache di browser). Layanan lain: cermin tabel (SRIT.Store).
 SRIT.Features.profiling=(function(){
 const U=SRIT.Util,esc=U.esc;
 const BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -10948,7 +11117,7 @@ const F={
     const ms=monthsOfTA(ta),mrow=ms.map(ym=>{const Pm=mk('bulan',ta,ms.indexOf(ym),ms.indexOf(ym)),x=stats(D,Pm,false);return {ym,x,sel:P.months.includes(ym)};});
     const alamat=[nmOf('ASRAMA',a.ASRAMA),nmOf('GEDUNG',a.GEDUNG),nmOf('LANTAI',a.LANTAI),nmOf('KAMAR',a.KAMAR)].filter(Boolean).join(' › ')||'-';
     const masuk=a.TANGGAL_MASUK?U.fmtDateShort(String(a.TANGGAL_MASUK).slice(0,10)):'-';
-    const canC=sens&&SRIT.Auth.can('profiling:CREATE'),canU=sens&&SRIT.Auth.can('profiling:UPDATE'),canD=sens&&SRIT.Auth.can('profiling:DELETE'),canP=sens&&SRIT.Auth.can('pelanggaran:CREATE');
+    const canAs=SRIT.Auth.canModule('penilaian')&&SRIT.Features.penilaian._inScope(a),canC=sens&&SRIT.Auth.can('profiling:CREATE'),canU=sens&&SRIT.Auth.can('profiling:UPDATE'),canD=sens&&SRIT.Auth.can('profiling:DELETE'),canP=sens&&SRIT.Auth.can('pelanggaran:CREATE');
     const tl=[];
     Object.keys(D.hari).filter(d=>inR(P,d)&&(D.hari[d][1]+D.hari[d][2]+D.hari[d][3])>0).forEach(d=>{const x=D.hari[d];tl.push({d,c:x[3]?COL.A:x[2]?COL.S:COL.I,i:'bi-calendar-x',t:'Tidak hadir',x:[x[1]?'Izin '+x[1]:'',x[2]?'Sakit '+x[2]:'',x[3]?'Alpa '+x[3]:''].filter(Boolean).join(', ')+' sesi'});});
     if(sens){
@@ -10986,7 +11155,7 @@ const F={
       <div class="card-srit p-3 mb-3"><div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
         ${iv.hero}
         <div class="text-end"><div class="fw-bold" style="font-size:15px;color:${cat.c}"><i class="bi ${cat.i} me-1"></i>${cat.k}</div><div class="text-muted-2" style="font-size:12px">${esc(P.label)}</div>
-          <div class="d-flex gap-1 flex-wrap justify-content-end mt-2">${canC?'<button class="btn btn-primary btn-sm" id="pfAddNote"><i class="bi bi-journal-plus"></i> Catat perkembangan</button>'+(canP?'<button class="btn btn-outline-danger btn-sm" id="pfAddPel"><i class="bi bi-exclamation-diamond"></i> Catat pelanggaran</button>':'')+'':''}<button class="btn btn-outline-primary btn-sm" id="pfReport"><i class="bi bi-file-earmark-text"></i> Laporan resmi</button></div></div></div>
+          <div class="d-flex gap-1 flex-wrap justify-content-end mt-2">${canAs?'<button class="btn btn-primary btn-sm" id="pfAsesmen"><i class="bi bi-person-lines-fill"></i> Asesmen personal</button>':''}${canC&&canP?'<button class="btn btn-outline-danger btn-sm" id="pfAddPel"><i class="bi bi-exclamation-diamond"></i> Catat pelanggaran</button>':''}<button class="btn btn-outline-primary btn-sm" id="pfReport"><i class="bi bi-file-earmark-text"></i> Laporan resmi</button></div></div></div>
         ${iv.tiles}
         ${absen.partial?`<div class="alert alert-warning py-1 mt-2 mb-0" style="font-size:12px">Data absensi baru dimuat sampai ${U.fmtDateShort(absen.sampai)} (batas waktu). <a href="#" id="pfMore">Muat sisanya</a></div>`:''}
       </div>
@@ -11016,7 +11185,7 @@ const F={
         <ul class="nav nav-pills mb-3 flex-wrap" id="pfTabs">${tabs.map(t=>`<li class="nav-item"><a class="nav-link pointer ${this.st.tab===t[0]?'active':''}" data-t="${t[0]}" style="font-size:12.5px;padding:4px 10px">${t[1]} <span class="badge bg-secondary">${t[2]}</span></a></li>`).join('')}</ul>
         <div id="pfDetail">${detail[this.st.tab]}</div></div></div>`;
     $$('#pfTabs a').forEach(x=>x.onclick=()=>{this.st.tab=x.dataset.t;$$('#pfTabs a').forEach(y=>y.classList.toggle('active',y===x));$('#pfDetail').innerHTML=detail[this.st.tab];this._bindDetail();});
-    const bn=$('#pfAddNote'),bp=$('#pfAddPel'),br=$('#pfReport');if(bn)bn.onclick=()=>this._noteForm();if(bp)bp.onclick=()=>this._pelForm();if(br)br.onclick=()=>this._report();
+    const bn=$('#pfAsesmen'),bp=$('#pfAddPel'),br=$('#pfReport');if(bn)bn.onclick=()=>SRIT.Asesmen.hub(a.ID);if(bp)bp.onclick=()=>this._pelForm();if(br)br.onclick=()=>this._report();
     this._bindDetail();
     const ne=$('#pfNikEye');if(ne)ne.onclick=()=>{const n=$('#pfNik'),on=n.textContent===n.dataset.m;n.textContent=on?n.dataset.f:n.dataset.m;ne.firstChild.className='bi '+(on?'bi-eye-slash':'bi-eye');};
     const mo=$('#pfMore');if(mo)mo.onclick=e=>{e.preventDefault();delete this.cache[a.ID+'|'+ta];this.load();};
@@ -11614,7 +11783,7 @@ SRIT.computeAlerts=()=>{
     [['KEGIATAN','kegiatan','kegiatan khusus'],['PROGRAM','program','program pembinaan']].forEach(x=>{const n=SRIT.Store.read(x[0]).filter(r=>r.STATUS==='USULAN').length;if(n&&AP.canUsulan(x[1]))al.push({title:n+' usulan '+x[2]+' menunggu persetujuan Anda',desc:'Diusulkan wali asrama',level:'MEDIUM',color:'var(--srit-info)',icon:'bi-lightbulb'});});
     if(AP.canKasus()){const kn=SRIT.Store.read('INSIDEN').filter(i=>(!SRIT.Kasus||SRIT.Kasus.aktif(i))&&i.TINGKAT&&i.TINGKAT!=='RINGAN'&&i.KLASIFIKASI_STATUS!=='DITETAPKAN').length;
       if(kn)al.push({title:kn+' kasus sedang/berat menunggu penetapan klasifikasi',desc:'Tetapkan melalui case conference; eskalasikan ke Satgas Pusat',level:'HIGH',color:'var(--srit-danger)',icon:'bi-shield-exclamation'});}
-    if(AP.canRapor()){const rp=SRIT.Store.read('ASESMEN_PERSONAL').filter(r=>r.STATUS==='FINAL').length;if(rp)al.push({title:rp+' rapor perkembangan anak final menunggu diketahui',desc:'Kepala Sekolah mengetahui sebelum dibagikan',level:'LOW',color:'var(--srit-info)',icon:'bi-journal-check'});}
+    if(AP.canRapor()){const rp=SRIT.Store.read('ASESMEN_PERSONAL').filter(r=>r.STATUS==='FINAL').length;if(rp)al.push({title:rp+' asesmen personal anak final menunggu diketahui',desc:'Buka Profiling Siswa, pilih anak, klik Asesmen personal',level:'LOW',color:'var(--srit-info)',icon:'bi-journal-check'});}
     if(AP.canJurnal()){const u=(SRIT.Auth.user||{}).ID,jp=SRIT.Store.read('JURNAL_PIKET').filter(j=>j.STATUS==='DISERAHKAN'&&j.PETUGAS!==u).length;if(jp)al.push({title:jp+' jurnal piket menunggu diketahui koordinator',desc:'Periksa catatan kejadian dan anak perlu perhatian khusus',level:'LOW',color:'var(--srit-info)',icon:'bi-journal-bookmark'});}
   }
   // pelanggaran yang menunggu asesmen lanjutan wali asuh akun ini
