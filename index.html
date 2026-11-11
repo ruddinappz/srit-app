@@ -95,17 +95,17 @@ window.__srit=(function(){
      chart (Chart.js)  → grafik Dashboard/Analytics/Profiling
      jsqr  (jsQR)      → pembaca QR dari foto/kamera
      xlsx  (SheetJS)   → impor/ekspor Excel
+     qr    (qrcode-generator) → kartu QR anak (dibuat di perangkat, tanpa layanan luar)
    Urutan sumber (berhenti di yang pertama berhasil):
-     1) salinan lokal ./libs/  (hanya bila dijalankan dari GitHub Pages)
-     2) cdn.jsdelivr.net   3) cdnjs.cloudflare.com
-     4) SERVER Apps Script (apiLibSource) — selalu tersedia selama aplikasi bisa dibuka, tanpa CDN
-     5) unpkg.com
+     GitHub Pages : 1) salinan lokal ./libs/  2) jsdelivr  3) cdnjs  4) SERVER Apps Script  5) unpkg
+     Apps Script  : 1) SERVER Apps Script (apiLibSource, tanpa CDN)  2) jsdelivr  3) cdnjs  4) unpkg
    Pakai: await SRITLib.need('xlsx');  |  SRITLib.preload(['chart']);  |  SRITLib.has('chart')
    ========================================================================= */
 window.SRITLib=(function(){
   var DEF={
     chart:{g:'Chart',file:'chart.umd.js',srv:'Lib_Chart',u:['https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js','https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.6/chart.umd.min.js','https://unpkg.com/chart.js@4.4.6/dist/chart.umd.js']},
     jsqr:{g:'jsQR',file:'jsQR.js',srv:'Lib_JsQR',u:['https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js','https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js','https://unpkg.com/jsqr@1.4.0/dist/jsQR.js']},
+    qr:{g:'qrcode',file:'qrcode.js',srv:'Lib_Qr',u:['https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js','https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','https://unpkg.com/qrcode-generator@1.4.4/qrcode.js']},
     xlsx:{g:'XLSX',file:'xlsx.full.min.js',srv:'Lib_Xlsx',u:['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js','https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js','https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js']}
   };
   var P={},via={},log=[];
@@ -128,11 +128,14 @@ window.SRITLib=(function(){
     var d=DEF[name];if(!d)return Promise.reject(new Error('Pustaka tidak dikenal: '+name));
     if(has(name))return Promise.resolve();
     if(P[name])return P[name];
-    var steps=[];
-    if(window.SRIT_CONFIG)steps.push(['lokal',function(){return tag('libs/'+d.file,4000);}]);
-    steps.push(['jsdelivr',function(){return tag(d.u[0],7000);}]);
-    steps.push(['cdnjs',function(){return tag(d.u[1],7000);}]);
-    steps.push(['server',function(){return fromServer(d.srv);}]);
+    var steps=[],srv=['server',function(){return fromServer(d.srv);}];
+    var cdn=[['jsdelivr',function(){return tag(d.u[0],7000);}],['cdnjs',function(){return tag(d.u[1],7000);}]];
+    if(window.SRIT_CONFIG){   // GitHub Pages: salinan lokal dulu, CDN, lalu server
+      steps.push(['lokal',function(){return tag('libs/'+d.file,4000);}]);
+      steps=steps.concat(cdn);steps.push(srv);
+    }else{                    // Apps Script: server sendiri dulu (tanpa CDN), CDN hanya cadangan
+      steps.push(srv);steps=steps.concat(cdn);
+    }
     steps.push(['unpkg',function(){return tag(d.u[2],7000);}]);
     function run(i,last){
       if(has(name))return Promise.resolve();
@@ -2805,15 +2808,21 @@ SRIT.Features.anak={
       SRIT.Repo.update('ANAK',id,{STATUS:'AKTIF',TANGGAL_KELUAR:''});
       SRIT.Audit.log('UPDATE','anak',id);SRIT.Notify('Anak diaktifkan kembali','ok');this.load();
     }},
-  qr(id){
+  async qr(id){
     const a=SRIT.Repo.getById('ANAK',id);if(!a)return;
     const payload='SRIT:'+a.ID;
-    const url='https://api.qrserver.com/v1/create-qr-code/?size=240x240&data='+encodeURIComponent(payload);
+    // QR dibuat di perangkat (pustaka tertanam) — tidak memakai layanan internet apa pun
+    let qrSvg='';
+    try{
+      await SRITLib.need('qr');
+      const q=window.qrcode(0,'M');q.addData(payload);q.make();
+      qrSvg=q.createSvgTag({cellSize:4,margin:2,scalable:true}).replace('<svg ','<svg width="220" height="220" ');
+    }catch(e){qrSvg='<div style="width:220px;height:220px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:12px;color:#b00;border:1px dashed #b00">QR gagal dibuat: '+SRIT.Util.esc((e&&e.message)||e)+'</div>';}
     const set=SRIT.Store.readObj('SETTINGS');
     const card=`<div id="qrCard" style="text-align:center;font-family:Segoe UI,sans-serif;color:#111;border:1px solid #ddd;border-radius:12px;padding:20px;max-width:300px;margin:0 auto">
       <div style="font-weight:800;font-size:14px">${SRIT.Util.esc(set.SCHOOL_SHORT||set.SCHOOL_NAME||'SRITi')}</div>
       <div style="font-size:11px;color:#666;margin-bottom:12px">KARTU ABSENSI SANTRI</div>
-      <img src="${url}" alt="QR" style="width:220px;height:220px" crossorigin="anonymous">
+      <div style="width:220px;height:220px;margin:0 auto">${qrSvg}</div>
       <div style="font-weight:700;margin-top:10px">${SRIT.Util.esc(a.NAMA)}</div>
       <div style="font-size:12px;color:#444">NIS: ${a.NIS} · ${a.JENJANG} ${a.KELAS||''}</div>
       <div style="font-size:10px;color:#999;margin-top:6px">${payload}</div>
@@ -3613,6 +3622,8 @@ SRIT.Features.absensi={
   var MODEL_URL='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@'+VER+'/model/';
   var LIB_ALT='https://unpkg.com/@vladmandic/face-api@'+VER+'/dist/face-api.js';          // cadangan bila jsdelivr gagal/lambat
   var MODEL_ALT='https://unpkg.com/@vladmandic/face-api@'+VER+'/model/';
+  var PAGES=!!window.SRIT_CONFIG;                       // dibuka dari GitHub Pages → pakai salinan lokal ./libs/ lebih dulu
+  var LIB_LOCAL='libs/face-api.js',MODEL_LOCAL='libs/models/';
   var MATCH_MAX=0.5;      // jarak Euclidean maksimum agar dianggap cocok (makin kecil makin ketat)
   var MARGIN=0.04;        // selisih minimal dengan anak lain terdekat (mencegah salah orang)
   var NEED_HITS=3;        // wajah harus cocok pada 3 bingkai berturut-turut
@@ -3625,7 +3636,7 @@ SRIT.Features.absensi={
     if(libP)return libP;
     libP=new Promise(function(res,rej){
       if(window.faceapi){res();return;}
-      var urls=[LIB_URL,LIB_ALT];
+      var urls=PAGES?[LIB_LOCAL,LIB_URL,LIB_ALT]:[LIB_URL,LIB_ALT];
       (function next(i){
         if(window.faceapi){res();return;}
         if(i>=urls.length){rej(new Error('Pustaka pengenal wajah gagal dimuat dari semua sumber. Periksa koneksi internet lalu coba lagi.'));return;}
@@ -3641,7 +3652,7 @@ SRIT.Features.absensi={
       return pickBackend(fa).then(function(){
         if(setStat)setStat('Memuat model wajah\u2026');
         var lm=function(u){return Promise.all([fa.nets.tinyFaceDetector.loadFromUri(u),fa.nets.faceLandmark68Net.loadFromUri(u),fa.nets.faceRecognitionNet.loadFromUri(u)]);};
-        return lm(MODEL_URL).catch(function(){return lm(MODEL_ALT);});
+        return (PAGES?lm(MODEL_LOCAL).catch(function(){return lm(MODEL_URL);}):lm(MODEL_URL)).catch(function(){return lm(MODEL_ALT);});
       });
     }).catch(function(e){libP=null;throw e;});
     return libP;
@@ -4822,7 +4833,6 @@ SRIT.Features.dokumentasi={
           <div class="text-muted-2 mt-2" style="font-size:11px">Bisa pilih banyak foto sekaligus. Di komputer, foto juga bisa diseret ke kotak ini.</div>
         </div>
         <input type="file" id="dkFcam" accept="image/*" capture="environment" hidden><input type="file" id="dkFgal" accept="image/*" multiple hidden>
-        <div class="form-check form-switch mt-3"><input class="form-check-input" type="checkbox" id="dkWm" ${this._wm===false?'':'checked'}><label class="form-check-label" for="dkWm" style="font-size:13px">Tambahkan watermark (kegiatan, waktu, shift, koordinat)</label></div>
         <details class="dk-info mt-3"><summary>Bagaimana foto disimpan &amp; jam shift</summary>
           <div class="mt-2">Foto disimpan di Drive: <b>Tahun / Bulan / Tanggal / Shift</b>. Tanggal &amp; jam diambil dari data foto (bisa dikoreksi di antrean).<br>
           ${this._badge('PAGI')} ${cfg.PAGI} \u00b7 ${this._badge('SIANG')} ${cfg.SIANG} \u00b7 ${this._badge('MALAM')} ${cfg.MALAM}\u2013${cfg.PAGI} (lewat tengah malam).<br>
@@ -4838,7 +4848,6 @@ SRIT.Features.dokumentasi={
         <div id="dkResult"></div>
       </div></div></div>`;
     $('#dkKeg').oninput=e=>{this._keg=e.target.value;};
-    $('#dkWm').onchange=e=>{this._wm=e.target.checked;};
     $('#dkCam').onclick=()=>$('#dkFcam').click();$('#dkGal').onclick=()=>$('#dkFgal').click();
     $('#dkFcam').onchange=e=>this._add(e.target.files);$('#dkFgal').onchange=e=>this._add(e.target.files);
     const dz=$('#dkDrop');
@@ -4911,19 +4920,10 @@ SRIT.Features.dokumentasi={
       img.onerror=()=>{URL.revokeObjectURL(url);res(null);};img.src=url;
     });
   },
-  _mark(c,m,keg){
-    const ctx=c.getContext('2d'),w=c.width,h=c.height,fs=Math.max(13,Math.floor(w/32)),lh=fs*1.45;
-    const d=m.tanggal.split('-').reverse().join('/');
-    const lines=[keg,d+'  '+m.jam,'Shift : '+m.shift,m.lat!==''?'Lat : '+m.lat:'Lat : -',m.lng!==''?'Lng : '+m.lng:'Lng : -'];
-    const bh=lh*lines.length+fs*0.7,by=h-bh-fs*0.3;
-    ctx.fillStyle='rgba(0,0,0,0.52)';ctx.fillRect(0,by,w,h-by);
-    ctx.fillStyle='#fff';ctx.font='bold '+fs+'px Arial,sans-serif';ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=3;
-    lines.forEach((l,i)=>ctx.fillText(l,fs*0.4,by+lh*(i+1)-fs*0.1));
-  },
   async _uploadAll(){
     const keg=($('#dkKeg').value||'').trim();
     if(!keg){SRIT.Notify('Nama kegiatan wajib diisi','err');$('#dkKeg').focus();return;}
-    const wm=$('#dkWm').checked,sesi=(()=>{try{return SRIT.Api.getSessionsForDate(SRIT.Util.todayISO(),true).find(s=>s.nama===keg);}catch(e){return null;}})();
+    const sesi=(()=>{try{return SRIT.Api.getSessionsForDate(SRIT.Util.todayISO(),true).find(s=>s.nama===keg);}catch(e){return null;}})();
     this.state.busy=true;this._result=null;this._renderResult();let ok=0,gagal=0,done=0;
     const todo=this.state.queue.filter(x=>x.st!=='ok'),fo={};
     const pw=$('#dkProgW'),pb=$('#dkProg');if(pw){pw.hidden=false;pb.style.width='0';}
@@ -4931,8 +4931,7 @@ SRIT.Features.dokumentasi={
       x.st='run';this._renderQueue();
       try{
         const c=await this._compress(x.file);if(!c)throw new Error('Foto tidak terbaca');
-        if(wm)this._mark(c,x.meta,keg);
-        const b64=c.toDataURL('image/jpeg',wm?0.88:0.7).split(',')[1];
+        const b64=c.toDataURL('image/jpeg',0.7).split(',')[1];
         const r=await SRIT.Server.call('apiDokUpload',{base64:b64,kegiatan:keg,sesiId:sesi?sesi.id:'',tanggal:x.meta.tanggal,jam:x.meta.jam,
           lat:String(x.meta.lat),lng:String(x.meta.lng),ukuranKb:Math.round(b64.length*0.75/1024),clientId:x.id});
         x.st='ok';x.meta.shift=r.shift;x.meta.tglShift=r.tglShift;ok++;
@@ -10332,11 +10331,12 @@ regFeature('refleksi',{title:'Refleksi',table:'REFLEKSI',perm:'refleksi',module:
 //# sourceURL=View_Penghuni.html
 // ---------- PENGHUNI & PENEMPATAN ----------
 SRIT.Features.penghuni={
-  state:{page:1,size:25,search:'',asrama:'',status:''},
+  state:{page:1,size:25,search:'',asrama:'',status:'',jenjang:'',bed:''},
   render(host){SRIT.UI.setPage('Penghuni Asrama','Penghuni');
     const asr=SRIT.Store.read('ASRAMA');
     host.innerHTML=`
       <div class="row g-3 mb-3" id="phKpi"></div>
+      <div class="card-srit p-3 mb-3" id="phRekap"></div>
       <div class="card-srit p-3 mb-3"><div class="filter-bar">
         <div style="flex:1;min-width:180px"><label class="form-label-sm">Cari Nama / NIS</label>
           <div style="position:relative">
@@ -10345,6 +10345,8 @@ SRIT.Features.penghuni={
           </div>
         </div>
         <div><label class="form-label-sm">Asrama</label><select class="form-select form-select-sm" id="phAsrama"><option value="">Semua</option>${asr.map(a=>`<option value="${a.ID}" ${this.state.asrama===a.ID?'selected':''}>${a.NAME}</option>`).join('')}</select></div>
+        <div><label class="form-label-sm">Jenjang</label><select class="form-select form-select-sm" id="phJenjang"><option value="">Semua</option>${['SRD','SRMP','SRMA'].map(j=>`<option ${this.state.jenjang===j?'selected':''}>${j}</option>`).join('')}</select></div>
+        <div><label class="form-label-sm">Status Tempat Tidur</label><select class="form-select form-select-sm" id="phBed"><option value="">Semua</option><option value="PUNYA" ${this.state.bed==='PUNYA'?'selected':''}>Sudah ada tempat tidur</option><option value="BELUM" ${this.state.bed==='BELUM'?'selected':''}>Belum ada tempat tidur</option></select></div>
         <div><label class="form-label-sm">Status</label><select class="form-select form-select-sm" id="phStatus"><option value="">Semua</option>${['AKTIF','IZIN','PULANG','SAKIT','PINDAH','NONAKTIF','LULUS'].map(s=>`<option ${this.state.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
       </div><div id="phActiveChips"></div></div>
       <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="phTable"></table></div><div class="p-3 border-top" id="phPag"></div></div>`;
@@ -10356,6 +10358,8 @@ SRIT.Features.penghuni={
     $('#phSearchClear').onclick=()=>{$('#phSearch').value='';$('#phSearchClear').style.display='none';this.state.search='';this.state.page=1;this.load();};
     $('#phAsrama').onchange=e=>{this.state.asrama=e.target.value;this.state.page=1;this.load();};
     $('#phStatus').onchange=e=>{this.state.status=e.target.value;this.state.page=1;this.load();};
+    $('#phJenjang').onchange=e=>{this.state.jenjang=e.target.value;this.state.page=1;this.load();};
+    $('#phBed').onchange=e=>{this.state.bed=e.target.value;this.state.page=1;this.load();};
     this.load();
   },
   renderChips(){
@@ -10365,6 +10369,8 @@ SRIT.Features.penghuni={
     if(this.state.search)chips.push({label:'Cari: "'+this.state.search+'"',clear:()=>{this.state.search='';$('#phSearch').value='';$('#phSearchClear').style.display='none';}});
     if(this.state.asrama)chips.push({label:'Asrama: '+((asr.find(a=>a.ID===this.state.asrama)||{}).NAME||this.state.asrama),clear:()=>{this.state.asrama='';$('#phAsrama').value='';}});
     if(this.state.status)chips.push({label:'Status: '+this.state.status,clear:()=>{this.state.status='';$('#phStatus').value='';}});
+    if(this.state.jenjang)chips.push({label:'Jenjang: '+this.state.jenjang,clear:()=>{this.state.jenjang='';$('#phJenjang').value='';}});
+    if(this.state.bed)chips.push({label:'Tempat tidur: '+(this.state.bed==='PUNYA'?'sudah ada':'belum ada'),clear:()=>{this.state.bed='';$('#phBed').value='';}});
     if(!chips.length){box.innerHTML='';return;}
     box.innerHTML=`<div class="d-flex align-items-center gap-2 flex-wrap mt-2">
       <span class="text-muted-2" style="font-size:11px">Filter aktif:</span>
@@ -10373,8 +10379,8 @@ SRIT.Features.penghuni={
     </div>`;
     box.querySelectorAll('[data-chip]').forEach((el,i)=>{el.onclick=()=>{chips[i].clear();this.state.page=1;this.load();};});
     const ca=$('#phClearAll');if(ca)ca.onclick=()=>{
-      this.state.search='';this.state.asrama='';this.state.status='';
-      $('#phSearch').value='';$('#phSearchClear').style.display='none';$('#phAsrama').value='';$('#phStatus').value='';
+      this.state.search='';this.state.asrama='';this.state.status='';this.state.jenjang='';this.state.bed='';
+      $('#phSearch').value='';$('#phSearchClear').style.display='none';$('#phAsrama').value='';$('#phStatus').value='';$('#phJenjang').value='';$('#phBed').value='';
       this.state.page=1;this.load();
     };
   },
@@ -10384,7 +10390,10 @@ SRIT.Features.penghuni={
     const terisi=SRIT.Store.read('TEMPAT_TIDUR').filter(b=>b.STATUS==='TERISI').length;
     const kpi=(v,l,c)=>`<div class="col-6 col-lg-3"><div class="kpi"><div class="kpi-lbl">${l}</div><div class="kpi-val">${v}</div><div class="trend text-muted-2">${c||''}</div></div></div>`;
     $('#phKpi').innerHTML=kpi(anak.filter(a=>a.STATUS==='AKTIF').length,'Penghuni Aktif')+kpi(cap,'Kapasitas Bed')+kpi(terisi,'Bed Terisi',SRIT.Util.pct(terisi,cap)+'% okupansi')+kpi(cap-terisi,'Bed Tersedia');
-    const r=SRIT.Api.list('ANAK',{page:this.state.page,size:this.state.size,search:this.state.search,searchFields:['NAMA','NIS'],filters:{ASRAMA:this.state.asrama,STATUS:this.state.status}});
+    this.renderRekap(anak);
+    const bedIds=new Set(SRIT.Store.read('TEMPAT_TIDUR').map(b=>b.ID)),bedSt=this.state.bed;
+    const r=SRIT.Api.list('ANAK',{page:this.state.page,size:this.state.size,search:this.state.search,searchFields:['NAMA','NIS'],filters:{ASRAMA:this.state.asrama,STATUS:this.state.status,JENJANG:this.state.jenjang},
+      where:bedSt?a=>{const has=!!a.TEMPAT_TIDUR&&bedIds.has(a.TEMPAT_TIDUR);return bedSt==='PUNYA'?has:!has;}:null});
     $('#phTable').innerHTML=`<thead><tr><th>NIS</th><th>Nama</th><th>Jenjang</th><th>Kamar</th><th>Tempat Tidur</th><th>Wali Asuh</th><th>Status</th><th></th></tr></thead><tbody>
     ${r.rows.length?r.rows.map(a=>`<tr><td>${a.NIS}</td><td class="fw-semibold">${SRIT.Util.esc(a.NAMA)}</td><td><span class="badge-soft st-IZIN">${a.JENJANG}</span></td>
       <td>${(SRIT.Repo.getById('KAMAR',a.KAMAR)||{}).NAME||'-'}</td>
@@ -10397,6 +10406,36 @@ SRIT.Features.penghuni={
     $('#phPag').innerHTML=SRIT.UI.pagination(r);
     $$('#phPag [data-pg]').forEach(a=>a.onclick=()=>{this.state.page=+a.dataset.pg;this.load();});
     this.renderChips();
+  },
+  // Rekap sebaran per jenjang: penghuni aktif (STATUS=AKTIF, sama dengan kartu "Penghuni Aktif"), status tempat tidur, kapasitas bed, dan sebaran per asrama
+  renderRekap(anak){
+    const box=$('#phRekap');if(!box)return;
+    const E=SRIT.Util.esc,beds=SRIT.Store.read('TEMPAT_TIDUR'),bedIds=new Set(beds.map(b=>b.ID)),asr=SRIT.Store.read('ASRAMA');
+    const aktif=anak.filter(a=>a.STATUS==='AKTIF');
+    const jn=['SRD','SRMP','SRMA'];
+    [].concat(aktif.map(a=>a.JENJANG),beds.map(b=>b.JENJANG)).forEach(j=>{j=String(j||'').trim();if(j&&jn.indexOf(j)<0)jn.push(j);});
+    const hasBed=a=>!!a.TEMPAT_TIDUR&&bedIds.has(a.TEMPAT_TIDUR);
+    const rows=jn.map(j=>{
+      const ak=aktif.filter(a=>a.JENJANG===j),bd=beds.filter(b=>b.JENJANG===j),ter=bd.filter(b=>b.STATUS==='TERISI').length;
+      const ph=ak.filter(hasBed).length;
+      return {j,ak,n:ak.length,ph,belum:ak.length-ph,cap:bd.length,ter,kos:bd.filter(b=>b.STATUS==='KOSONG').length,rusak:bd.filter(b=>b.STATUS==='RUSAK').length};
+    });
+    const sum=k=>rows.reduce((s,x)=>s+x[k],0),tot={n:sum('n'),ph:sum('ph'),belum:sum('belum'),cap:sum('cap'),ter:sum('ter'),kos:sum('kos'),rusak:sum('rusak')};
+    const cols=asr.map(a=>({id:a.ID,nm:a.NAME}));const known=new Set(cols.map(c=>c.id));
+    const inCol=(x,id)=>x.ak.filter(a=>id===''?!a.ASRAMA||!known.has(a.ASRAMA):a.ASRAMA===id).length;
+    const allCols=cols.concat([{id:'',nm:'Belum ditempatkan'}]);
+    const pill=(v,c)=>v?`<span class="badge-soft ${c}">${v}</span>`:'<span class="text-muted-2">0</span>';
+    const jl=j=>`<a href="javascript:void(0)" class="fw-semibold" data-rj="${E(j)}" title="Tampilkan daftar jenjang ${E(j)}">${E(j)}</a>`;
+    box.innerHTML=`<details open><summary class="fw-bold" style="cursor:pointer"><i class="bi bi-diagram-3"></i> Rekap Sebaran Penghuni per Jenjang <span class="text-muted-2 fw-normal" style="font-size:11px">· penghuni berstatus AKTIF</span></summary>
+      <div class="table-responsive mt-2"><table class="table table-srit mb-0"><thead><tr><th>Jenjang</th><th class="text-end">Penghuni</th><th class="text-end">Sudah ada bed</th><th class="text-end">Belum ada bed</th><th class="text-end">Kapasitas bed</th><th class="text-end">Bed terisi</th><th class="text-end">Bed kosong</th><th class="text-end">Bed rusak</th><th class="text-end">Okupansi</th></tr></thead><tbody>
+      ${rows.map(x=>`<tr><td>${jl(x.j)}</td><td class="text-end">${x.n}</td><td class="text-end">${x.ph}</td><td class="text-end">${pill(x.belum,'st-ALPA')}</td><td class="text-end">${x.cap}</td><td class="text-end">${x.ter}</td><td class="text-end">${x.kos}</td><td class="text-end">${x.rusak}</td><td class="text-end">${SRIT.Util.pct(x.ter,x.cap)}%</td></tr>`).join('')}
+      <tr class="fw-bold"><td>Total</td><td class="text-end">${tot.n}</td><td class="text-end">${tot.ph}</td><td class="text-end">${tot.belum}</td><td class="text-end">${tot.cap}</td><td class="text-end">${tot.ter}</td><td class="text-end">${tot.kos}</td><td class="text-end">${tot.rusak}</td><td class="text-end">${SRIT.Util.pct(tot.ter,tot.cap)}%</td></tr></tbody></table></div>
+      <div class="fw-semibold mt-3 mb-1" style="font-size:13px">Sebaran per Asrama</div>
+      <div class="table-responsive"><table class="table table-srit mb-0"><thead><tr><th>Jenjang</th>${allCols.map(c=>`<th class="text-end">${E(c.nm)}</th>`).join('')}<th class="text-end">Total</th></tr></thead><tbody>
+      ${rows.map(x=>`<tr><td>${jl(x.j)}</td>${allCols.map(c=>`<td class="text-end">${inCol(x,c.id)||'<span class="text-muted-2">0</span>'}</td>`).join('')}<td class="text-end fw-semibold">${x.n}</td></tr>`).join('')}
+      <tr class="fw-bold"><td>Total</td>${allCols.map(c=>`<td class="text-end">${rows.reduce((s,x)=>s+inCol(x,c.id),0)}</td>`).join('')}<td class="text-end">${tot.n}</td></tr></tbody></table></div>
+      <div class="text-muted-2 mt-2" style="font-size:11px">Kapasitas, terisi, kosong, dan rusak dihitung dari tempat tidur menurut peruntukan jenjangnya. Klik nama jenjang untuk memfilter daftar di bawah.</div></details>`;
+    box.querySelectorAll('[data-rj]').forEach(el=>el.onclick=()=>{this.state.jenjang=el.dataset.rj;this.state.page=1;const s=$('#phJenjang');if(s)s.value=this.state.jenjang;this.load();});
   },
   place(id,after){
     const a=SRIT.Repo.getById('ANAK',id);

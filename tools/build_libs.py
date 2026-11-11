@@ -2,11 +2,11 @@
 """Buat ulang pustaka yang ditanam SRITi (jalankan HANYA bila ada ikon baru atau versi pustaka diganti).
 Langkah:
   1) mkdir libsrc && cd libsrc
-     npm pack bootstrap@5.3.3 bootstrap-icons@1.11.3 chart.js@4.4.6 xlsx@0.18.5 jsqr@1.4.0
+     npm pack bootstrap@5.3.3 bootstrap-icons@1.11.3 chart.js@4.4.6 xlsx@0.18.5 jsqr@1.4.0 qrcode-generator@1.4.4
      (ekstrak tiap .tgz ke folder bernama sama tanpa .tgz, mis. bootstrap-5.3.3/package/...)
   2) pip install fonttools brotli
   3) python build_libs.py <folder_libsrc> <folder_clasp_package> <folder_srit-app>
-Hasil: Lib_Bootstrap.html (Bootstrap + ikon SUBSET), Lib_Chart/Lib_JsQR/Lib_Xlsx.html (sumber cadangan apiLibSource), srit-app/libs/*.
+Hasil: Lib_Bootstrap.html (Bootstrap + ikon SUBSET), Lib_Chart/Lib_JsQR/Lib_Xlsx/Lib_Qr.html (sumber cadangan apiLibSource), srit-app/libs/*.
 Ikon yang ikut = semua nama ikon bootstrap-icons yang muncul sebagai kata di berkas .html/.gs paket (aman untuk nama ikon dinamis)."""
 import re, glob, base64, io, sys, os
 from fontTools import subset
@@ -36,7 +36,7 @@ js = strip_map(rd(P('bootstrap-5.3.3', 'package', 'dist', 'js', 'bootstrap.bundl
 open(os.path.join(CLASP, 'Lib_Bootstrap.html'), 'w', encoding='utf-8').write(
     '<!-- SRITi — pustaka inti DITANAM (tanpa CDN): Bootstrap 5.3.3 + Bootstrap Icons 1.11.3 (subset). Dibuat oleh tools/build_libs.py -->\n<style id="srit-lib-css">\n' + css + '\n' + ico + '</style>\n<script>\n' + js + '\n</script>\n')
 os.makedirs(os.path.join(APP, 'libs'), exist_ok=True)
-for src, name, fn in [('chart.js-4.4.6/package/dist/chart.umd.js', 'Lib_Chart', 'chart.umd.js'), ('jsqr-1.4.0/package/dist/jsQR.js', 'Lib_JsQR', 'jsQR.js'), ('xlsx-0.18.5/package/dist/xlsx.full.min.js', 'Lib_Xlsx', 'xlsx.full.min.js')]:
+for src, name, fn in [('chart.js-4.4.6/package/dist/chart.umd.js', 'Lib_Chart', 'chart.umd.js'), ('jsqr-1.4.0/package/dist/jsQR.js', 'Lib_JsQR', 'jsQR.js'), ('xlsx-0.18.5/package/dist/xlsx.full.min.js', 'Lib_Xlsx', 'xlsx.full.min.js'), ('qrcode-generator-1.4.4/package/qrcode.js', 'Lib_Qr', 'qrcode.js')]:
     t = strip_map(rd(P(*src.split('/'))))
     open(os.path.join(CLASP, name + '.html'), 'w', encoding='utf-8').write(t)
     open(os.path.join(APP, 'libs', fn), 'w', encoding='utf-8').write(t)
