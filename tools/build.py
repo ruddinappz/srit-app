@@ -5,6 +5,8 @@ Contoh: python build.py ../../clasp_package ..
 """
 import re, sys, pathlib, shutil
 src = pathlib.Path(sys.argv[1]); out = pathlib.Path(sys.argv[2])
+import subprocess
+subprocess.run([sys.executable, str(pathlib.Path(__file__).with_name('make_manifest.py')), str(src)], check=True)   # manifest berkas untuk selfCheck_ (Apps Script)
 inc = re.compile(r"<\?!=\s*include\(\s*['\"]([A-Za-z0-9_]+)['\"]\s*\)\s*;?\s*\?>")
 def expand(text, depth=0):
     if depth > 5: raise SystemExit('include terlalu dalam')
@@ -14,9 +16,9 @@ def expand(text, depth=0):
         return expand(f.read_text(encoding='utf-8'), depth + 1)
     return inc.sub(rep, text)
 html = expand((src / 'Index.html').read_text(encoding='utf-8'))
-# V1.9.92: menu "lazy" (LAZY_VIEWS_ di Config.gs) di Apps Script dimuat saat dibuka; GitHub Pages tidak memakai server-lib, jadi disisipkan langsung di sini.
-_lz = re.search(r"const LAZY_VIEWS_ = \{([^}]*)\}", (src / 'Config.gs').read_text(encoding='utf-8'))
-_lazy = re.findall(r"'[^']+':\s*'([A-Za-z0-9_]+)'", _lz.group(1)) if _lz else []
+# menu "lazy" (LAZY_VIEWS_ di Config.gs): di Apps Script dimuat saat dibuka; GitHub Pages tidak memakai server-lib, jadi disisipkan langsung di sini.
+_lz = re.search(r"const LAZY_VIEWS_ = \{(.*?)\};", (src / 'Config.gs').read_text(encoding='utf-8'))
+_lazy = list(dict.fromkeys(re.findall(r"'((?:View|JS)_[A-Za-z0-9_]+)'", _lz.group(1)))) if _lz else []
 _blob = ''.join('<script>__srit.n(\'%s\')</script>\n%s\n' % (n, expand((src / (n + '.html')).read_text(encoding='utf-8'))) for n in _lazy)
 if _lazy and '<!--LAZY_VIEWS-->' not in html: raise SystemExit('Penanda <!--LAZY_VIEWS--> tidak ada di Index.html')
 html = html.replace('<!--LAZY_VIEWS-->', _blob, 1)
