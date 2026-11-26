@@ -12863,6 +12863,7 @@ return F;
  *   1) Impor/ekspor Excel instrumen 56 butir (template_penilaian_non_akademik) — dipanggil dari tab Penilaian Wali (View_Penilaian). Menggantikan tab "Nilai SRMA (62)" (V1.9.88).
  *   2) Raport Keasramaan : 15 kategori / 79 indikator (predikat A/B/C + deskripsi); keluaran Word identik A__..._RAPORT_KEASRAMAAN_GANJIL.docx (watermark, header, tanda tangan)
  * Cetakan Word dimuat dari server (apiRaporAsset <- Assets_RaporSRMA.gs / Assets_RaporWM.gs, dibangun oleh tools/make_assets_rapor.py).
+ * Tab Nilai Matrikulasi (V1.9.91): 41 nilai/anak (9 kelompok) sesuai FORMAT_PENGUMPULAN_NILAI_MATRIKULASI_26-27.xlsx; tabel NILAI_MATRIKULASI; impor/ekspor Excel per kelas.
  * Tabel: ANGKET_NONAK (penilaian wali asuh; JAWABAN={_v:2,id:nilai}), RAPORT_KA (JAWABAN={k:{p:A|B|C,d:deskripsi}}, KETIDAKHADIRAN, baris ANAK='_CFG' = pengaturan raport). NILAI_SRMA = data lama, tidak lagi diisi dari menu (hanya dibaca tombol "Isi dari Nilai SRMA" di Raport Keasramaan). */
 SRIT.RaporSRMA=(function(){
 'use strict';
@@ -13102,6 +13103,174 @@ SRIT.RaporSRMA=(function(){
     }catch(e){SRIT.Notify('Gagal membaca berkas: '+(e.message||e),'err');}finally{_busy=false;}
   }
 
+  /* ========================================= TAB: NILAI MATRIKULASI ========================================= */
+  // Acuan: FORMAT_PENGUMPULAN_NILAI_MATRIKULASI_26-27.xlsx. 9 kelompok (LIT NUM SAI BIN ENG AGM KEP SOS MAN); 5 kelompok pertama punya "AWAL" (capaian awal / diagnostik) + 4 indikator, 4 terakhir hanya 4 indikator
+  // = 41 kolom nilai 0-100 per anak. Tabel NILAI_MATRIKULASI: JAWABAN = JSON {"LIT-AWAL":80,"LIT-1":75,...}; satu baris per anak per periode.
+  const MK=[{"nama": "LITERASI", "kode": "LIT", "awal": true, "ind": ["Membaca berbagai teks secara efisien dan kritis", "Menganalisis, menyimpulkan, dan mengevaluasi isi bacaan", "Menulis teks terstruktur dengan gagasan yang jelas", "rutin membaca beragam sumber dan merefleksikan bacaannya"]}, {"nama": "NUMERASI", "kode": "NUM", "awal": true, "ind": ["Menggunakan operasi bilangan, aljabar dasar, dan perbandingan dengan benar", "Menerapkan konsep geometri dan pengukuran dalam masalah nyata", "Bernalar dan menyelesaikan masalah kontekstual secara sistematis", "Menganalisis dan menafsirkan data untuk mengambil keputusan"]}, {"nama": "SAINS", "kode": "SAI", "awal": true, "ind": ["Menjelaskan konsep sains dan keterkaitannya antar bidang", "Merancang dan melakukan percobaan dengan prosedur yang tepat", "Menganalisis data dan menyusun proposal penelitian sederhana", "Menerapkan sains dan sikap ilmiah untuk memecahkan masalah"]}, {"nama": "BAHASA INDONESIA", "kode": "BIN", "awal": true, "ind": ["Menyimak dan menilai gagasan dari paparan lisan", "Menyampaikan gagasan dan argumen secara lisan dengan sistematis", "Menggunakan ragam bahasa dan diksi yang sesuai konteks", "Menulis teks eksposisi, argumentasi, dan laporan"]}, {"nama": "BAHASA INGGRIS", "kode": "ENG", "awal": true, "ind": ["Menggunakan kosakata bahasa inggris yang lebih luas sesuai konteks", "Memahami informasi dalam percakapan dan teks lisan bahasa inggris", "Berkomunikasi fungsional secara lisan dalam bahasa inggris", "Membaca dan menulis teks fungsional dalam bahasa inggris"]}, {"nama": "KEAGAMAAN DAN AKHLAK MULIA", "kode": "AGM", "awal": false, "ind": ["Melaksanakan ibadah secara konsisten dan ikut memandu ibadah bersama", "Menghafal minimal 20 surat pendek atau bacaan setara sesuai agamanya", "Menunjukkan integrasi dan keteladanan akhlak dalam keseharian", "Mengembangkan sikap toleran dan menjaga kerukunan antar umat beragama"]}, {"nama": "KEPEMIMPINAN DAN KESAMAPTAAN", "kode": "KEP", "awal": false, "ind": ["Menjaga disiplin diri dan menjadi teladan ketertiban", "Memimpin atau mengatur jalannya PBB dan upacara", "Mencapai target kebugaran (Push Up, Sit Up, Pull Up)", "Memimpin dengan keteladanan dan mengelola kelompok"]}, {"nama": "KETERAMPILAN SOSIAL DAN KEPRIBADIAN", "kode": "SOS", "awal": false, "ind": ["Berkolaborasi dan berkontribusi dalam tim", "Berkomunikasi efektif dan santun dalam berbagai situasi", "Menunjukkan empati dan menghargai perbedaan pendapat", "Mengelola emosi dan menyelesaikan konflik secara dewasa"]}, {"nama": "KEMANDIRIAN DAN KEASRAMAAN", "kode": "MAN", "awal": false, "ind": ["Merawat diri dan menjaga kesehatan secara mandiri", "Mengelola kebersihan kamar, mencuci, dan memasak sederhana secara mandiri", "Mengelola waktu secara mandiri dan menjaga keteraturan", "Menaati aturan dan membantu menertibkan lingkungan asrama"]}];
+  const MK_KEYS=[];MK.forEach(g=>{if(g.awal)MK_KEYS.push(g.kode+'-AWAL');for(let i=1;i<=4;i++)MK_KEYS.push(g.kode+'-'+i);});   // urutan kolom D..AR
+  const MK_STY={"r1": [1, 1, 2, 2], "r2": [3, 4, 5, 5], "r5": [4, 4, 5, 6, 7, 7, 7, 8, 9, 10, 10, 10, 11, 12, 10, 10, 10, 11, 13, 10, 10, 10, 11, 12, 10, 10, 10, 11, 14, 10, 10, 11, 15, 10, 10, 11, 14, 10, 10, 11, 15, 10, 10, 11], "r6": [16, 16, 17, 18, 19, 19, 19, 19, 20, 21, 21, 21, 21, 22, 21, 21, 21, 21, 22, 21, 21, 21, 21, 22, 21, 21, 21, 21, 23, 23, 23, 23, 24, 24, 24, 24, 23, 23, 23, 23, 24, 24, 24, 24], "r7": [25, 25, 26, 27, 28, 28, 28, 28, 29, 30, 30, 30, 30, 31, 30, 30, 30, 30, 31, 30, 30, 30, 30, 31, 30, 30, 30, 30, 32, 32, 32, 32, 33, 33, 33, 33, 32, 32, 32, 32, 33, 33, 33, 33], "d8": [34, 35, 36], "d9": [38, 39, 40], "dv": 37};
+  const MK_STYLES="<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:x14ac=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><fonts count=\"12\"><font><sz val=\"11.0\"/><color/><name val=\"Arial\"/><scheme val=\"minor\"/></font><font><sz val=\"11.0\"/><color/><name val=\"Arial\"/></font><font><sz val=\"10.0\"/><color/><name val=\"Arial\"/></font><font><b/><sz val=\"9.0\"/><name val=\"Arial\"/></font><font/><font><b/><sz val=\"9.0\"/><color rgb=\"FFFFFFFF\"/><name val=\"Arial\"/></font><font><b/><sz val=\"8.0\"/><color rgb=\"FFFFFFFF\"/><name val=\"Arial\"/></font><font><sz val=\"8.0\"/><color rgb=\"FFFFFFFF\"/><name val=\"Arial\"/></font><font><sz val=\"11.0\"/><color/><name val=\"Calibri\"/></font><font><sz val=\"10.0\"/><color rgb=\"FF0000FF\"/><name val=\"Arial\"/></font><font><b/><sz val=\"11.0\"/><color/><name val=\"Calibri\"/></font><font><b/><u/><sz val=\"10.0\"/><color/><name val=\"Arial\"/></font></fonts><fills count=\"8\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"lightGray\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor rgb=\"FFFFFF00\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFF0000\"/><bgColor rgb=\"FFFF0000\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFC0504D\"/><bgColor rgb=\"FFC0504D\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFD9877F\"/><bgColor rgb=\"FFD9877F\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFFFF\"/><bgColor rgb=\"FFFFFFFF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFF8D6\"/><bgColor rgb=\"FFFFF8D6\"/></patternFill></fill></fills><borders count=\"19\"><border/><border><left style=\"thin\"><color rgb=\"FF000000\"/></left><top style=\"thin\"><color rgb=\"FF000000\"/></top><bottom style=\"thin\"><color rgb=\"FF000000\"/></bottom></border><border><top style=\"thin\"><color rgb=\"FF000000\"/></top><bottom style=\"thin\"><color rgb=\"FF000000\"/></bottom></border><border><right style=\"thin\"><color rgb=\"FF000000\"/></right><top style=\"thin\"><color rgb=\"FF000000\"/></top><bottom style=\"thin\"><color rgb=\"FF000000\"/></bottom></border><border><left/><top style=\"thin\"><color rgb=\"FF999999\"/></top><bottom style=\"thin\"><color rgb=\"FF999999\"/></bottom></border><border><top style=\"thin\"><color rgb=\"FF999999\"/></top><bottom style=\"thin\"><color rgb=\"FF999999\"/></bottom></border><border><right style=\"thin\"><color rgb=\"FF999999\"/></right><top style=\"thin\"><color rgb=\"FF999999\"/></top><bottom style=\"thin\"><color rgb=\"FF999999\"/></bottom></border><border><left style=\"thin\"><color rgb=\"FF999999\"/></left><top style=\"thin\"><color rgb=\"FF999999\"/></top><bottom style=\"thin\"><color rgb=\"FF999999\"/></bottom></border><border><left style=\"thin\"><color rgb=\"FF000000\"/></left><right style=\"thin\"><color rgb=\"FF000000\"/></right><top style=\"thin\"><color rgb=\"FF000000\"/></top></border><border><left style=\"thin\"><color rgb=\"FF000000\"/></left><top style=\"thin\"><color rgb=\"FF000000\"/></top></border><border><left style=\"thin\"><color rgb=\"FF000000\"/></left><right style=\"thin\"><color rgb=\"FF000000\"/></right><top style=\"thin\"><color rgb=\"FF000000\"/></top><bottom style=\"thin\"><color rgb=\"FF000000\"/></bottom></border><border><left/><right style=\"thin\"><color rgb=\"FF999999\"/></right><top style=\"thin\"><color rgb=\"FF999999\"/></top><bottom style=\"thin\"><color rgb=\"FF999999\"/></bottom></border><border><left style=\"thin\"><color rgb=\"FF999999\"/></left><right style=\"thin\"><color rgb=\"FF999999\"/></right><top style=\"thin\"><color rgb=\"FF999999\"/></top><bottom style=\"thin\"><color rgb=\"FF999999\"/></bottom></border><border><left style=\"thin\"><color rgb=\"FF000000\"/></left><right style=\"thin\"><color rgb=\"FF000000\"/></right><bottom style=\"thin\"><color rgb=\"FF000000\"/></bottom></border><border><left style=\"thin\"><color rgb=\"FF000000\"/></left><bottom style=\"thin\"><color rgb=\"FF000000\"/></bottom></border><border><left style=\"thin\"><color rgb=\"FF999999\"/></left><right style=\"thin\"><color rgb=\"FF999999\"/></right><top/><bottom style=\"thin\"><color rgb=\"FF999999\"/></bottom></border><border><left/><right/><top/><bottom/></border><border><top style=\"thin\"><color rgb=\"FF000000\"/></top></border><border><right style=\"thin\"><color rgb=\"FF000000\"/></right><top style=\"thin\"><color rgb=\"FF000000\"/></top></border></borders><cellStyleXfs count=\"1\"><xf borderId=\"0\" fillId=\"0\" fontId=\"0\" numFmtId=\"0\" applyAlignment=\"1\" applyFont=\"1\"/></cellStyleXfs><cellXfs count=\"86\"><xf borderId=\"0\" fillId=\"0\" fontId=\"0\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyFont=\"1\"><alignment readingOrder=\"0\" shrinkToFit=\"0\" vertical=\"bottom\" wrapText=\"0\"/></xf><xf borderId=\"0\" fillId=\"0\" fontId=\"1\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyFont=\"1\"><alignment horizontal=\"center\"/></xf><xf borderId=\"0\" fillId=\"0\" fontId=\"1\" numFmtId=\"0\" xfId=\"0\" applyFont=\"1\"/><xf borderId=\"0\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyFont=\"1\"><alignment horizontal=\"left\"/></xf><xf borderId=\"0\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyFont=\"1\"><alignment horizontal=\"center\"/></xf><xf borderId=\"0\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyFont=\"1\"/><xf borderId=\"1\" fillId=\"2\" fontId=\"3\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"2\" fillId=\"0\" fontId=\"4\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"3\" fillId=\"0\" fontId=\"4\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"4\" fillId=\"0\" fontId=\"5\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"5\" fillId=\"0\" fontId=\"4\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"6\" fillId=\"0\" fontId=\"4\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"7\" fillId=\"2\" fontId=\"3\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"7\" fillId=\"0\" fontId=\"5\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"7\" fillId=\"3\" fontId=\"5\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"7\" fillId=\"0\" fontId=\"5\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"8\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"9\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"4\" fontId=\"6\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"10\" fillId=\"5\" fontId=\"6\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"11\" fillId=\"4\" fontId=\"6\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"12\" fillId=\"5\" fontId=\"6\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"12\" fillId=\"4\" fontId=\"6\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"12\" fillId=\"3\" fontId=\"6\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"12\" fillId=\"0\" fontId=\"6\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"13\" fillId=\"0\" fontId=\"4\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"14\" fillId=\"0\" fontId=\"4\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"10\" fillId=\"4\" fontId=\"7\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" textRotation=\"90\" wrapText=\"1\"/></xf><xf borderId=\"10\" fillId=\"5\" fontId=\"7\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" textRotation=\"90\" wrapText=\"1\"/></xf><xf borderId=\"11\" fillId=\"4\" fontId=\"7\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" textRotation=\"90\" wrapText=\"1\"/></xf><xf borderId=\"12\" fillId=\"5\" fontId=\"7\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" textRotation=\"90\" wrapText=\"1\"/></xf><xf borderId=\"12\" fillId=\"4\" fontId=\"7\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" textRotation=\"90\" wrapText=\"1\"/></xf><xf borderId=\"12\" fillId=\"3\" fontId=\"7\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" textRotation=\"90\" wrapText=\"1\"/></xf><xf borderId=\"12\" fillId=\"0\" fontId=\"7\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" textRotation=\"90\" wrapText=\"1\"/></xf><xf borderId=\"10\" fillId=\"6\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf quotePrefix=\"1\" borderId=\"10\" fillId=\"6\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"6\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"15\" fillId=\"7\" fontId=\"9\" numFmtId=\"1\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\" applyNumberFormat=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"10\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf quotePrefix=\"1\" borderId=\"10\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"0\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyFont=\"1\"><alignment horizontal=\"center\"/></xf><xf borderId=\"16\" fillId=\"6\" fontId=\"1\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\"/></xf><xf borderId=\"16\" fillId=\"6\" fontId=\"1\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment shrinkToFit=\"0\" wrapText=\"1\"/></xf><xf borderId=\"16\" fillId=\"6\" fontId=\"1\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"/><xf borderId=\"16\" fillId=\"6\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"/><xf borderId=\"16\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"left\"/></xf><xf borderId=\"16\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\"/></xf><xf borderId=\"16\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment shrinkToFit=\"0\" wrapText=\"1\"/></xf><xf borderId=\"16\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"/><xf borderId=\"16\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"left\" shrinkToFit=\"0\" wrapText=\"1\"/></xf><xf borderId=\"8\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"10\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"10\" fillId=\"6\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"10\" fillId=\"6\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"left\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"10\" fillId=\"6\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"left\" vertical=\"center\"/></xf><xf borderId=\"16\" fillId=\"6\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\"/></xf><xf borderId=\"16\" fillId=\"6\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment shrinkToFit=\"0\" wrapText=\"1\"/></xf><xf borderId=\"8\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" shrinkToFit=\"0\" vertical=\"center\" wrapText=\"1\"/></xf><xf borderId=\"8\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"3\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf quotePrefix=\"1\" borderId=\"10\" fillId=\"3\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"3\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFill=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"16\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\"/></xf><xf borderId=\"16\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"8\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"17\" fillId=\"0\" fontId=\"4\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"18\" fillId=\"0\" fontId=\"4\" numFmtId=\"0\" xfId=\"0\" applyBorder=\"1\" applyFont=\"1\"/><xf borderId=\"0\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf quotePrefix=\"1\" borderId=\"3\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"1\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"3\" fillId=\"0\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"0\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"3\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"0\" fontId=\"10\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"1\" fillId=\"0\" fontId=\"10\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"10\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf borderId=\"3\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"2\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment vertical=\"center\"/></xf><xf borderId=\"0\" fillId=\"0\" fontId=\"11\" numFmtId=\"0\" xfId=\"0\" applyFont=\"1\"/><xf borderId=\"0\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyFont=\"1\"/><xf quotePrefix=\"1\" borderId=\"10\" fillId=\"0\" fontId=\"8\" numFmtId=\"0\" xfId=\"0\" applyAlignment=\"1\" applyBorder=\"1\" applyFont=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf></cellXfs><cellStyles count=\"1\"><cellStyle xfId=\"0\" name=\"Normal\" builtinId=\"0\"/></cellStyles><dxfs count=\"0\"/></styleSheet>";
+  const mkClean=v=>{if(v===''||v==null)return null;const n=Number(String(v).replace(',','.'));return (isFinite(n)&&n>=0&&n<=100)?Math.round(n*100)/100:undefined;};   // null = kosong, undefined = tidak valid
+  function mkAvg(j){const v=[];MK.forEach(g=>{for(let i=1;i<=4;i++){const x=j[g.kode+'-'+i];if(typeof x==='number')v.push(x);}});return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*100)/100:null;}   // rata-rata indikator (capaian AWAL tidak ikut)
+  function mkGroupAvg(j,g){const v=[];for(let i=1;i<=4;i++){const x=j[g.kode+'-'+i];if(typeof x==='number')v.push(x);}return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10:null;}
+  const mkParse=s=>{const o=parseJ(s),r={};Object.keys(o).forEach(k=>{if(typeof o[k]==='number')r[k]=o[k];});return r;};
+  function mkSheetName(kelas,jenjang,used){
+    const lab=({SRMA:'SMA',SRMP:'SMP',SRD:'SD'})[jenjang]||jenjang||'',k=String(kelas||'-').replace(/[-\s]+/g,'');
+    let n=((lab?lab+' ':'')+'Kelas '+k).replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31),b=n,i=2;while(used[n]){n=b.slice(0,28)+' '+i++;}used[n]=1;return n;
+  }
+  /** Excel format pengumpulan nilai matrikulasi: satu sheet per kelas, tata letak & gaya sama dengan berkas acuan. kelas: [{kelas,jenjang,rows:[{induk,nama,nilai:{kunci:angka}}]}] */
+  async function buildXlsxMk(kelasList,tgl){
+    const cn=colName,cs=(r,c,st,t)=>`<c r="${cn(c)}${r}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${xe(t)}</t></is></c>`,ce=(r,c,st)=>`<c r="${cn(c)}${r}" s="${st}"/>`,cn_=(r,c,st,v)=>`<c r="${cn(c)}${r}" s="${st}"><v>${v}</v></c>`;
+    const used={},sheets=[];
+    const cols='<cols><col customWidth="1" min="1" max="1" width="6.43"/><col customWidth="1" min="2" max="2" width="12"/><col customWidth="1" min="3" max="3" width="32"/><col customWidth="1" min="4" max="44" width="10"/></cols>';
+    // gabungan sel baris 5 (judul kelompok)
+    const merges=[];let c0=4;MK.forEach(g=>{const n=(g.awal?5:4);merges.push(cn(c0)+'5:'+cn(c0+n-1)+'5');c0+=n;});merges.push('A6:A7','B6:B7','C6:C7');
+    kelasList.forEach(K=>{
+      const nm=mkSheetName(K.kelas,K.jenjang,used),n=K.rows.length,last=Math.max(8+n-1,8);
+      let sd=`<row r="1">${ce(1,1,MK_STY.r1[0])}${ce(1,2,MK_STY.r1[1])}${ce(1,3,MK_STY.r1[2])}${ce(1,4,MK_STY.r1[3])}</row>`;
+      sd+=`<row r="2">${cs(2,1,MK_STY.r2[0],'KELAS')}${ce(2,2,MK_STY.r2[1])}${cs(2,3,MK_STY.r2[2],': '+(K.kelas||''))}</row>`;
+      sd+=`<row r="3">${cs(3,1,MK_STY.r2[0],'WALI KELAS')}${ce(3,2,MK_STY.r2[1])}${cs(3,3,MK_STY.r2[2],': '+(K.wali||''))}</row>`;
+      sd+=`<row r="4">${cs(4,1,MK_STY.r2[0],'HARI/TGL')}${ce(4,2,MK_STY.r2[1])}${cs(4,3,MK_STY.r2[2],': '+(tgl||''))}</row>`;
+      let r5='',r6='',r7='',c=4;
+      for(let i=1;i<=3;i++){r5+=ce(5,i,MK_STY.r5[i-1]);}
+      r6+=cs(6,1,MK_STY.r6[0],'NO ')+cs(6,2,MK_STY.r6[1],'NO INDUK ')+cs(6,3,MK_STY.r6[2],'NAMA SISWA');r7+=ce(7,1,MK_STY.r7[0])+ce(7,2,MK_STY.r7[1])+ce(7,3,MK_STY.r7[2]);
+      MK.forEach(g=>{
+        for(let i=(g.awal?0:1);i<=4;i++,c++){
+          r5+=(i===(g.awal?0:1))?cs(5,c,MK_STY.r5[c-1],g.nama):ce(5,c,MK_STY.r5[c-1]);
+          r6+=cs(6,c,MK_STY.r6[c-1],i===0?'AWAL':g.kode+'-'+i);
+          r7+=cs(7,c,MK_STY.r7[c-1],i===0?'Capaian Awal (diagnostik, 0–100)':g.ind[i-1]);
+        }
+      });
+      sd+=`<row r="5">${r5}</row><row r="6" ht="14.25" customHeight="1">${r6}</row><row r="7" ht="96" customHeight="1">${r7}</row>`;
+      K.rows.forEach((o,i)=>{
+        const r=8+i,a=i===0?MK_STY.d8:MK_STY.d9;let x=cn_(r,1,a[0],i+1)+cs(r,2,a[1],o.induk||'')+cs(r,3,a[2],o.nama||'');
+        MK_KEYS.forEach((k,j)=>{const v=o.nilai&&o.nilai[k];x+=(typeof v==='number')?cn_(r,4+j,MK_STY.dv,v):ce(r,4+j,MK_STY.dv);});
+        sd+=`<row r="${r}" ht="19.5" customHeight="1">${x}</row>`;
+      });
+      const dv=`<dataValidations count="1"><dataValidation type="decimal" allowBlank="1" showInputMessage="1" showErrorMessage="1" prompt="Nilai tidak valid - Isi angka 0 – 100." sqref="D8:AR${Math.max(last,37)}"><formula1>0.0</formula1><formula2>100.0</formula2></dataValidation></dataValidations>`;
+      sheets.push({nm,xml:XD+'\n'+`<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_R}"><dimension ref="A1:AR${last}"/><sheetViews><sheetView workbookViewId="0"><pane xSplit="3" ySplit="7" topLeftCell="D8" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultColWidth="14.43" defaultRowHeight="15"/>${cols}<sheetData>${sd}</sheetData><mergeCells count="${merges.length}">${merges.map(m=>`<mergeCell ref="${m}"/>`).join('')}</mergeCells>${dv}<pageMargins left="0.118" right="0.118" top="0.551" bottom="0.157" header="0" footer="0"/><pageSetup paperSize="9" scale="72" orientation="landscape"/></worksheet>`});
+    });
+    const RT='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    const files=[
+      {name:'[Content_Types].xml',data:XD+'\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+'</Types>'},
+      {name:'_rels/.rels',data:XD+`\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${RT}/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+      {name:'xl/workbook.xml',data:XD+`\n<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_R}"><sheets>${sheets.map((s,i)=>`<sheet name="${xe(s.nm)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`},
+      {name:'xl/_rels/workbook.xml.rels',data:XD+`\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="${RT}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length+1}" Type="${RT}/styles" Target="styles.xml"/></Relationships>`},
+      {name:'xl/styles.xml',data:XD+'\n'+MK_STYLES}].concat(sheets.map((s,i)=>({name:`xl/worksheets/sheet${i+1}.xml`,data:s.xml})));
+    return zip(files);
+  }
+  /** Baca berkas format matrikulasi -> {kelas:[{sheet,kelas,rows:[{induk,nama,nilai,baris}]}],jumlahKolom,galat:[...]}. Sheet dikenali dari judul "NAMA SISWA" + kode kolom (LIT-1, AWAL, ...); sheet lain (mis. daftar hadir) dilewati. */
+  function parseMk(XL,buf){
+    const wb=XL.read(buf,{type:'array'}),out=[],galat=[],valid={};MK_KEYS.forEach(k=>{valid[k]=1;});let kolom=0;
+    wb.SheetNames.forEach(nm=>{
+      const aoa=XL.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:true,defval:''});
+      const hi=aoa.findIndex(r=>r.some(c=>/^nama\s*siswa$/i.test(String(c).trim())));if(hi<0)return;
+      const h=aoa[hi].map(c=>String(c).trim().toUpperCase()),map={},cNama=h.findIndex(x=>/^NAMA\s*SISWA$/.test(x)),cInduk=h.findIndex(x=>/^NO\s*INDUK$/.test(x));
+      h.forEach((x,i)=>{if(/^[A-Z]{3}-[1-4]$/.test(x)&&valid[x])map[i]=x;else if(x==='AWAL'){const nx=h[i+1]||'',m=/^([A-Z]{3})-1$/.exec(nx);if(m&&valid[m[1]+'-AWAL'])map[i]=m[1]+'-AWAL';}});
+      if(!Object.keys(map).length)return;
+      kolom=Math.max(kolom,Object.keys(map).length);
+      let kelas='';for(let r=0;r<hi;r++){const a=String(aoa[r][0]||'').trim().toUpperCase();if(a==='KELAS'){kelas=String(aoa[r][2]||aoa[r][1]||'').replace(/^[:\s]+/,'').trim();break;}}
+      const rows=[];
+      for(let r=hi+1;r<aoa.length;r++){
+        const a=aoa[r];if(!a)continue;const nama=String(a[cNama]==null?'':a[cNama]).trim();if(!nama||/^capaian awal|^nilai/i.test(nama)&&!a.slice(3).some(x=>typeof x==='number'))continue;
+        const o={induk:String(cInduk>=0&&a[cInduk]!=null?a[cInduk]:'').trim(),nama:nama,nilai:{},baris:r+1};
+        Object.keys(map).forEach(i=>{const raw=a[i];if(raw===''||raw==null)return;const v=mkClean(raw);if(v===undefined)galat.push(nm+' baris '+(r+1)+' '+map[i]+': "'+raw+'" bukan angka 0–100');else if(v!==null)o.nilai[map[i]]=v;});
+        rows.push(o);
+      }
+      if(rows.length)out.push({sheet:nm,kelas:kelas,rows:rows});
+    });
+    return{kelas:out,jumlahKolom:kolom,galat:galat};
+  }
+  function mkDaftar(ctx){return daftarAnak(ctx);}
+  function mkBarisEkspor(ctx,kosong,kelasPilih){
+    const s=ctx.state,map=petaRows('NILAI_MATRIKULASI',s.periode),by={};
+    mkDaftar(ctx).forEach(a=>{const r=map[a.ID];if(!kosong&&!r)return;const k=(a.JENJANG||'')+'|'+(a.KELAS||'');
+      (by[k]=by[k]||{kelas:a.KELAS||'',jenjang:a.JENJANG||'',wali:'',rows:[]}).rows.push({induk:String(a.NIS||a.NISN||'').trim(),nama:String(a.NAMA||''),nilai:r?mkParse(r.JAWABAN):{}});});
+    return Object.keys(by).sort().map(k=>by[k]);
+  }
+  async function mkEkspor(ctx,kosong){
+    if(_busy)return;const L=mkBarisEkspor(ctx,kosong),n=L.reduce((a,k)=>a+k.rows.length,0);
+    if(!n){SRIT.Notify(kosong?'Tidak ada anak':'Belum ada nilai matrikulasi pada periode ini','warn');return;}
+    _busy=true;try{
+      const bin=await buildXlsxMk(L,'');
+      unduh(bin,'FORMAT_PENGUMPULAN_NILAI_MATRIKULASI_'+bersih(ctx.state.periode)+(ctx.state.jenjang?'_'+ctx.state.jenjang:'')+(kosong?'_kosong':'')+'.xlsx',MIME.xlsx);
+      SRIT.Audit.log('EXPORT','penilaian','matrikulasi-xlsx',null,{periode:ctx.state.periode,jumlah:n});SRIT.Notify(n+' anak pada '+L.length+' kelas diekspor','ok');
+    }catch(e){SRIT.Notify('Gagal ekspor: '+(e.message||e),'err');}finally{_busy=false;}
+  }
+  function mkSimpan(ctx,a,ex,j){
+    const t=Object.keys(j).length;
+    upsert('NILAI_MATRIKULASI','MKL',ex,{ANAK:a.ID,NAMA_ANAK:a.NAMA,PERIODE:ctx.state.periode,TANGGAL:SRIT.Util.todayISO(),JENJANG:a.JENJANG||'',KELAS:a.KELAS||'',JAWABAN:JSON.stringify(j),TERISI:t,RATA:mkAvg(j)==null?'':mkAvg(j),PENGISI:(SRIT.Auth.user||{}).NAME||'',DIUBAH_PADA:new Date().toISOString()});
+  }
+  async function mkImpor(ctx,file){
+    if(_busy)return;_busy=true;
+    try{
+      if(typeof XLSX==='undefined'){SRIT.Notify('Pustaka Excel belum termuat','err');return;}
+      const pr=parseMk(XLSX,await file.arrayBuffer());
+      if(!pr.kelas.length){SRIT.Notify('Tidak ada sheet berformat matrikulasi (judul NAMA SISWA + kode LIT-1 dst.) pada berkas','warn');return;}
+      const nn=x=>SRIT.Import._nn(x),anak=ctx._anak(),byInduk={},byNama={};
+      anak.forEach(a=>{[a.NIS,a.NISN,a.NIK].forEach(v=>{if(v)byInduk[nn(v)]=byInduk[nn(v)]||a;});(byNama[nn(a.NAMA)]=byNama[nn(a.NAMA)]||[]).push(a);});
+      const map=petaRows('NILAI_MATRIKULASI',ctx.state.periode),cocok=[],tidak=[];let kosong=0;
+      pr.kelas.forEach(K=>K.rows.forEach(o=>{
+        let a=o.induk&&byInduk[nn(o.induk)];if(!a){const l=byNama[nn(o.nama)]||[];a=l.length===1?l[0]:null;if(l.length>1){tidak.push(o.nama+' (nama kembar, isi NO INDUK = NIS)');return;}}
+        if(!a){tidak.push(o.nama+(o.induk?' ['+o.induk+']':''));return;}
+        if(!Object.keys(o.nilai).length){kosong++;return;}cocok.push({a:a,o:o,sheet:K.sheet});}));
+      const ada=cocok.filter(c=>map[c.a.ID]).length;
+      const m=SRIT.Modal.open({title:'Impor Nilai Matrikulasi',
+        body:`<div style="font-size:13px"><div>Berkas: <b>${E(file.name)}</b> · ${pr.kelas.length} sheet kelas (${E(pr.kelas.map(k=>k.sheet).join(', '))}) · ${pr.jumlahKolom} kolom nilai terbaca</div>
+          <div class="mt-2">${pill(cocok.length+' anak cocok','success')} ${pill(tidak.length+' tidak ditemukan',tidak.length?'warning':'secondary')} ${pill(ada+' akan diperbarui',ada?'danger':'secondary')}${kosong?' '+pill(kosong+' tanpa nilai (dilewati)','secondary'):''}</div>
+          <div class="mt-2">Periode tujuan: <b>${E(ctx.state.periode)}</b>. Anak dicocokkan lewat NO INDUK (NIS / NISN / NIK), lalu nama. Sel yang kosong di berkas <b>tidak</b> mengubah nilai yang sudah tersimpan.</div>
+          ${tidak.length?`<div class="mt-2 text-warning-emphasis">Tidak ditemukan: ${E(tidak.slice(0,8).join('; '))}${tidak.length>8?' …':''}</div>`:''}
+          ${pr.galat.length?`<div class="mt-2 text-danger">${pr.galat.length} nilai tidak valid dilewati: ${E(pr.galat.slice(0,3).join('; '))}</div>`:''}</div>`,
+        footer:`<button class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" id="mkOk" ${cocok.length?'':'disabled'}><i class="bi bi-check2"></i> Impor ${cocok.length} anak</button>`});
+      $('#mkOk',m.el).onclick=()=>{
+        let n=0;cocok.forEach(c=>{const ex=map[c.a.ID],j=Object.assign({},ex?mkParse(ex.JAWABAN):{},c.o.nilai);mkSimpan(ctx,c.a,ex,j);n++;});
+        m.close();SRIT.Notify(n+' anak diimpor','ok');ctx.render(ctx._host);
+      };
+    }catch(e){SRIT.Notify('Gagal membaca berkas: '+(e.message||e),'err');}finally{_busy=false;}
+  }
+  function mkForm(ctx,aid){
+    const s=ctx.state,a=SRIT.Repo.getById('ANAK',aid);if(!a)return;
+    const ex=petaRows('NILAI_MATRIKULASI',s.periode)[aid],cur=ex?mkParse(ex.JAWABAN):{};
+    const fld=(g,i)=>{const k=i===0?g.kode+'-AWAL':g.kode+'-'+i,lbl=i===0?'Capaian awal (diagnostik)':g.ind[i-1];
+      return `<div class="col-12 col-md-6 col-xl-4"><label class="form-label-sm" for="mk_${k}"><b>${k}</b> · ${E(lbl)}</label><input type="number" class="form-control form-control-sm" id="mk_${k}" name="${k}" min="0" max="100" step="any" inputmode="decimal" placeholder="0–100" value="${cur[k]===undefined?'':cur[k]}"></div>`;};
+    const m=SRIT.Modal.open({title:'Nilai Matrikulasi · '+E(a.NAMA),size:'modal-xl',
+      body:`<div class="row g-2 mb-2"><div class="col-6 col-md-4"><label class="form-label-sm">Anak</label><div class="fw-semibold">${E(a.NAMA)}</div><div class="text-muted-2" style="font-size:11px">${E([a.KELAS,a.JENJANG,a.NIS||a.NISN].filter(Boolean).join(' · '))}</div></div><div class="col-6 col-md-4"><label class="form-label-sm">Periode</label><div class="fw-semibold">${E(s.periode)}</div></div></div>
+        <div id="mkFSum" class="p-2 rounded border mb-2" style="position:sticky;top:0;z-index:5;background:var(--bs-body-bg,#fff);font-size:13px"></div>
+        ${MK.map(g=>`<div class="fw-bold mt-3 mb-1" style="font-size:14px">${E(g.nama)}</div><div class="row g-2">${(g.awal?[0,1,2,3,4]:[1,2,3,4]).map(i=>fld(g,i)).join('')}</div>`).join('')}`,
+      footer:'<button class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" id="mkSave"><i class="bi bi-check2"></i> Simpan</button>'});
+    const el=m.el,sum=()=>{const r=mkAvg(cur),n=Object.keys(cur).length;$('#mkFSum',el).innerHTML=`<b>Terisi ${n}/${MK_KEYS.length}</b> · Rata-rata indikator <b>${r==null?'-':r}</b><div class="d-flex flex-wrap gap-1 mt-1">${MK.map(g=>{const x=mkGroupAvg(cur,g);return `<span class="badge-soft st-IZIN" style="font-size:11px">${E(g.kode)}: ${x==null?'-':x}</span>`;}).join('')}</div>`;};
+    $$('input[type=number]',el).forEach(inp=>inp.oninput=()=>{const raw=inp.value.trim(),v=raw===''?null:mkClean(raw),bad=raw!==''&&v===undefined;inp.classList.toggle('is-invalid',bad);if(raw===''||bad)delete cur[inp.name];else cur[inp.name]=v;sum();});
+    sum();
+    $('#mkSave',el).onclick=()=>{
+      if($$('.is-invalid',el).length){SRIT.Notify('Ada nilai di luar rentang 0–100, perbaiki dulu','warn');return;}
+      if(!Object.keys(cur).length){SRIT.Notify('Isi minimal satu nilai','warn');return;}
+      mkSimpan(ctx,a,ex,cur);m.close();SRIT.Notify('Nilai matrikulasi tersimpan','ok');drawMk(ctx);
+    };
+  }
+  function renderMatrikulasi(host,ctx){
+    SRIT.UI.setPage('Nilai Matrikulasi','Penilaian');
+    const ex=canExport(),ed=canEdit();
+    host.innerHTML=filterBar(ctx,'mk',`
+      ${ed?'<button class="btn btn-outline-primary btn-sm" id="mkImpor"><i class="bi bi-upload"></i> Impor Excel matrikulasi</button><input type="file" id="mkFile" accept=".xlsx,.xls" hidden>':''}
+      ${ex?'<button class="btn btn-outline-primary btn-sm" id="mkEkspor"><i class="bi bi-download"></i> Ekspor Excel</button><button class="btn btn-outline-secondary btn-sm" id="mkKosong"><i class="bi bi-file-earmark-spreadsheet"></i> Format kosong (semua kelas)</button>':''}`);
+    $('#mkInfo').innerHTML='<b>Nilai Matrikulasi</b> (acuan: <b>FORMAT_PENGUMPULAN_NILAI_MATRIKULASI_26-27</b>): 9 kelompok — Literasi, Numerasi, Sains, Bahasa Indonesia, Bahasa Inggris (masing-masing capaian awal + 4 indikator), Keagamaan &amp; Akhlak Mulia, Kepemimpinan &amp; Kesamaptaan, Keterampilan Sosial &amp; Kepribadian, Kemandirian &amp; Keasramaan (4 indikator) = 41 nilai 0–100 per anak. Isi per anak lewat tombol <b>Isi/Ubah</b>, atau sekaligus lewat Excel (satu sheet per kelas, sama dengan berkas acuan).';
+    bindFilter(ctx,host,'mk',()=>drawMk(ctx),()=>renderMatrikulasi(host,ctx));
+    if($('#mkImpor')){$('#mkImpor').onclick=()=>$('#mkFile').click();$('#mkFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)mkImpor(ctx,f);};}
+    if($('#mkEkspor'))$('#mkEkspor').onclick=()=>mkEkspor(ctx,false);
+    if($('#mkKosong'))$('#mkKosong').onclick=()=>mkEkspor(ctx,true);
+    drawMk(ctx);
+  }
+  function drawMk(ctx){
+    const s=ctx.state,rows=mkDaftar(ctx),map=petaRows('NILAI_MATRIKULASI',s.periode),ed=canEdit(),N=MK_KEYS.length,info={};
+    let penuh=0,sebagian=0;rows.forEach(a=>{const r=map[a.ID];if(!r)return;const j=mkParse(r.JAWABAN),n=Object.keys(j).length;info[a.ID]={n:n,rata:mkAvg(j)};if(n>=N)penuh++;else if(n)sebagian++;});
+    $('#mkSum').innerHTML=pill(rows.length+' anak')+pill(penuh+' lengkap ('+N+'/'+N+')','success')+pill(sebagian+' sebagian','warning')+pill((rows.length-penuh-sebagian)+' belum diisi','secondary');
+    const start=(s.page-1)*s.size,part=rows.slice(start,start+s.size);
+    $('#mkTbl').innerHTML=`<thead><tr><th>Nama</th><th>Kelas</th><th>No induk</th><th class="text-end">Terisi</th><th class="text-end">Rata-rata indikator</th><th></th></tr></thead><tbody>${part.map(a=>{const f=info[a.ID],n=f?f.n:0;
+      return `<tr><td><b>${E(a.NAMA)}</b></td><td>${E(a.KELAS||'')}</td><td>${E(a.NIS||a.NISN||'-')}</td><td class="text-end">${n?pill(n+'/'+N,n>=N?'success':'warning'):pill('belum','secondary')}</td><td class="text-end">${n&&f.rata!=null?'<b>'+E(String(f.rata))+'</b>':'-'}</td><td class="text-end">${ed?`<button class="btn btn-sm btn-outline-primary" data-id="${E(a.ID)}"><i class="bi bi-pencil-square"></i> ${n?'Ubah':'Isi'} nilai</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="6" class="text-center text-muted-2 py-4">Tidak ada anak</td></tr>'}</tbody>`;
+    pager(ctx,rows.length,'mkPag',()=>drawMk(ctx));
+    $$('#mkTbl [data-id]').forEach(b=>b.onclick=()=>mkForm(ctx,b.dataset.id));
+  }
+
   /* ---------------------------------------- TAB: RAPORT KEASRAMAAN (docx) ---------------------------------------- */
   function cfgRow(){return SRIT.Store.read('RAPORT_KA').find(r=>r.ANAK==='_CFG')||null;}
   function cfgGet(){const r=cfgRow();return Object.assign({},CFG_DEF,r?parseJ(r.JAWABAN):{});}
@@ -13121,29 +13290,76 @@ SRIT.RaporSRMA=(function(){
     const si=semesterInfo(periode),rom=/-\s*([A-Za-z0-9]+)\s*$/.exec(String(a.KELAS||'')),kata=String(a.NAMA||'').trim().split(/\s+/),last=kata[kata.length-1]||'SISWA';
     return (rom?rom[1].toUpperCase():'')+'__'+bersih(last).toUpperCase()+'_RAPORT_KEASRAMAAN_'+si.jenis+'.docx';
   }
+  /* ---- KONVERSI OTOMATIS nilai akhir (56 butir) -> Raport Keasramaan (79 indikator) ----
+   * RK_MAP: nomor indikator raport -> butir instrumen yang berpadanan (id pada SRIT.Rapor.ITEMS).
+   * Nilai indikator = rata-rata NILAI AKHIR (wali 60% + siswa 40%) butir-butir itu -> predikat A/B/C menurut SRIT.Rapor.PRED (rubrik) -> deskripsi.
+   * Indikator tanpa padanan (bahasa asing, seni, numerasi, sebagian literasi, dll.) tetap diisi manual. */
+  const RK_MAP={1:['2E03','2F03'],2:['3D01'],4:['3D03'],6:['1D03','4B04'],7:['1D01','4B02'],8:['1D03'],9:['4B03'],10:['2C04'],11:['2C01','4A02'],12:['2D02','2C03'],13:['2F03','2F01'],14:['2C02'],
+    15:['3A02','1A03'],16:['1C03'],17:['1B01'],18:['3A03','2A02'],19:['2F02','1B03'],20:['3A01'],21:['2E01'],23:['3C03'],25:['1C01'],26:['1C01'],27:['1C02'],28:['1C03'],29:['1C03'],30:['1B04'],
+    32:['2E02'],33:['2E04'],36:['2B03'],37:['3B03'],39:['3B03'],40:['3B01'],41:['3B01'],42:['3B02'],52:['1C04'],60:['3C01','3C03'],63:['2E01','3C03'],65:['2E01','2F01'],67:['2B01','2B02'],
+    69:['1B02'],70:['1C04'],74:['1A01'],75:['1A01','4A01'],76:['3C02','4A01'],77:['2F03'],78:['2A01','2A03'],79:['2A03','1A03']};
+  const lcf=t=>{t=String(t||'');return t.charAt(0).toLowerCase()+t.slice(1);};
+  // deskripsi: pustaka per predikat bila indikator punya padanan di katalog lama (x), selain itu kalimat baku menurut predikat
+  function deskRk(A,e,p){
+    const l=e.x&&A.srma.lib[e.x]&&A.srma.lib[e.x][p];if(l)return l;
+    const i=lcf(e.i);
+    return p==='A'?'Anak sangat konsisten dan baik dalam hal '+i+'.':(p==='B'?'Anak sudah baik dalam hal '+i+', namun konsistensinya masih perlu ditingkatkan.':'Anak masih perlu pendampingan dan pembiasaan dalam hal '+i+'.');
+  }
+  function petaRaport(periode){return{w:petaRows('ANGKET_NONAK',periode),g:petaRows('ANGKET_SISWA',periode),k:petaRows('RAPORT_KA',periode)};}
+  function autoRaport(A,aid,M){
+    const R=SRIT.Rapor,w=M.w[aid],g=M.g[aid],out={};if(!w&&!g)return out;
+    const d=R.hitungDua(R.parse(w&&w.JAWABAN),R.parse(g&&g.JAWABAN));
+    A.rk.cat.forEach(e=>{const ids=RK_MAP[e.k];if(!ids)return;const v=ids.map(id=>R.nilai(d.gabung,id)).filter(x=>x!==null);if(!v.length)return;
+      const rata=v.reduce((a,b)=>a+b,0)/v.length,p=R.predikat(rata);out[e.k]={p:p,d:deskRk(A,e,p),v:Math.round(rata*10)/10};});
+    return out;
+  }
+  // Isi efektif = isian MANUAL yang tersimpan (tanpa tanda a) > hasil otomatis dari nilai akhir > isian lama
+  function efektif(A,aid,M){
+    const au=autoRaport(A,aid,M),r=M.k[aid],sv=r?parseJ(r.JAWABAN):{},jw={};let man=0,otm=0;
+    A.rk.cat.forEach(e=>{const s=sv[e.k],a=au[e.k];
+      if(s&&s.p&&!s.a){jw[e.k]={p:s.p,d:s.d||''};man++;}
+      else if(a){jw[e.k]={p:a.p,d:a.d,a:1};otm++;}
+      else if(s&&s.p){jw[e.k]={p:s.p,d:s.d||'',a:1};man++;}
+      else if(s&&s.d){jw[e.k]={p:'',d:s.d};}
+    });
+    return{jw:jw,n:man+otm,man:man,otm:otm,au:au};
+  }
+  /** HTML tabel pemetaan untuk tab Rubrik & Panduan */
+  async function htmlKonversi(){
+    const A=await aset(false),R=SRIT.Rapor,Ei=SRIT.Util.esc,by={};R.ITEMS.forEach(it=>{by[it.id]=it;});
+    let g=null,rows='',tanpa=[];
+    A.rk.cat.forEach(e=>{
+      const ids=RK_MAP[e.k];if(!ids){tanpa.push(e.no+'. '+e.i);return;}
+      if(e.g!==g){g=e.g;rows+=`<tr class="table-light"><td colspan="3"><b>${Ei(g)}</b></td></tr>`;}
+      rows+=`<tr><td>${e.no}</td><td>${Ei(e.i)}</td><td style="font-size:12px">${ids.map(id=>'<b>'+id+'</b> '+Ei(by[id]?by[id].d:'')).join('<br>')}</td></tr>`;
+    });
+    return{html:`<div class="table-responsive"><table class="table table-sm" style="font-size:13px"><thead><tr><th>No</th><th>Indikator raport</th><th>Butir sumber (rata-rata nilai akhir)</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+      tanpa:tanpa,jumlah:Object.keys(RK_MAP).length,total:A.rk.cat.length};
+  }
   function renderRaport(host,ctx){
     SRIT.UI.setPage('Raport Keasramaan','Penilaian');
     const ex=canExport(),ed=canEdit();
     host.innerHTML=filterBar(ctx,'rk',`
       ${ed?'<button class="btn btn-outline-secondary btn-sm" id="rkCfg"><i class="bi bi-gear"></i> Pengaturan raport</button>':''}
       ${ex?'<button class="btn btn-outline-success btn-sm" id="rkZip"><i class="bi bi-file-earmark-zip"></i> Unduh Word semua (ZIP)</button>':''}`);
-    $('#rkInfo').innerHTML='Hasil berupa berkas <b>Word (.docx)</b> yang dibuat dari cetakan raport keasramaan contoh: ukuran Letter, identitas di header tiap halaman, watermark logo Sekolah Rakyat, 15 kategori (79 indikator), tabel ketidakhadiran, dan 4 kolom tanda tangan.';
+    $('#rkInfo').innerHTML='Raport <b>terisi otomatis</b>: nilai akhir (wali 60% + siswa 40%) dikonversi per indikator menjadi predikat <b>A / B / C</b> dan deskripsi sesuai tab <b>Rubrik &amp; Panduan</b>. Indikator tanpa padanan nilai diisi manual lewat tombol Periksa/Ubah (isian manual tidak ditimpa otomatis). Hasil: berkas <b>Word (.docx)</b> dengan 15 kategori (79 indikator), tabel ketidakhadiran, dan 4 kolom tanda tangan.';
     bindFilter(ctx,host,'rk',()=>drawRaport(ctx),()=>renderRaport(host,ctx));
     if($('#rkCfg'))$('#rkCfg').onclick=()=>formCfg(ctx);
     if($('#rkZip'))$('#rkZip').onclick=()=>unduhRaport(ctx,null);
-    drawRaport(ctx);
+    $('#rkTbl').innerHTML='<tbody><tr><td class="text-center text-muted-2 py-4">Memuat katalog raport…</td></tr></tbody>';
+    aset(false).then(()=>drawRaport(ctx)).catch(e=>SRIT.Notify('Gagal memuat katalog: '+(e.message||e),'err'));
   }
   function drawRaport(ctx){
-    const s=ctx.state,rows=daftarAnak(ctx),map=petaRows('RAPORT_KA',s.periode),ed=canEdit(),ex=canExport();
-    let lengkap=0,sebagian=0;rows.forEach(a=>{const r=map[a.ID],n=r?+r.TERISI||0:0;if(n>=79)lengkap++;else if(n>0)sebagian++;});
-    $('#rkSum').innerHTML=pill(rows.length+' anak')+pill(lengkap+' lengkap (79/79)','success')+pill(sebagian+' sebagian','warning')+pill((rows.length-lengkap-sebagian)+' belum diisi','secondary');
+    if(!_A)return;
+    const s=ctx.state,rows=daftarAnak(ctx),M=petaRaport(s.periode),ed=canEdit(),ex=canExport(),R0=SRIT.Rapor,pc=x=>Math.round(x*100)+'%',EF={};
+    let lengkap=0,sebagian=0;rows.forEach(a=>{const f=EF[a.ID]=efektif(_A,a.ID,M);if(f.n>=79)lengkap++;else if(f.n>0)sebagian++;});
+    $('#rkSum').innerHTML=pill(rows.length+' anak')+pill(lengkap+' lengkap (79/79)','success')+pill(sebagian+' sebagian','warning')+pill((rows.length-lengkap-sebagian)+' belum ada nilai','secondary');
     const start=(s.page-1)*s.size,part=rows.slice(start,start+s.size);
-    const R0=SRIT.Rapor,mw=petaRows('ANGKET_NONAK',s.periode),ms=petaRows('ANGKET_SISWA',s.periode),pc=x=>Math.round(x*100)+'%';
-    const nilaiAkhir=a=>{const w=mw[a.ID],g=ms[a.ID];if(!w&&!g)return '<span class="text-muted-2">-</span>';const d=R0.hitungDua(R0.parse(w&&w.JAWABAN),R0.parse(g&&g.JAWABAN)),t=d.akhir.total;
+    const nilaiAkhir=a=>{const w=M.w[a.ID],g=M.g[a.ID];if(!w&&!g)return '<span class="text-muted-2">-</span>';const d=R0.hitungDua(R0.parse(w&&w.JAWABAN),R0.parse(g&&g.JAWABAN)),t=d.akhir.total;
       return t.n?`<b>${E(R0.fmt(t.skor))}</b> <span class="text-muted-2" style="font-size:11px">${E(t.kat?t.kat.k:'')}${w&&g?'':' · sementara'}</span>`:'<span class="text-muted-2">-</span>';};
-    $('#rkTbl').innerHTML=`<thead><tr><th>Nama</th><th>Kelas</th><th class="text-end" title="Penilaian wali asuh ${pc(R0.BOBOT.wali)} + angket siswa ${pc(R0.BOBOT.siswa)}">Nilai akhir<div style="font-size:10px;font-weight:400">wali ${pc(R0.BOBOT.wali)} + siswa ${pc(R0.BOBOT.siswa)}</div></th><th class="text-end">Terisi</th><th></th></tr></thead><tbody>${part.map(a=>{
-      const r=map[a.ID],n=r?+r.TERISI||0:0;
-      return `<tr><td><b>${E(a.NAMA)}</b></td><td>${E(a.KELAS)}</td><td class="text-end">${nilaiAkhir(a)}</td><td class="text-end">${n?pill(n+'/79',n>=79?'success':'warning'):pill('belum','secondary')}</td><td class="text-end text-nowrap">${ed?`<button class="btn btn-sm btn-outline-primary" data-isi="${E(a.ID)}"><i class="bi bi-pencil-square"></i> ${n?'Ubah':'Isi'}</button> `:''}${ex?`<button class="btn btn-sm btn-outline-success" data-word="${E(a.ID)}" ${n?'':'disabled'}><i class="bi bi-file-earmark-word"></i> Word</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="5" class="text-center text-muted-2 py-4">Tidak ada anak</td></tr>'}</tbody>`;
+    $('#rkTbl').innerHTML=`<thead><tr><th>Nama</th><th>Kelas</th><th class="text-end" title="Penilaian wali asuh ${pc(R0.BOBOT.wali)} + angket siswa ${pc(R0.BOBOT.siswa)}">Nilai akhir<div style="font-size:10px;font-weight:400">wali ${pc(R0.BOBOT.wali)} + siswa ${pc(R0.BOBOT.siswa)}</div></th><th class="text-end">Raport terisi</th><th></th></tr></thead><tbody>${part.map(a=>{
+      const f=EF[a.ID],n=f.n;
+      return `<tr><td><b>${E(a.NAMA)}</b></td><td>${E(a.KELAS)}</td><td class="text-end">${nilaiAkhir(a)}</td><td class="text-end">${n?pill(n+'/79',n>=79?'success':'warning')+`<div class="text-muted-2" style="font-size:11px">${f.otm} otomatis · ${f.man} manual</div>`:pill('belum','secondary')}</td><td class="text-end text-nowrap">${ed?`<button class="btn btn-sm btn-outline-primary" data-isi="${E(a.ID)}"><i class="bi bi-pencil-square"></i> ${n?'Periksa/Ubah':'Isi'}</button> `:''}${ex?`<button class="btn btn-sm btn-outline-success" data-word="${E(a.ID)}" ${n?'':'disabled'}><i class="bi bi-file-earmark-word"></i> Word</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="5" class="text-center text-muted-2 py-4">Tidak ada anak</td></tr>'}</tbody>`;
     pager(ctx,rows.length,'rkPag',()=>drawRaport(ctx));
     $$('#rkTbl [data-isi]').forEach(b=>b.onclick=()=>formRaport(ctx,b.dataset.isi));
     $$('#rkTbl [data-word]').forEach(b=>b.onclick=()=>unduhRaport(ctx,[b.dataset.word]));
@@ -13163,47 +13379,45 @@ SRIT.RaporSRMA=(function(){
   }
   async function formRaport(ctx,aid){
     let A;try{A=await aset(false);}catch(e){SRIT.Notify('Gagal memuat katalog: '+(e.message||e),'err');return;}
-    const s=ctx.state,a=SRIT.Repo.getById('ANAK',aid),map=petaRows('RAPORT_KA',s.periode),ex=map[aid],cur=ex?parseJ(ex.JAWABAN):{},kh=ex?parseJ(ex.KETIDAKHADIRAN):{};
+    const s=ctx.state,a=SRIT.Repo.getById('ANAK',aid),M=petaRaport(s.periode),ex=M.k[aid],ef=efektif(A,aid,M),cur=ef.jw,kh=ex?parseJ(ex.KETIDAKHADIRAN):{};
     const lib=(e,p)=>e.x?((A.srma.lib[e.x]||{})[p]||''):(p===e.p?e.d:'');
     let g=null,html='';
     A.rk.cat.forEach(e=>{
       if(e.g!==g){g=e.g;html+=`<tr class="table-light"><td colspan="4"><b>${E(g)}</b></td></tr>`;}
-      const c=cur[e.k]||{};
-      html+=`<tr><td>${e.no}</td><td style="min-width:190px">${E(e.i)}</td><td style="width:84px"><select class="form-select form-select-sm" data-p="${e.k}"><option value="">-</option>${['A','B','C'].map(p=>`<option ${c.p===p?'selected':''}>${p}</option>`).join('')}</select></td><td style="min-width:260px"><textarea class="form-control form-control-sm" rows="2" data-d="${e.k}" data-auto="${c.d&&c.p&&c.d===lib(e,c.p)?1:0}">${E(c.d||'')}</textarea></td></tr>`;
+      const c=cur[e.k]||{},au=ef.au[e.k];
+      html+=`<tr><td>${e.no}</td><td style="min-width:190px">${E(e.i)}${c.a?' <span class="badge-soft st-HADIR" style="font-size:10px">otomatis</span>':(RK_MAP[e.k]?'':' <span class="badge-soft st-BELUM" style="font-size:10px">manual</span>')}${au?`<div class="text-muted-2" style="font-size:11px">nilai ${E(String(au.v))}</div>`:''}</td><td style="width:84px"><select class="form-select form-select-sm" data-p="${e.k}"><option value="">-</option>${['A','B','C'].map(p=>`<option ${c.p===p?'selected':''}>${p}</option>`).join('')}</select></td><td style="min-width:260px"><textarea class="form-control form-control-sm" rows="2" data-d="${e.k}" data-auto="${c.d&&c.p&&c.d===(au&&au.p===c.p?au.d:lib(e,c.p))?1:0}">${E(c.d||'')}</textarea></td></tr>`;
     });
-    const lain=Object.keys(map).filter(k=>k!==aid).map(k=>SRIT.Repo.getById('ANAK',k)).filter(Boolean).sort(byNama);
+    const lain=Object.keys(M.k).filter(k=>k!==aid).map(k=>SRIT.Repo.getById('ANAK',k)).filter(Boolean).sort(byNama);
     const m=SRIT.Modal.open({title:'Raport Keasramaan · '+E(a.NAMA)+' · '+E(s.periode),size:'modal-xl',
       body:`<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
         <div><label class="form-label-sm">Salin isian dari anak lain</label><div class="input-group input-group-sm" style="width:260px"><select class="form-select" id="rkSalin"><option value="">— pilih —</option>${lain.map(x=>`<option value="${E(x.ID)}">${E(x.NAMA)}</option>`).join('')}</select><button class="btn btn-outline-secondary" id="rkSalinBtn" type="button">Salin</button></div></div>
-        ${petaRows('NILAI_SRMA',s.periode)[aid]?'<button class="btn btn-sm btn-outline-secondary" id="rkDariSrma" type="button"><i class="bi bi-magic"></i> Isi dari Nilai SRMA (data lama, indikator berpadanan)</button>':''}</div>
+        <button class="btn btn-sm btn-outline-secondary" id="rkOtomatis" type="button" ${Object.keys(ef.au).length?'':'disabled'}><i class="bi bi-magic"></i> Hitung ulang dari nilai akhir (${Object.keys(ef.au).length} indikator)</button></div>
         <div class="row g-2 mb-2"><div class="col-12 col-md-4"><label class="form-label-sm">Sakit (jumlah)</label><input class="form-control form-control-sm" id="khS" value="${E(kh.sakit||'')}" placeholder="mis. 2 hari"></div><div class="col-12 col-md-4"><label class="form-label-sm">Izin (jumlah)</label><input class="form-control form-control-sm" id="khI" value="${E(kh.izin||'')}"></div><div class="col-12 col-md-4"><label class="form-label-sm">Tanpa keterangan (jumlah)</label><input class="form-control form-control-sm" id="khT" value="${E(kh.tk||'')}"></div></div>
-        <div class="text-muted-2 mb-2" style="font-size:12px">Memilih predikat mengisi deskripsi dari pustaka bila tersedia (semua predikat untuk indikator yang padanannya pasti dengan Nilai SRMA; selain itu hanya predikat pada berkas contoh). Deskripsi lain ketik sendiri.</div>
+        <div class="text-muted-2 mb-2" style="font-size:12px">Indikator berlabel <b>otomatis</b> dihitung dari nilai akhir (predikat menurut rubrik) dan ikut berubah bila nilai berubah, sampai Anda mengubah isinya di sini (menjadi manual). Memilih predikat mengisi deskripsi dari pustaka bila tersedia.</div>
         <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>No</th><th>Indikator</th><th>Predikat</th><th>Deskripsi</th></tr></thead><tbody>${html}</tbody></table></div>`,
       footer:'<button class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" id="rkSimpan"><i class="bi bi-check2"></i> Simpan</button>'});
     const el=m.el;
     $$('[data-p]',el).forEach(sel=>sel.onchange=()=>{
       const k=sel.dataset.p,ta=$('[data-d="'+k+'"]',el),e=A.rk.cat[k-1];
-      if(sel.value&&(ta.value.trim()===''||ta.dataset.auto==='1')){const t=lib(e,sel.value);if(t||ta.dataset.auto==='1'){ta.value=t;ta.dataset.auto=t?'1':'0';}}
+      if(sel.value&&(ta.value.trim()===''||ta.dataset.auto==='1')){const t=deskRk(A,e,sel.value);ta.value=t;ta.dataset.auto='1';}
     });
     $$('[data-d]',el).forEach(t=>t.oninput=()=>{t.dataset.auto='0';});
     $('#rkSalinBtn',el).onclick=()=>{
-      const id=$('#rkSalin',el).value,r=id&&map[id];if(!r){SRIT.Notify('Pilih anak sumber','warn');return;}
+      const id=$('#rkSalin',el).value,r=id&&M.k[id];if(!r){SRIT.Notify('Pilih anak sumber','warn');return;}
       if(!window.confirm('Isian yang ada di formulir ini akan diganti dengan isian anak terpilih. Lanjutkan?'))return;
       const j=parseJ(r.JAWABAN),k2=parseJ(r.KETIDAKHADIRAN);
       A.rk.cat.forEach(e=>{const c=j[e.k]||{};$('[data-p="'+e.k+'"]',el).value=c.p||'';const ta=$('[data-d="'+e.k+'"]',el);ta.value=c.d||'';ta.dataset.auto='0';});
       $('#khS',el).value=k2.sakit||'';$('#khI',el).value=k2.izin||'';$('#khT',el).value=k2.tk||'';SRIT.Notify('Isian disalin','ok');
     };
-    if($('#rkDariSrma',el))$('#rkDariSrma',el).onclick=()=>{
-      const sr=petaRows('NILAI_SRMA',s.periode)[aid],j=sr?parseJ(sr.JAWABAN):{};let n=0;
-      A.rk.cat.forEach(e=>{
-        if(!e.x||!j[e.x]||j[e.x].n==null)return;const p=bandOf(A,+j[e.x].n),ta=$('[data-d="'+e.k+'"]',el);
-        $('[data-p="'+e.k+'"]',el).value=p;ta.value=j[e.x].d||lib(e,p);ta.dataset.auto='0';n++;
-      });
-      SRIT.Notify(n?n+' indikator diisi dari Nilai SRMA':'Tidak ada Nilai SRMA yang berpadanan untuk anak ini','ok');
+    $('#rkOtomatis',el).onclick=()=>{
+      if(!window.confirm('Indikator yang punya padanan nilai akan diisi ulang otomatis (isian manual pada indikator itu diganti). Lanjutkan?'))return;
+      let n=0;A.rk.cat.forEach(e=>{const au=ef.au[e.k];if(!au)return;$('[data-p="'+e.k+'"]',el).value=au.p;const ta=$('[data-d="'+e.k+'"]',el);ta.value=au.d;ta.dataset.auto='1';n++;});
+      SRIT.Notify(n+' indikator diisi dari nilai akhir','ok');
     };
     $('#rkSimpan',el).onclick=()=>{
       const jw={};let n=0;
-      A.rk.cat.forEach(e=>{const p=$('[data-p="'+e.k+'"]',el).value,d=$('[data-d="'+e.k+'"]',el).value.trim();if(!p&&!d)return;jw[e.k]={p:p,d:d};if(p)n++;});
+      A.rk.cat.forEach(e=>{const p=$('[data-p="'+e.k+'"]',el).value,d=$('[data-d="'+e.k+'"]',el).value.trim();if(!p&&!d)return;const au=ef.au[e.k];
+        jw[e.k]=(au&&au.p===p&&au.d===d)?{p:p,d:d,a:1}:{p:p,d:d};if(p)n++;});
       if(!n){SRIT.Notify('Pilih predikat minimal satu indikator','warn');return;}
       upsert('RAPORT_KA','RKA',ex,{ANAK:aid,NAMA_ANAK:a.NAMA,PERIODE:s.periode,TANGGAL:SRIT.Util.todayISO(),JENJANG:a.JENJANG||'',JAWABAN:JSON.stringify(jw),
         KETIDAKHADIRAN:JSON.stringify({sakit:$('#khS',el).value.trim(),izin:$('#khI',el).value.trim(),tk:$('#khT',el).value.trim()}),TERISI:n,PENGISI:(SRIT.Auth.user||{}).NAME||'',DIUBAH_PADA:new Date().toISOString()});
@@ -13212,24 +13426,24 @@ SRIT.RaporSRMA=(function(){
   }
   async function unduhRaport(ctx,ids){
     if(_busy)return;
-    const s=ctx.state,map=petaRows('RAPORT_KA',s.periode),cfg=cfgGet();
-    const list=(ids?ids.map(id=>SRIT.Repo.getById('ANAK',id)).filter(Boolean):daftarAnak(ctx)).filter(a=>map[a.ID]&&(+map[a.ID].TERISI||0)>0);
-    if(!list.length){SRIT.Notify('Belum ada raport terisi untuk diunduh','warn');return;}
+    const s=ctx.state,cfg=cfgGet();
     _busy=true;
     try{
-      const A=await aset(true);
-      if(list.length===1){unduh(await buildDocx(A,_wm,dataDocx(A,list[0],s.periode,map[list[0].ID],cfg)),namaBerkas(list[0],s.periode),MIME.docx);SRIT.Notify('Raport diunduh','ok');return;}
+      const A=await aset(true),M=petaRaport(s.periode),pseudo=a=>{const f=efektif(A,a.ID,M),r=M.k[a.ID];return f.n>0?{JAWABAN:JSON.stringify(f.jw),KETIDAKHADIRAN:r?r.KETIDAKHADIRAN:'{}'}:null;};
+      const list=(ids?ids.map(id=>SRIT.Repo.getById('ANAK',id)).filter(Boolean):daftarAnak(ctx)).map(a=>({a:a,r:pseudo(a)})).filter(x=>x.r);
+      if(!list.length){SRIT.Notify('Belum ada nilai/raport terisi untuk diunduh','warn');return;}
+      if(list.length===1){unduh(await buildDocx(A,_wm,dataDocx(A,list[0].a,s.periode,list[0].r,cfg)),namaBerkas(list[0].a,s.periode),MIME.docx);SRIT.Notify('Raport diunduh','ok');return;}
       const files=[],pakai={};
       for(let i=0;i<list.length;i++){
         SRIT.Notify('Membuat raport '+(i+1)+' / '+list.length+'…','info');
-        const a=list[i];let nm=namaBerkas(a,s.periode);if(pakai[nm]){pakai[nm]++;nm=nm.replace(/\.docx$/,'_'+pakai[nm]+'.docx');}else pakai[nm]=1;
-        files.push({name:nm,data:await buildDocx(A,_wm,dataDocx(A,a,s.periode,map[a.ID],cfg)),store:true});
+        const a=list[i].a;let nm=namaBerkas(a,s.periode);if(pakai[nm]){pakai[nm]++;nm=nm.replace(/\.docx$/,'_'+pakai[nm]+'.docx');}else pakai[nm]=1;
+        files.push({name:nm,data:await buildDocx(A,_wm,dataDocx(A,a,s.periode,list[i].r,cfg)),store:true});
       }
       unduh(await zip(files,{compress:false}),'RAPORT_KEASRAMAAN_'+bersih(s.periode)+'.zip',MIME.zip);SRIT.Notify(list.length+' raport diunduh (ZIP)','ok');
     }catch(e){SRIT.Notify('Gagal membuat raport: '+(e.message||e),'err');}finally{_busy=false;}
   }
 
-  return{eksporNonak,imporNonak,renderRaport,_t:{zip,buildXlsxNonak,buildDocx,parseNonak,semesterInfo,bandOf,crc32,namaBerkas,dataDocx,tglInfo,barisNonak}};
+  return{eksporNonak,imporNonak,renderRaport,renderMatrikulasi,htmlKonversi,RK_MAP,_t:{buildXlsxMk,parseMk,mkAvg,mkClean,MK_KEYS,mkBarisEkspor,efektif,autoRaport,deskRk,petaRaport,zip,buildXlsxNonak,buildDocx,parseNonak,semesterInfo,bandOf,crc32,namaBerkas,dataDocx,tglInfo,barisNonak}};
 
 })();
 </script>
@@ -13269,6 +13483,9 @@ SRIT.Rapor=(function(){
   // KONVERSI RUBRIK (V1.9.64): nilai butir 0-100 -> predikat butir. Pita nilai mengikuti KAT (indeks sejajar):
   //   Perlu Pembinaan -> Kurang | Cukup -> Cukup | Baik -> Baik | Sangat Baik -> Sangat Baik   (SKALA[3..0] = tafsir dari Rubrik Penilaian)
   const butir=v=>SKALA[3-KAT.indexOf(kategori(v))];
+  // RUBRIK PREDIKAT RAPORT KEASRAMAAN (nilai 0-100 -> A/B/C); batas sejajar KAT: A = Sangat Baik, B = Baik, C = Cukup & Perlu Pembinaan
+  const PRED=[{p:'A',min:KAT[3].min,k:'Sangat Baik'},{p:'B',min:KAT[2].min,k:'Baik'},{p:'C',min:0,k:'Cukup / Perlu Pembinaan'}];
+  const predikat=v=>{for(let i=0;i<PRED.length;i++)if(v>=PRED[i].min)return PRED[i].p;return 'C';};
   const rentang=i=>i>=KAT.length-1?(KAT[i].min+' – 100'):(KAT[i].min+' – <'+KAT[i+1].min);
   // nilai butir id pada jawaban j: 0-100 atau null. Format baru {_v:2} = 0-100; data lama (tanpa _v) = skala 1-4 dikonversi x25 (4=100, 3=75, 2=50, 1=25)
   const nilai=(j,id)=>{const raw=j?j[id]:undefined;if(raw===undefined||raw===null||raw==='')return null;const v=+raw;if(isNaN(v))return null;
@@ -13327,11 +13544,11 @@ SRIT.Rapor=(function(){
   const anakInfo=a=>{const km=SRIT.Repo.getById('KAMAR',a.KAMAR)||{},w=SRIT.Asuh.waliAnak(a);
     return {nama:a.NAMA||'',nis:[a.NIS,a.NISN].filter(Boolean).join(' / '),umur:umur(a.TANGGAL_LAHIR),kelas:[a.KELAS,a.JENJANG,km.NAME].filter(Boolean).join(' / '),
       wali:w?SRIT.Asuh.nama(w):'',waliId:w||'',asal:[a.DESA,a.KECAMATAN].filter(Boolean).join(', ')||a.ALAMAT||''};};
-  return {IND,ITEMS,BOBOT,PENDEK,SKALA,KAT,ASPEK,NARASI,kategori,butir,rentang,nilai,hitung,gabung,hitungDua,fmt,parse,tafsir,deskripsi,periodeDefault,periodeSebelum,periodeList,umur,tglPanjang,anakInfo};
+  return {IND,ITEMS,BOBOT,PRED,predikat,PENDEK,SKALA,KAT,ASPEK,NARASI,kategori,butir,rentang,nilai,hitung,gabung,hitungDua,fmt,parse,tafsir,deskripsi,periodeDefault,periodeSebelum,periodeList,umur,tglPanjang,anakInfo};
 })();
 
 SRIT.Features.penilaian={
-  state:{tab:'siswa',q:'',jenjang:'',wali:'',periode:'',page:1,size:20},
+  state:{tab:'nilai',q:'',jenjang:'',wali:'',periode:'',page:1,size:20},
   // ---------- siapa saya? Wali asuh hanya melihat anak asuhnya sendiri (kecuali Super Admin / pemegang izin Kelola) ----------
   _me(){return (SRIT.Auth.user||{}).ID||'';},
   _isWali(){const id=this._me();return !!id&&SRIT.Store.read('WALI_ASUH').some(w=>w.ID===id);},
@@ -13346,12 +13563,12 @@ SRIT.Features.penilaian={
   render(host){
     const s=this.state;this._host=host;if(!s.periode)s.periode=SRIT.Rapor.periodeDefault();
     SRIT.UI.setPage('Rapor Perkembangan Anak','Penilaian');
-    if(['siswa','wali','rk'].indexOf(s.tab)<0)s.tab='siswa';   // 3 tab: input angket siswa, input penilaian wali, unduh Word raport keasramaan
-    const tabs=[['siswa','bi-person-check','Angket Siswa'],['wali','bi-ui-checks','Penilaian Wali'],['rk','bi-file-earmark-word','Download Raport Keasramaan (Word)']];
+    if(['nilai','mk','rk','panduan'].indexOf(s.tab)<0)s.tab='nilai';   // 4 tab:  input angket siswa + penilaian wali, unduh Word raport keasramaan (otomatis), rubrik & panduan
+    const tabs=[['nilai','bi-ui-checks','Angket Siswa & Penilaian Wali'],['mk','bi-journal-text','Nilai Matrikulasi'],['rk','bi-file-earmark-word','Download Raport Keasramaan (Word)'],['panduan','bi-info-circle','Rubrik & Panduan']];
     host.innerHTML=`<ul class="nav nav-pills mb-3 gap-1" id="pnTabs">${tabs.map(t=>`<li class="nav-item"><button type="button" class="nav-link py-1 px-3 ${s.tab===t[0]?'active':''}" data-tab="${t[0]}"><i class="bi ${t[1]}"></i> ${t[2]}</button></li>`).join('')}</ul><div id="pnBody"></div>`;
     $$('#pnTabs [data-tab]').forEach(b=>b.onclick=()=>{s.tab=b.dataset.tab;s.page=1;this.render(host);});
     const body=$('#pnBody');
-    if(s.tab==='rk')SRIT.RaporSRMA.renderRaport(body,this);else this.renderRapor(body);
+    if(s.tab==='mk')SRIT.RaporSRMA.renderMatrikulasi(body,this);else if(s.tab==='rk')SRIT.RaporSRMA.renderRaport(body,this);else if(s.tab==='panduan')this.renderPanduan(body);else this.renderRapor(body);
   },
   _periodeSel(id){const s=this.state,E=SRIT.Util.esc,l=SRIT.Rapor.periodeList();if(l.indexOf(s.periode)<0)l.unshift(s.periode);
     return `<select class="form-select form-select-sm" id="${id}">${l.map(p=>`<option ${p===s.periode?'selected':''}>${E(p)}</option>`).join('')}<option value="__baru">+ Periode lain…</option></select>`;},
@@ -13369,7 +13586,6 @@ SRIT.Features.penilaian={
   },
   renderRapor(host){
     const s=this.state,E=SRIT.Util.esc,wali=SRIT.Store.read('WALI_ASUH').slice().sort((x,y)=>String(x.NAME||'').localeCompare(String(y.NAME||''),'id'));
-    const wl=this.state.tab==='wali';
     host.innerHTML=`<div class="card-srit p-3 mb-3"><div class="filter-bar">
         <div style="flex:1;min-width:170px"><label class="form-label-sm">Cari anak</label><input class="form-control form-control-sm" id="rpQ" placeholder="Nama / NIS / kelas" value="${E(s.q)}"></div>
         <div style="min-width:170px"><label class="form-label-sm">Periode</label>${this._periodeSel('rpPer')}</div>
@@ -13377,12 +13593,12 @@ SRIT.Features.penilaian={
         ${this._scoped()?'':`<div style="min-width:170px"><label class="form-label-sm">Wali asuh</label><select class="form-select form-select-sm" id="rpWali"><option value="">Semua</option>${wali.map(w=>`<option value="${E(w.ID)}" ${s.wali===w.ID?'selected':''}>${E(w.NAME)}</option>`).join('')}</select></div>`}
       </div>
       <div class="d-flex flex-wrap gap-2 mt-2">
-        ${wl?`<button class="btn btn-outline-secondary btn-sm" id="rpAngketKosong"><i class="bi bi-file-earmark-pdf"></i> Unduh lembar penilaian wali (PDF)</button>
-        ${SRIT.Auth.can('penilaian:CREATE')||SRIT.Auth.can('penilaian:UPDATE')||SRIT.Auth.isSuper()?'<button class="btn btn-outline-primary btn-sm" id="rpImpor"><i class="bi bi-upload"></i> Impor Excel (template non-akademik)</button><input type="file" id="rpFile" accept=".xlsx,.xls" hidden>':''}
-        ${SRIT.Auth.can('penilaian:EXPORT')||SRIT.Auth.isSuper()?'<button class="btn btn-outline-success btn-sm" id="rpEkspor"><i class="bi bi-download"></i> Ekspor Excel</button><button class="btn btn-outline-secondary btn-sm" id="rpKosong"><i class="bi bi-file-earmark-spreadsheet"></i> Template Excel kosong</button>':''}`
-        :`<button class="btn btn-outline-success btn-sm" id="rpSiswaKosong"><i class="bi bi-file-earmark-pdf"></i> Unduh angket siswa (PDF)</button>`}
+        <button class="btn btn-outline-success btn-sm" id="rpSiswaKosong"><i class="bi bi-file-earmark-pdf"></i> Unduh angket siswa (PDF)</button>
+        <button class="btn btn-outline-secondary btn-sm" id="rpAngketKosong"><i class="bi bi-file-earmark-pdf"></i> Unduh lembar penilaian wali (PDF)</button>
+        ${SRIT.Auth.can('penilaian:CREATE')||SRIT.Auth.can('penilaian:UPDATE')||SRIT.Auth.isSuper()?'<button class="btn btn-outline-primary btn-sm" id="rpImpor"><i class="bi bi-upload"></i> Impor Excel penilaian wali</button><input type="file" id="rpFile" accept=".xlsx,.xls" hidden>':''}
+        ${SRIT.Auth.can('penilaian:EXPORT')||SRIT.Auth.isSuper()?'<button class="btn btn-outline-primary btn-sm" id="rpEkspor"><i class="bi bi-download"></i> Ekspor Excel</button><button class="btn btn-outline-secondary btn-sm" id="rpKosong"><i class="bi bi-file-earmark-spreadsheet"></i> Template Excel kosong</button>':''}
       </div>
-      <div class="text-muted-2 mt-2" style="font-size:12px">${wl?'<b>Penilaian Wali Asuh</b>: nilai 0–100 per butir (56 butir, 4 indikator).':'<b>Angket Siswa</b>: jawaban siswa Tidak Pernah (1) – Kadang-kadang (2) – Sering (3) – Selalu (4), dikonversi ke 0–100.'} <b>Nilai akhir = Wali Asuh 60% + Angket Siswa 40%</b> (dihitung per butir, lalu per sub indikator, indikator, dan total). Bila baru satu sumber terisi, nilai akhir sementara memakai sumber itu.${this._scoped()?' Anda hanya melihat anak asuh Anda.':''}</div></div>
+      <div class="text-muted-2 mt-2" style="font-size:12px"><b>Angket siswa</b>: jawaban Tidak Pernah (1) – Kadang-kadang (2) – Sering (3) – Selalu (4), dikonversi ke 0–100. <b>Penilaian wali asuh</b>: nilai 0–100 per butir (56 butir, 4 indikator). <b>Nilai akhir = Wali Asuh 60% + Angket Siswa 40%</b> (per butir, lalu per sub indikator, indikator, dan total); bila baru satu sumber terisi, nilai akhir sementara memakai sumber itu. Nilai akhir otomatis mengisi tab Raport Keasramaan.${this._scoped()?' Anda hanya melihat anak asuh Anda.':''}</div></div>
       <div id="rpSum" class="d-flex flex-wrap gap-2 mb-2"></div>
       <div class="card-srit p-0"><div class="table-responsive"><table class="table table-srit mb-0" id="rpTbl"></table></div><div class="p-3 border-top" id="pnPag"></div></div>`;
     let t;$('#rpQ').oninput=e=>{clearTimeout(t);t=setTimeout(()=>{s.q=e.target.value;s.page=1;this.drawRapor();},300);};
@@ -13398,21 +13614,22 @@ SRIT.Features.penilaian={
   },
   drawRapor(){
     const s=this.state,R=SRIT.Rapor,E=SRIT.Util.esc,rows=this._rows(),canC=SRIT.Auth.can('penilaian:CREATE'),canU=SRIT.Auth.can('penilaian:UPDATE');
-    const wl0=s.tab==='wali',nAk=rows.filter(r=>r.ak).length,nAs=rows.filter(r=>r.as).length,nDua=rows.filter(r=>r.ak&&r.as).length;
+    const nAk=rows.filter(r=>r.ak).length,nAs=rows.filter(r=>r.as).length,nDua=rows.filter(r=>r.ak&&r.as).length;
     $('#rpSum').innerHTML=[['Anak',rows.length,'st-IZIN'],['Angket siswa terisi',nAs+'/'+rows.length,'st-HADIR'],['Penilaian wali asuh terisi',nAk+'/'+rows.length,'st-HADIR'],['Lengkap (2 sumber)',nDua+'/'+rows.length,'st-IZIN']].map(x=>`<span class="badge-soft ${x[2]}" style="font-size:12px">${x[0]}: <b>${x[1]}</b></span>`).join('');
     const pages=Math.max(1,Math.ceil(rows.length/s.size));if(s.page>pages)s.page=pages;
     const show=rows.slice((s.page-1)*s.size,s.page*s.size);
     const badge=(h,kosong)=>(h&&h.total.n)?`<span class="badge-soft ${h.total.kat.cls}">${R.fmt(h.total.skor)} · ${h.total.kat.k}</span><div class="text-muted-2" style="font-size:11px">${h.total.n}/${h.total.total} butir</div>`:`<span class="badge-soft st-BELUM">${kosong}</span>`;
-    const wl=s.tab==='wali',B=R.BOBOT,pc=x=>Math.round(x*100)+'%';
-    $('#rpTbl').innerHTML=`<thead><tr><th>Anak</th><th>Wali asuh</th><th>${wl?'Penilaian wali asuh ('+pc(B.wali)+')':'Angket siswa ('+pc(B.siswa)+')'}</th><th>${wl?'Angket siswa ('+pc(B.siswa)+')':'Penilaian wali asuh ('+pc(B.wali)+')'}</th><th>Nilai akhir (wali ${pc(B.wali)} + siswa ${pc(B.siswa)})</th><th></th></tr></thead><tbody>${
+    const B=R.BOBOT,pc=x=>Math.round(x*100)+'%',belum='<span class="badge-soft st-BELUM">Belum diisi</span>';
+    $('#rpTbl').innerHTML=`<thead><tr><th>Anak</th><th>Wali asuh</th><th>Angket siswa (${pc(B.siswa)})</th><th>Penilaian wali (${pc(B.wali)})</th><th>Nilai akhir</th><th class="text-end">Isi nilai</th></tr></thead><tbody>${
       show.map(r=>{const a=r.a,w=SRIT.Asuh.waliAnak(a),d=R.hitungDua(R.parse(r.ak&&r.ak.JAWABAN),R.parse(r.as&&r.as.JAWABAN)),ada=!!(r.ak||r.as);
         return `<tr><td><div class="fw-semibold">${E(a.NAMA)}</div><div class="text-muted-2" style="font-size:11px">${E([a.KELAS,a.JENJANG].filter(Boolean).join(' · '))}</div></td>
         <td>${w?E(SRIT.Asuh.nama(w)):'<span class="text-muted-2">–</span>'}</td>
-        <td>${wl?(r.ak?badge(d.wali,'–'):'<span class="badge-soft st-BELUM">Belum diisi</span>'):(r.as?badge(d.siswa,'–'):'<span class="badge-soft st-BELUM">Belum diisi</span>')}</td>
-        <td>${wl?(r.as?badge(d.siswa,'–'):'<span class="badge-soft st-BELUM">Belum diisi</span>'):(r.ak?badge(d.wali,'–'):'<span class="badge-soft st-BELUM">Belum diisi</span>')}</td>
-        <td>${ada?badge(d.akhir,'–')+`<div class="text-muted-2" style="font-size:11px">${r.ak&&r.as?'wali '+pc(B.wali)+' + siswa '+pc(B.siswa):'sementara: baru '+(r.as?'angket siswa':'penilaian wali asuh')}</div>`:'<span class="badge-soft st-BELUM">Belum ada</span>'}</td>
+        <td>${r.as?badge(d.siswa,'–'):belum}</td>
+        <td>${r.ak?badge(d.wali,'–'):belum}</td>
+        <td>${ada?badge(d.akhir,'–')+`<div class="text-muted-2" style="font-size:11px">${r.ak&&r.as?'wali '+pc(B.wali)+' + siswa '+pc(B.siswa):'sementara: baru '+(r.as?'angket siswa':'penilaian wali')}</div>`:'<span class="badge-soft st-BELUM">Belum ada</span>'}</td>
         <td class="text-end text-nowrap">
-          ${wl?((r.ak?canU:canC)?`<button class="btn btn-sm btn-outline-primary py-0" data-act="ak" data-id="${E(a.ID)}"><i class="bi bi-ui-checks"></i> ${r.ak?'Ubah':'Isi'} penilaian</button>`:''):((r.as?canU:canC)?`<button class="btn btn-sm btn-outline-success py-0" data-act="as" data-id="${E(a.ID)}"><i class="bi bi-person-check"></i> ${r.as?'Ubah':'Isi'} angket</button>`:'')}
+          ${(r.as?canU:canC)?`<button class="btn btn-sm btn-outline-success py-0" data-act="as" data-id="${E(a.ID)}"><i class="bi bi-person-check"></i> ${r.as?'Ubah':'Isi'} angket siswa</button>`:''}
+          ${(r.ak?canU:canC)?`<button class="btn btn-sm btn-outline-primary py-0" data-act="ak" data-id="${E(a.ID)}"><i class="bi bi-ui-checks"></i> ${r.ak?'Ubah':'Isi'} penilaian wali</button>`:''}
         </td></tr>`;}).join('')||'<tr><td colspan="6"><div class="empty-state"><i class="bi bi-journal-check d-block"></i>Tidak ada anak yang cocok dengan filter.</div></td></tr>'}</tbody>`;
     $$('#rpTbl [data-act]').forEach(b=>b.onclick=()=>{const id=b.dataset.id,x=b.dataset.act;
       if(x==='ak')this.formAngket(id);else if(x==='as')this.formAngketSiswa(id);});
@@ -13572,7 +13789,7 @@ SRIT.Features.penilaian={
   /* =========================== TAB 3: RUBRIK & PANDUAN =========================== */
   renderPanduan(host){
     const R=SRIT.Rapor,E=SRIT.Util.esc;
-    host.innerHTML=`<div class="row g-3"><div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Dua sumber penilaian &amp; cara menghitung hasil akhir</div><div style="font-size:13px">
+    host.innerHTML=`<div class="row g-3"><div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Dua sumber penilaian &amp; cara menghitung nilai akhir</div><div style="font-size:13px">
         <b>1. Angket siswa</b>: siswa menjawab 56 pernyataan (${R.SKALA.map(x=>E(x.l)+' = '+x.v).join(' · ')}). Jawaban dikonversi ke 0–100 (×25): 4 = 100, 3 = 75, 2 = 50, 1 = 25.<br>
         <b>2. Penilaian wali asuh</b>: wali asuh memberi nilai 0–100 untuk tiap butir berdasarkan pengamatan.<br>
         <b>3. Hasil akhir</b> = penilaian wali asuh 60% + angket siswa 40% pada setiap butir; skor sub indikator, indikator, dan total dihitung dari nilai akhir butir (rata-rata butir terisi, bobot sama). Bila baru satu sumber yang terisi, nilai sumber itu dipakai sementara dan diberi tanda "sementara". Butir pengurus (*) yang dikosongkan tidak dihitung.</div></div></div>
@@ -13580,7 +13797,13 @@ SRIT.Features.penilaian={
         <div class="text-muted-2 mt-2" style="font-size:12px">Rubrik ini dipakai untuk nilai akhir. Data lama berskala 1–4 dibaca sebagai 25 / 50 / 75 / 100.</div></div></div>
       <div class="col-12 col-lg-6"><div class="card-srit p-3 h-100"><div class="fw-semibold mb-2">Kategori hasil (berlaku untuk sub indikator, indikator, dan total)</div><table class="table table-sm mb-0" style="font-size:13px"><thead><tr><th>Skor ≥</th><th>Kategori</th><th>Interpretasi</th><th>Tindak lanjut</th></tr></thead><tbody>${R.KAT.map(k=>`<tr><td><b>${k.min}</b></td><td><span class="badge-soft ${k.cls}">${k.k}</span></td><td>${E(k.tafsir)}</td><td>${E(k.tl)}</td></tr>`).join('')}</tbody></table></div></div>
       <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Isi angket: 4 indikator · 16 sub indikator · ${R.ITEMS.length} butir</div>${R.IND.map(I=>`<div class="mb-2"><div class="fw-semibold" style="font-size:13px">${I.k}. ${E(I.nama)}</div><div class="text-muted-2" style="font-size:12px">${I.subs.map(S=>E(S.nama)+' ('+S.items.length+')').join(' · ')}</div></div>`).join('')}</div></div>
-      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Cara memakai</div><ol class="mb-0" style="font-size:13px"><li>Pilih <b>periode</b> (semester) di tab Rapor Anak.</li><li><b>Angket siswa</b>: cetak <b>Unduh angket siswa (PDF)</b>, siswa mengisi dengan centang, lalu petugas/wali asuh memasukkan jawabannya lewat tombol <b>Angket Siswa</b> pada tiap anak.</li><li><b>Penilaian wali asuh</b>: bila perlu catat dulu di kertas (<b>Lembar penilaian wali asuh</b>), lalu masukkan <b>nilai 0–100</b> tiap butir (pengamatan 1 bulan terakhir) lewat tombol <b>Penilaian Wali</b>.</li><li>Kolom <b>Hasil akhir</b> terisi otomatis sebagai rata-rata keduanya. Cetak <b>Laporan Perkembangan Anak Dampingan</b> (menampilkan skor siswa, wali asuh, dan akhir per indikator). Tab Rekap &amp; Ekspor memuat rata-rata per indikator, unduhan CSV rekap, dan <b>Ekspor Template Nilai (Excel)</b> berisi nilai akhir untuk diunggah ke aplikasi Kemensos.</li></ol><div class="text-muted-2 mt-2" style="font-size:12px"><b>Asesmen personal</b> (diisi wali asuh, Draf → Final → Diketahui Kepala Sekolah) tidak lagi di menu ini: buka <b>Profiling Siswa</b>, pilih anak, lalu klik <b>Asesmen personal</b>.</div></div></div></div>`;
+      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Konversi otomatis ke Raport Keasramaan (A / B / C)</div><div style="font-size:13px">
+        Tab <b>Download Raport Keasramaan (Word)</b> terisi otomatis dari <b>nilai akhir</b> (wali 60% + siswa 40%): setiap indikator raport dihitung dari <b>rata-rata nilai akhir butir yang berpadanan</b> (tabel di bawah), lalu diubah menjadi predikat menurut rubrik berikut dan diberi deskripsi.
+        <table class="table table-sm my-2" style="font-size:13px;max-width:560px"><thead><tr><th>Rata-rata nilai</th><th>Predikat raport</th><th>Setara kategori</th></tr></thead><tbody>${R.PRED.map((x,i)=>`<tr><td><b>${i===0?'≥ '+x.min:(i===R.PRED.length-1?'< '+R.PRED[i-1].min:x.min+' – '+(R.PRED[i-1].min-1))}</b></td><td><b>${x.p}</b></td><td>${E(x.k)}</td></tr>`).join('')}</tbody></table>
+        <b>Deskripsi</b>: memakai pustaka kalimat per predikat bila indikator punya padanan di katalog lama; selain itu kalimat baku menurut predikat. <b>Indikator tanpa padanan</b> (mis. bahasa asing, seni budaya, numerasi, sebagian literasi) tidak terisi otomatis dan diisi manual lewat tombol <b>Periksa/Ubah</b>. Isian <b>manual tidak ditimpa</b> oleh perhitungan otomatis; indikator otomatis ikut berubah bila nilai berubah. Tombol <b>Hitung ulang dari nilai akhir</b> di formulir raport mengembalikan indikator berpadanan ke hasil otomatis.</div>
+        <div id="pnKonv" class="mt-2 text-muted-2" style="font-size:12px">Memuat tabel pemetaan…</div></div></div>
+      <div class="col-12"><div class="card-srit p-3"><div class="fw-semibold mb-2">Cara memakai</div><ol class="mb-0" style="font-size:13px"><li>Pilih <b>periode</b> (semester) di tab <b>Angket Siswa &amp; Penilaian Wali</b>.</li><li><b>Angket siswa</b>: klik <b>Unduh angket siswa (PDF)</b>, siswa mengisi dengan centang, lalu petugas/wali asuh memasukkan jawabannya lewat tombol <b>Isi angket siswa</b> di kanan nama anak.</li><li><b>Penilaian wali asuh</b>: bila perlu catat dulu di kertas (<b>Unduh lembar penilaian wali (PDF)</b>), lalu masukkan <b>nilai 0–100</b> tiap butir lewat tombol <b>Isi penilaian wali</b>, atau sekaligus lewat <b>Impor Excel</b> (template non-akademik; anak dicocokkan dengan NISN, NIK, lalu nama).</li><li>Kolom <b>Nilai akhir</b> terisi otomatis (wali 60% + siswa 40%).</li><li>Nilai akademik matrikulasi (literasi, numerasi, sains, bahasa, keagamaan, kepemimpinan, sosial, kemandirian) diinput di tab <b>Nilai Matrikulasi</b>: tombol <b>Isi nilai</b> per anak, atau <b>Impor Excel</b> memakai format pengumpulan matrikulasi (satu sheet per kelas; <b>Format kosong</b> menyiapkan berkasnya).</li><li>Buka tab <b>Download Raport Keasramaan (Word)</b>: raport sudah terisi otomatis; periksa/ubah bila perlu, isi indikator tanpa padanan dan jumlah ketidakhadiran, atur nama penandatangan di <b>Pengaturan raport</b>, lalu unduh <b>Word</b> per anak atau <b>ZIP</b> semua.</li></ol><div class="text-muted-2 mt-2" style="font-size:12px"><b>Asesmen personal</b> (diisi wali asuh, Draf → Final → Diketahui Kepala Sekolah) ada di <b>Profiling Siswa</b>: pilih anak, lalu klik <b>Asesmen personal</b>.</div></div></div></div>`;
+    SRIT.RaporSRMA.htmlKonversi().then(k=>{const el=$('#pnKonv');if(!el)return;el.className='';el.innerHTML=`<div class="fw-semibold mb-1" style="font-size:13px">Pemetaan indikator raport ← butir instrumen (${k.jumlah} dari ${k.total} indikator terisi otomatis)</div>${k.html}<div class="text-muted-2" style="font-size:12px"><b>Diisi manual</b> (${k.tanpa.length}): ${E(k.tanpa.join('; '))}</div>`;}).catch(e=>{const el=$('#pnKonv');if(el)el.textContent='Gagal memuat pemetaan: '+(e.message||e);});
   },
 
   /* =========================== CETAK =========================== */
