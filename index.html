@@ -659,7 +659,7 @@ a{text-decoration:none}
    ========================================================================= */
 window.SRIT = window.SRIT || {};
 /* V1.9.93 — versi & tanggal rilis paket ini (tampilan). WAJIB sama dengan APP_INFO_ di Config.gs dan nama cache di srit-app/sw.js; build.py memeriksanya. */
-SRIT.VERSION = { v: '1.9.93', tgl: '2026-11-27' };
+SRIT.VERSION = { v: '1.9.98', tgl: '2026-11-27' };
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -1462,6 +1462,64 @@ SRIT.Kop={
     return '<style>'+this.CSS+'</style><div class="kop-s"><img src="'+this.LOGO+'" alt="Logo Kementerian Sosial">'+
       '<div class="k1">'+e(this.L[0])+'</div>'+this.L.slice(1).map(x=>'<div class="k2">'+e(x)+'</div>').join('')+
       this.ALAMAT.map(x=>'<div class="k3">'+e(x)+'</div>').join('')+'</div>';
+  }
+};
+
+/* ---------- V1.9.93 — SURAT A4 DIBAGI 3 (Izin & Kepulangan, Izin Keluar) ----------
+   Satu lembar A4 portrait = 3 salinan identik (masing-masing 99 mm, margin 5 mm semua sisi): 1 arsip asrama, 1 keamanan, 1 dibawa siswa. Kop memakai SRIT.Kop (teks & logo terbaru) dalam bentuk ringkas.
+   opt = {judul, no, kiri:[[label,nilai],..], kanan:[[label,nilai],..], status, ttd:[{role,nama,sub}], audit:[modul,id]} — semua nilai di-escape di sini. */
+SRIT.SuratA4={
+  SALINAN:['ARSIP ASRAMA','KEAMANAN','DIBAWA SISWA'],
+  _e:s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),
+  _slip(o,i){
+    const e=this._e,K=SRIT.Kop,tb=rows=>'<table>'+rows.filter(r=>r&&r[1]!==''&&r[1]!=null).map(r=>'<tr><td class="l">'+e(r[0])+'</td><td class="s">:</td><td>'+e(r[1])+'</td></tr>').join('')+'</table>';
+    const sec=i===1?'<div class="sec">Jam keluar gerbang: ........ &nbsp; Jam kembali: ........ &nbsp; Paraf petugas: ................</div>':'';
+    const ttd=o.ttd||[];
+    return '<section class="slip'+(i<2?' cut':'')+'">'+
+      '<div class="hd"><div class="lg"><img src="'+K.LOGO+'" alt=""></div><div class="ht">'+K.L.map((x,j)=>'<div class="l'+j+'">'+e(x)+'</div>').join('')+K.ALAMAT.map(x=>'<div class="ad">'+e(x)+'</div>').join('')+
+      '</div><div class="tg"><div class="tag">'+e(this.SALINAN[i])+'</div><div class="pr">Dicetak: '+e(new Date().toLocaleString('id-ID'))+'</div></div></div>'+
+      '<div class="jd">'+e(o.judul)+'<span>No: '+e(o.no)+'</span></div>'+
+      '<div class="cols"><div>'+tb(o.kiri||[])+'</div><div>'+tb(o.kanan||[])+'</div></div>'+
+      (o.status?'<div class="st">STATUS: '+e(o.status)+'</div>':'')+sec+
+      '<div class="ttd">'+ttd.map(t=>'<div><div>'+e(t.role)+'</div><div class="sp">'+(t.note?'<span class="ap">'+e(t.note).replace(/\n/g,'<br>')+'</span>':'')+'</div><div class="nm">('+e(t.nama||'________________')+')</div>'+'<div class="sb">'+(t.sub?e(t.sub):'&nbsp;')+'</div>'+'</div>').join('')+'</div>'+'</section>';
+  },
+  /** Urutan tanda tangan izin (kiri→kanan): Wali Asrama, Wali Asuh, lalu pihak ketiga (orang tua/penjemput, atau siswa). Stempel "persetujuan online" dipasang di kolom penyetuju yang tercatat (DISETUJUI_NAMA/PADA);
+   penyetuju berperan WALI_ASUH (atau bernama sama dengan wali asuh anak) → kolom Wali Asuh, selain itu → kolom Wali Asrama. Pengesahan izin darurat lama (PENGESAH_NAMA) juga distempel di kolom Wali Asrama. */
+  ttdIzin(rec,wa,kanan){
+    const U=SRIT.Util,usr=SRIT.Repo.getById('USERS',rec.DISETUJUI_OLEH)||{};
+    const ok=!!rec.DISETUJUI_NAMA&&rec.STATUS!=='MENUNGGU'&&rec.STATUS!=='DITOLAK';
+    const asuh=ok&&(usr.ROLE==='WALI_ASUH'||String(rec.DISETUJUI_NAMA)===String(wa));
+    const cap=(t,w)=>t+(w?'\n'+U.fmtWaktu(w):'');
+    const asrama=ok&&!asuh?{nama:rec.DISETUJUI_NAMA,note:cap('✔ Persetujuan online',rec.DISETUJUI_PADA)}
+      :(rec.PENGESAHAN==='SAH'&&rec.PENGESAH_NAMA?{nama:rec.PENGESAH_NAMA,note:cap('✔ Pengesahan online',rec.PENGESAH_PADA)}:{nama:'________________',note:''});
+    return [{role:'Wali Asrama',nama:asrama.nama,note:asrama.note},
+            {role:'Wali Asuh',nama:wa,note:asuh?cap('✔ Pengajuan online',rec.DISETUJUI_PADA):''},kanan];
+  },
+  /* V1.9.96 — tata letak presisi: A4 = 297 mm dibagi 3 = 99 mm per salinan (garis potong tepat di 99 mm dan 198 mm).
+     Setiap salinan diberi margin 5 mm (0,5 cm) di SEMUA sisi, termasuk sisi potong, jadi setelah dipotong tiap lembar arsip punya batas isi yang sama.
+     Lembar dibuat 296,8 mm (bukan 297) agar peramban tidak menambah halaman kosong; selisih 0,2 mm diserap salinan ke-3 (padding bawah 4,8 mm) sehingga tinggi area isi tetap 89 mm di ketiganya. */
+  CSS:'@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff}body{width:210mm;font-family:Arial,Helvetica,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    '.sheet{width:210mm;height:296.8mm;overflow:hidden;position:relative;page-break-after:avoid;break-after:avoid}'+
+    '.slip{width:210mm;height:99mm;padding:5mm;overflow:hidden;position:relative;display:flex;flex-direction:column;page-break-inside:avoid;break-inside:avoid;font-size:9pt;line-height:1.2}'+
+    '.slip:last-child{height:98.8mm;padding-bottom:4.8mm}'+
+    '.slip.cut::after{content:"";position:absolute;left:0;right:0;bottom:0;border-bottom:.3mm dashed #000}'+
+    '.hd{display:flex;align-items:center;gap:2mm;border-bottom:2px solid #000;padding-bottom:1mm;flex:none}.lg{flex:none;width:32mm}.lg img{display:block;width:15mm;height:16.5mm;object-fit:contain}'+
+    '.ht{flex:1;text-align:center;line-height:1.1}.ht .l0{font-size:8pt;font-weight:700}.ht .l1,.ht .l2{font-size:7.5pt;font-weight:700}.ht .l3{font-size:9.5pt;font-weight:700}.ht .ad{font-size:6.3pt}'+
+    '.tg{flex:none;width:32mm;text-align:center}.tag{border:1.4px solid #000;padding:.8mm;font-size:8pt;font-weight:700}.pr{font-size:5.8pt;color:#333;margin-top:.8mm;line-height:1.1}'+
+    '.jd{text-align:center;font-weight:700;font-size:10.5pt;margin:.8mm 0 .6mm;text-decoration:underline;flex:none}.jd span{display:block;font-size:8pt;font-weight:400;text-decoration:none}'+
+    '.cols{display:grid;grid-template-columns:1fr 1.25fr;gap:0 6mm;flex:none}table{width:100%;border-collapse:collapse;font-size:8.6pt;line-height:1.15}td{padding:.05mm 1mm .05mm 0;vertical-align:top}td.l{width:24mm;white-space:nowrap}td.s{width:3mm}'+
+    '.st{border:1px solid #000;text-align:center;font-weight:700;padding:.3mm;margin-top:.8mm;font-size:8.5pt;flex:none}.sec{margin-top:.6mm;font-size:8pt;border:1px dotted #000;padding:.4mm 1.5mm;flex:none}'+
+    '.ttd{display:flex;justify-content:space-around;text-align:center;margin-top:.8mm;font-size:8pt;flex:1 1 auto;min-height:0}.ttd>div{flex:1;display:flex;flex-direction:column}.ttd .sp{flex:1 1 auto;min-height:7mm;display:flex;align-items:center;justify-content:center}.ttd .ap{font-size:6.5pt;font-style:italic;line-height:1.15;border:1px solid #000;padding:.3mm 1.2mm}.ttd .nm{font-weight:700}.ttd .sb{font-size:7pt}',
+  html(o){
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+this._e(o.judul)+' '+this._e(o.no)+'</title><style>'+this.CSS+'</style></head><body><div class="sheet">'+
+      [0,1,2].map(i=>this._slip(o,i)).join('')+'</div></body></html>';
+  },
+  cetak(o){
+    const w=window.open('','_blank','width=900,height=1000');
+    if(!w){SRIT.Notify('Popup diblokir, izinkan popup untuk mencetak','err');return;}
+    w.document.write(this.html(o));w.document.close();w.focus();
+    setTimeout(()=>{w.print();},500);
+    if(o.audit)SRIT.Audit.log('PRINT',o.audit[0],o.audit[1]);
   }
 };
 
@@ -4835,7 +4893,8 @@ regFeature('izin',{monitor:{date:'TANGGAL',dateEnd:'KEMBALI',anak:'ANAK'},title:
       return x;}}
   ],
   rowActions:[
-    {id:'cetak',label:'Cetak Surat Izin',icon:'bi-printer',cls:'btn-outline-dark',run:function(rec){SRIT.Features.izin.cetak(rec);}},
+    {id:'cetak',label:'Cetak Surat Izin (A4 ÷ 3)',icon:'bi-printer',cls:'btn-outline-dark',run:function(rec){SRIT.Features.izin.cetak(rec);}},
+    {id:'cetak-struk',label:'Cetak Struk (thermal 58 mm)',icon:'bi-file-earmark-text',cls:'btn-outline-secondary',run:function(rec){SRIT.Features.izin.cetakStruk(rec);}},
     {id:'setuju',label:'Setujui',icon:'bi-check-lg',cls:'btn-outline-success',show:r=>r.STATUS==='MENUNGGU'&&SRIT.Approval.canIzinAnak(r),run:function(rec,reload){SRIT.Approval.decide('IZIN','izin',rec,'DISETUJUI',reload,'Izin');}},
     {id:'tolak',label:'Tolak',icon:'bi-x-lg',cls:'btn-outline-danger',show:r=>r.STATUS==='MENUNGGU'&&SRIT.Approval.canIzinAnak(r),run:function(rec,reload){SRIT.Approval.decide('IZIN','izin',rec,'DITOLAK',reload,'Izin');}},
     {id:'sahkan',label:'Sahkan (izin darurat lama)',icon:'bi-patch-check',cls:'btn-outline-warning',show:r=>r.PENGESAHAN==='MENUNGGU'&&SRIT.Approval.canSah(r),run:function(rec,reload){SRIT.Approval.sahkan(rec,reload);}},
@@ -5007,8 +5066,22 @@ SRIT.Features.izin.putusPerpanjang=async function(rec,status,reload){
         return false;},reload);
     }});
 };
-// Cetak surat izin — dioptimalkan untuk printer thermal iPOS 58 (lebar kertas 58mm ≈ 48mm area cetak)
+// Cetak surat izin: A4 dibagi 3 (arsip asrama, keamanan, dibawa siswa) — V1.9.93
 SRIT.Features.izin.cetak=function(rec){
+  const a=SRIT.Repo.getById('ANAK',rec.ANAK)||{},F=SRIT.Util.fmtDateShort;
+  const kmr=(SRIT.Repo.getById('KAMAR',a.KAMAR)||{}).NAME||'-',wa=SRIT.Asuh.namaPada(rec.ANAK,rec.TANGGAL);
+  SRIT.SuratA4.cetak({
+    judul:'SURAT IZIN KELUAR / PULANG',no:(rec.ID||'').toUpperCase(),audit:['izin',rec.ID],
+    kiri:[['Nama',a.NAMA||rec.NAMA_ANAK||'-'],['NIS',a.NIS||'-'],['Jenjang',((a.JENJANG||'-')+' '+(a.KELAS||'')).trim()],['Kamar',kmr],['Wali Asuh',wa]],
+    kanan:[['Jenis',rec.JENIS||'-'],['Berangkat',F(rec.TANGGAL)+(rec.JAM_BERANGKAT?' '+rec.JAM_BERANGKAT:'')],['Kembali',F(rec.KEMBALI)+(rec.JAM_KEMBALI?' '+rec.JAM_KEMBALI:'')],
+      +rec.JML_PERPANJANGAN>0?['Diperpanjang',(+rec.JML_PERPANJANGAN)+'x (semula '+F(rec.KEMBALI_ASAL)+')']:null,
+      ['Tujuan',rec.TUJUAN||'-'],['Penjemput',(rec.PENJEMPUT||'-')+(rec.HUBUNGAN?' ('+rec.HUBUNGAN+')':'')],['Alasan',rec.ALASAN||'-']],
+    status:(rec.STATUS||'-')+(rec.DISETUJUI_NAMA?' · oleh '+rec.DISETUJUI_NAMA:'')+(rec.PENGESAHAN==='MENUNGGU'?' (menunggu pengesahan)':''),
+    ttd:SRIT.SuratA4.ttdIzin(rec,wa,{role:'Orang Tua / Penjemput',nama:rec.PENJEMPUT||'________________',sub:rec.HUBUNGAN||''})
+  });
+};
+// Cetak struk thermal — dioptimalkan untuk printer thermal iPOS 58 (lebar kertas 58mm ≈ 48mm area cetak)
+SRIT.Features.izin.cetakStruk=function(rec){
   const a=SRIT.Repo.getById('ANAK',rec.ANAK)||{};
   const set=SRIT.Store.readObj('SETTINGS');
   const kmr=(SRIT.Repo.getById('KAMAR',a.KAMAR)||{}).NAME||'-';
@@ -5111,7 +5184,8 @@ regFeature('izin-keluar',{monitor:{date:'TANGGAL',anak:'ANAK'},title:'Izin Kelua
       return x;}}
   ],
   rowActions:[
-    {id:'cetak',label:'Cetak Surat Izin Keluar',icon:'bi-printer',cls:'btn-outline-dark',run:function(rec){SRIT.Features['izin-keluar'].cetak(rec);}},
+    {id:'cetak',label:'Cetak Surat Izin Keluar (A4 ÷ 3)',icon:'bi-printer',cls:'btn-outline-dark',run:function(rec){SRIT.Features['izin-keluar'].cetak(rec);}},
+    {id:'cetak-struk',label:'Cetak Struk (thermal 58 mm)',icon:'bi-file-earmark-text',cls:'btn-outline-secondary',run:function(rec){SRIT.Features['izin-keluar'].cetakStruk(rec);}},
     {id:'setuju',label:'Setujui',icon:'bi-check-lg',cls:'btn-outline-success',show:r=>r.STATUS==='MENUNGGU'&&SRIT.Approval.canIzinAnak(r,'izin-keluar:APPROVE'),run:function(rec,reload){SRIT.Approval.decide('IZIN_KELUAR','izin-keluar',rec,'DISETUJUI',reload,'Izin keluar');}},
     {id:'tolak',label:'Tolak',icon:'bi-x-lg',cls:'btn-outline-danger',show:r=>r.STATUS==='MENUNGGU'&&SRIT.Approval.canIzinAnak(r,'izin-keluar:APPROVE'),run:function(rec,reload){SRIT.Approval.decide('IZIN_KELUAR','izin-keluar',rec,'DITOLAK',reload,'Izin keluar');}},
     {id:'berangkat',label:'Berangkat',icon:'bi-box-arrow-right',cls:'btn-outline-primary',show:r=>r.STATUS==='DISETUJUI',run:function(rec,reload){SRIT.Approval.setStatus('IZIN_KELUAR','izin-keluar',rec,'BERANGKAT',reload,'Izin Keluar');}},
@@ -5177,8 +5251,20 @@ SRIT.Features['izin-keluar'].form=function(id){
   };
 };
 
-// Cetak surat izin keluar - lebar kertas 58mm (printer thermal iPOS 58), sama dengan surat izin pulang
+// Cetak surat izin keluar: A4 dibagi 3 (arsip asrama, keamanan, dibawa siswa) — V1.9.93
 SRIT.Features['izin-keluar'].cetak=function(rec){
+  const a=SRIT.Repo.getById('ANAK',rec.ANAK)||{},F=SRIT.Util.fmtDateShort;
+  const kmr=(SRIT.Repo.getById('KAMAR',a.KAMAR)||{}).NAME||'-',wa=SRIT.Asuh.namaPada(rec.ANAK,rec.TANGGAL);
+  SRIT.SuratA4.cetak({
+    judul:'SURAT IZIN KELUAR',no:(rec.ID||'').toUpperCase(),audit:['izin-keluar',rec.ID],
+    kiri:[['Nama',a.NAMA||rec.NAMA_ANAK||'-'],['NIS',a.NIS||'-'],['Jenjang',((a.JENJANG||'-')+' '+(a.KELAS||'')).trim()],['Kamar',kmr],['Wali Asuh',wa]],
+    kanan:[['Tanggal',F(rec.TANGGAL)],['Berangkat',rec.JAM_BERANGKAT||'-'],['Pulang',rec.JAM_KEMBALI||'-'],['Tujuan',rec.TUJUAN||'-'],['Alasan',rec.ALASAN||'-']],
+    status:(rec.STATUS||'-')+(rec.DISETUJUI_NAMA?' · oleh '+rec.DISETUJUI_NAMA:''),
+    ttd:SRIT.SuratA4.ttdIzin(rec,wa,{role:'Siswa',nama:a.NAMA||rec.NAMA_ANAK||'________________'})
+  });
+};
+// Cetak struk thermal izin keluar - lebar kertas 58mm (printer thermal iPOS 58)
+SRIT.Features['izin-keluar'].cetakStruk=function(rec){
   const a=SRIT.Repo.getById('ANAK',rec.ANAK)||{};
   const set=SRIT.Store.readObj('SETTINGS');
   const kmr=(SRIT.Repo.getById('KAMAR',a.KAMAR)||{}).NAME||'-';
