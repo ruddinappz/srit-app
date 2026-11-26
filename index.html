@@ -658,6 +658,8 @@ a{text-decoration:none}
    google.script.run for GAS deployment — see SRIT.Api / SRIT.Repo comments).
    ========================================================================= */
 window.SRIT = window.SRIT || {};
+/* V1.9.93 — versi & tanggal rilis paket ini (tampilan). WAJIB sama dengan APP_INFO_ di Config.gs dan nama cache di srit-app/sw.js; build.py memeriksanya. */
+SRIT.VERSION = { v: '1.9.93', tgl: '2026-11-27' };
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -1640,7 +1642,8 @@ SRIT.MENU=[
   {r:'jabatan',t:'Jabatan',i:'bi-briefcase'},
   {r:'role',t:'Peran & Hak Akses',i:'bi-key'},
   {r:'audit',t:'Jejak Audit',i:'bi-clipboard-data'},
-  {r:'settings',t:'Pengaturan',i:'bi-gear'}
+  {r:'settings',t:'Pengaturan',i:'bi-gear'},
+  {r:'server',t:'Server & Versi',i:'bi-cloud-arrow-up'}
  ];
  // Setiap menu punya modul izin sendiri (nama modul = nama route), kecuali hub "Modul Operasional Lain" (route 'keasramaan' → modul 'ops').
  // Katalog izin (modul, aksi) ada di server: Config.gs → MENU_PERMS. Matriks di menu Peran & Hak Akses dibangun dari urutan SRIT.MENU ini.
@@ -6917,14 +6920,10 @@ SRIT.Features.settings={
       </div></div>
 
       <div class="col-lg-6"><div class="card-srit p-3">
-        <h6 class="section-title mb-3"><i class="bi bi-link-45deg me-1"></i> Alamat Server (GitHub Pages)</h6>
-        <div class="text-muted-2 mb-2" style="font-size:12px">Alamat web app Apps Script (berakhiran <b>/exec</b>). Bila diisi, semua perangkat yang membuka lewat GitHub Pages berpindah otomatis ke alamat ini begitu terhubung berikutnya, tanpa menempel ulang. Kosongkan bila tidak dipakai.</div>
-        <input class="form-control form-control-sm" id="setExecUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${SRIT.Util.esc(s.EXEC_URL||'')}">
-        <div class="text-muted-2 mt-1" style="font-size:11px">Penting: perangkat menemukan alamat baru lewat alamat lama, jadi <b>jangan hapus / arsipkan deployment lama</b> sampai semua perangkat sempat terhubung sekali. Untuk pembaruan biasa pakai Deploy &gt; Kelola deployment &gt; Edit &gt; Versi baru: alamat tidak berubah dan pengaturan ini tidak perlu disentuh.</div>
-        <div class="d-flex gap-2 flex-wrap mt-2">
-          <button class="btn btn-primary btn-sm" id="setSaveExec"><i class="bi bi-save"></i> Simpan &amp; Terapkan ke Semua Perangkat</button>
-          ${typeof window.SRIT_EXEC_URL==='function'?'<button class="btn btn-outline-secondary btn-sm" id="setExecThis"><i class="bi bi-pc-display"></i> Isi dengan alamat perangkat ini</button>':''}
-        </div>
+        <h6 class="section-title mb-3"><i class="bi bi-cloud-arrow-up me-1"></i> Alamat Server &amp; Versi</h6>
+        <div class="text-muted-2 mb-2" style="font-size:12px">Alamat web app Apps Script (/exec) dan informasi versi aplikasi kini ada di menu tersendiri: <b>Server &amp; Versi</b>.</div>
+        <div class="mb-2" style="font-size:13px">Versi tampilan ini: <b>V${SRIT.Util.esc((SRIT.VERSION||{}).v||'-')}</b></div>
+        ${SRIT.Auth.canModule('server')?'<button class="btn btn-outline-primary btn-sm" id="setGoServer"><i class="bi bi-box-arrow-up-right"></i> Buka Server &amp; Versi</button>':''}
       </div></div>
 
       <div class="col-12"><div class="card-srit p-3">
@@ -7067,20 +7066,7 @@ SRIT.Features.settings={
       SRIT.Notify('Logo & ikon tersimpan','ok');
       this.load();
     });
-    on('setExecThis','onclick',()=>{const u=window.SRIT_EXEC_URL&&window.SRIT_EXEC_URL();if(u)$('#setExecUrl').value=u;});
-    on('setSaveExec','onclick',async()=>{
-      const v=$('#setExecUrl').value.trim();
-      const RX=/^https:\/\/script\.google\.com\/(a\/[^\/]+\/)?macros\/s\/[^\/]+\/exec$/;
-      if(v&&!RX.test(v)){SRIT.Notify('Alamat harus berbentuk https://script.google.com/macros/s/…/exec','warn');return;}
-      if(v){   // uji dulu: alamat baru harus menjawab dan sudah memuat versi terbaru
-        let okp=false;
-        try{const r=await fetch(v,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'apiExecUrl',args:[]}),redirect:'follow'});const j=await r.json();okp=!!(j&&j.ok);}catch(e){}
-        if(!okp&&!confirm('Alamat ini belum bisa dihubungi atau belum berisi versi terbaru (Deploy > Versi baru). Tetap simpan?'))return;
-      }
-      this._save({EXEC_URL:v});
-      SRIT.Notify(v?'Alamat server tersimpan. Perangkat lain berpindah otomatis saat terhubung.':'Alamat server dikosongkan','ok');
-      this.load();
-    });
+    on('setGoServer','onclick',()=>{location.hash='#/server';});
     on('setSaveLtv','onclick',()=>{
       const rot=Math.min(120,Math.max(5,parseInt($('#setLtvRotate').value,10)||10));
       const poll=Math.min(300,Math.max(5,parseInt($('#setLtvPolling').value,10)||15));
@@ -7303,6 +7289,202 @@ SRIT.Features.settings={
   },
   _save(patch){const s=SRIT.Store.readObj('SETTINGS');SRIT.Store.writeObj('SETTINGS',{...s,...patch});SRIT.Cache.invalidate('livetv');SRIT.Audit.log('UPDATE','settings','SETTINGS');},
   destroy(){}
+};
+</script>
+
+<script>__srit.n('View_Server')</script>
+<script>
+//# sourceURL=View_Server.html
+// ---------- SERVER & VERSI (V1.9.93) ----------
+// Alamat web app Apps Script (/exec) yang diumumkan ke semua perangkat GitHub Pages (dulu kartu "Alamat Server" di Pengaturan),
+// ditambah versi + tanggal rilis aplikasi: versi tampilan (paket yang sedang dibuka) dan versi server (kode Apps Script di alamat itu).
+SRIT.Features.server={
+  RX:/^https:\/\/script\.google\.com\/(a\/[^\/]+\/)?macros\/s\/[^\/]+\/exec$/,
+  _srv:null,
+  render(host){
+    SRIT.UI.setPage('Server & Versi','Server & Versi');
+    this._host=host;this._srv=null;
+    this.draw();
+    this.cekServer();
+  },
+  destroy(){},
+
+  /* ---------- pembantu ---------- */
+  _tgl(iso){
+    const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||''));if(!m)return '';
+    const d=new Date(+m[1],+m[2]-1,+m[3]);
+    return isNaN(d)?'':d.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+  },
+  _waktu(iso){const d=new Date(iso);return isNaN(d)?'':d.toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});},
+  _cmp(a,b){   // bandingkan versi bertitik: -1 a<b, 0 sama, 1 a>b
+    const x=String(a||'').split('.').map(n=>parseInt(n,10)||0),y=String(b||'').split('.').map(n=>parseInt(n,10)||0);
+    for(let i=0;i<Math.max(x.length,y.length);i++){const p=x[i]||0,q=y[i]||0;if(p!==q)return p<q?-1:1;}
+    return 0;
+  },
+  _verTxt(v,t){const E=SRIT.Util.esc;return v?`<b>V${E(v)}</b>${t?` <span class="text-muted-2">· ${E(this._tgl(t))}</span>`:''}`:'<span class="text-muted-2">tidak diketahui</span>';},
+  _canEdit(){return SRIT.Auth.can('server:UPDATE')||SRIT.Auth.can('server:MANAGE');},
+  _isGh(){return typeof window.SRIT_EXEC_URL==='function';},
+
+  /** Tanya server (alamat yang dipakai perangkat ini) versinya. */
+  async cekServer(){
+    this._srv=null;this._paintSrv();
+    let r;
+    try{r=await SRIT.Server.pub('apiAppInfo');}
+    catch(e){
+      const m=String((e&&e.message)||e);
+      r=/tidak diizinkan|not a function|tidak dikenal|is not defined/i.test(m)?{lama:true}:{err:m};
+    }
+    if(SRIT.currentFeature!=='server')return;
+    this._srv=r||{err:'Tidak ada jawaban'};
+    this._paintSrv();
+  },
+  _paintSrv(){
+    const a=document.getElementById('svrVerSrv'),b=document.getElementById('svrBadge');if(!a||!b)return;
+    const E=SRIT.Util.esc,V=SRIT.VERSION,s=this._srv;
+    if(!s){a.innerHTML='<span class="text-muted-2">memeriksa…</span>';b.innerHTML='';return;}
+    if(s.err){a.innerHTML='<span class="text-muted-2">tidak terjangkau</span>';b.innerHTML=`<span class="badge-soft st-ALPA">Gagal terhubung</span><div class="text-muted-2 mt-1" style="font-size:11px">${E(s.err)}</div>`;return;}
+    if(s.lama){a.innerHTML='<span class="text-muted-2">lebih lama dari V1.9.93</span>';b.innerHTML='<span class="badge-soft st-IZIN">Server belum diperbarui</span><div class="text-muted-2 mt-1" style="font-size:11px">Kode Apps Script belum memuat info versi. <i>clasp push</i> semua berkas, lalu Deploy &gt; Kelola deployment &gt; Edit &gt; Versi baru.</div>';return;}
+    a.innerHTML=this._verTxt(s.versi,s.tgl);
+    const c=this._cmp(V.v,s.versi);
+    b.innerHTML=c===0
+      ?'<span class="badge-soft st-HADIR"><i class="bi bi-check-circle-fill"></i> Sinkron</span>'
+      :(c>0
+        ?`<span class="badge-soft st-IZIN"><i class="bi bi-exclamation-triangle-fill"></i> Server lebih lama</span><div class="text-muted-2 mt-1" style="font-size:11px">Tampilan V${E(V.v)}, server V${E(s.versi)}. <i>clasp push</i> semua berkas lalu Deploy &gt; Versi baru.</div>`
+        :`<span class="badge-soft st-IZIN"><i class="bi bi-exclamation-triangle-fill"></i> Tampilan lebih lama</span><div class="text-muted-2 mt-1" style="font-size:11px">Tampilan V${E(V.v)}, server V${E(s.versi)}. Ganti <i>index.html</i> di GitHub Pages dengan versi terbaru, lalu muat ulang (refresh keras).</div>`);
+  },
+
+  /** Uji sebuah alamat /exec: {versi,tgl} bila server baru, {lama:true} bila menjawab tetapi belum punya apiAppInfo; melempar galat bila tak terjangkau. */
+  async _probe(u){
+    const ctl=('AbortController' in window)?new AbortController():null,tm=ctl&&setTimeout(()=>ctl.abort(),20000);
+    let j;
+    try{
+      const r=await fetch(u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'apiAppInfo',args:[]}),redirect:'follow',signal:ctl?ctl.signal:undefined});
+      j=await r.json();
+    }catch(e){throw new Error(e&&e.name==='AbortError'?'Server terlalu lama menjawab':'Tidak terhubung (periksa alamat, akses "Siapa saja", dan internet)');}
+    finally{if(tm)clearTimeout(tm);}
+    if(j&&j.ok&&j.data&&j.data.versi)return {versi:String(j.data.versi),tgl:String(j.data.tgl||'')};
+    if(j&&j.ok===false&&/tidak diizinkan/i.test(String(j.msg||'')))return {lama:true};
+    throw new Error((j&&j.msg)||'Jawaban server tidak dikenali');
+  },
+
+  /* ---------- tampilan ---------- */
+  draw(){
+    const E=SRIT.Util.esc,s=SRIT.Store.readObj('SETTINGS')||{},V=SRIT.VERSION,gh=this._isGh(),can=this._canEdit();
+    const dev=gh?(window.SRIT_EXEC_URL()||''):'';
+    this._host.innerHTML=`
+    <div class="row g-3">
+      <div class="col-lg-5"><div class="card-srit p-3 h-100">
+        <h6 class="section-title mb-3"><i class="bi bi-tag me-1"></i> Versi Aplikasi</h6>
+        <div class="d-flex align-items-baseline gap-2 flex-wrap mb-3">
+          <div style="font-size:30px;font-weight:800;line-height:1">V${E(V.v)}</div>
+          <div class="text-muted-2" style="font-size:13px">dirilis ${E(this._tgl(V.tgl))}</div>
+        </div>
+        <table class="table table-sm mb-2" style="font-size:13px"><tbody>
+          <tr><td class="text-muted-2">Tampilan (${gh?'GitHub Pages':'Apps Script'})</td><td class="text-end">${this._verTxt(V.v,V.tgl)}</td></tr>
+          <tr><td class="text-muted-2">Server (Apps Script)</td><td class="text-end" id="svrVerSrv"></td></tr>
+          <tr><td class="text-muted-2">Status</td><td class="text-end" id="svrBadge"></td></tr>
+        </tbody></table>
+        <button class="btn btn-outline-secondary btn-sm" id="svrRecheck"><i class="bi bi-arrow-repeat"></i> Periksa Ulang</button>
+      </div></div>
+
+      <div class="col-lg-7"><div class="card-srit p-3 h-100">
+        <h6 class="section-title mb-3"><i class="bi bi-link-45deg me-1"></i> Alamat Server (Link Apps Script)</h6>
+        ${gh
+          ?`<div class="mb-2"><div class="form-label-sm">Dipakai perangkat ini</div><code style="font-size:11px;word-break:break-all">${E(dev||'(belum diisi)')}</code></div>`
+          :`<div class="text-muted-2 mb-2" style="font-size:12px">Aplikasi ini dibuka langsung dari Apps Script, jadi alamat servernya adalah alamat halaman ini. Kolom di bawah hanya untuk perangkat yang membuka lewat GitHub Pages.</div>`}
+        <div class="text-muted-2 mb-2" style="font-size:12px">Alamat web app Apps Script (berakhiran <b>/exec</b>). Bila diisi, semua perangkat GitHub Pages berpindah otomatis ke alamat ini begitu terhubung berikutnya, tanpa menempel ulang. Kosongkan bila tidak dipakai.</div>
+        <label class="form-label-sm" for="svrUrl">Alamat terbaru yang diumumkan</label>
+        <input class="form-control form-control-sm" id="svrUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${E(s.EXEC_URL||'')}" ${can?'':'disabled'}>
+        <div id="svrTest" class="mt-2" style="font-size:12px;min-height:18px"></div>
+        <div class="text-muted-2 mt-1" style="font-size:11px">Penting: perangkat menemukan alamat baru lewat alamat lama, jadi <b>jangan hapus / arsipkan deployment lama</b> sampai semua perangkat sempat terhubung sekali. Untuk pembaruan biasa pakai Deploy &gt; Kelola deployment &gt; Edit &gt; Versi baru: alamat tidak berubah dan kolom ini tidak perlu disentuh.</div>
+        ${can?`<div class="d-flex gap-2 flex-wrap mt-2">
+          <button class="btn btn-outline-primary btn-sm" id="svrTestBtn"><i class="bi bi-lightning-charge"></i> Uji Alamat</button>
+          <button class="btn btn-primary btn-sm" id="svrSave"><i class="bi bi-save"></i> Simpan &amp; Terapkan ke Semua Perangkat</button>
+          ${gh?'<button class="btn btn-outline-secondary btn-sm" id="svrThis"><i class="bi bi-pc-display"></i> Isi dengan alamat perangkat ini</button>':''}
+        </div>`:'<div class="text-muted-2 mt-2" style="font-size:12px">Anda hanya dapat melihat. Mengubah alamat memerlukan izin Ubah pada menu Server &amp; Versi.</div>'}
+        <div id="svrLast" class="mt-3" style="font-size:12px"></div>
+      </div></div>
+
+      <div class="col-12"><div class="card-srit p-3">
+        <h6 class="section-title mb-3"><i class="bi bi-clock-history me-1"></i> Riwayat Alamat Server</h6>
+        <div id="svrRiw"></div>
+      </div></div>
+    </div>`;
+    this._paintSrv();this._paintInfo();
+    const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.onclick=fn;};
+    on('svrRecheck',()=>this.cekServer());
+    on('svrThis',()=>{const u=window.SRIT_EXEC_URL&&window.SRIT_EXEC_URL();if(u)document.getElementById('svrUrl').value=u;});
+    on('svrTestBtn',()=>this.uji());
+    on('svrSave',()=>this.simpan());
+  },
+
+  /** Keterangan alamat tersimpan + tabel riwayat. */
+  _paintInfo(){
+    const E=SRIT.Util.esc,s=SRIT.Store.readObj('SETTINGS')||{},last=document.getElementById('svrLast'),riw=document.getElementById('svrRiw');
+    if(last){
+      last.innerHTML=s.EXEC_URL
+        ?`<div class="form-label-sm">Alamat tersimpan</div>
+           <div>${this._verTxt(s.EXEC_URL_VERSI,s.EXEC_URL_TGL)}${s.EXEC_URL_WAKTU?` <span class="text-muted-2">· disimpan ${E(this._waktu(s.EXEC_URL_WAKTU))}${s.EXEC_URL_OLEH?' oleh '+E(s.EXEC_URL_OLEH):''}</span>`:''}</div>`
+        :'<span class="text-muted-2">Belum ada alamat yang diumumkan.</span>';
+    }
+    if(riw){
+      let list=s.EXEC_URL_RIWAYAT;if(typeof list==='string'){try{list=JSON.parse(list);}catch(e){list=[];}}
+      list=Array.isArray(list)?list:[];this._riw=list;
+      riw.innerHTML=list.length
+        ?`<div class="table-responsive"><table class="table table-srit mb-0"><thead><tr><th>Versi</th><th>Tgl Rilis</th><th>Alamat</th><th>Disimpan</th><th>Oleh</th>${this._canEdit()?'<th></th>':''}</tr></thead><tbody>
+          ${list.map((r,i)=>`<tr${r.url===s.EXEC_URL?' style="font-weight:600"':''}>
+            <td>${r.versi?'V'+E(r.versi):'<span class="text-muted-2">–</span>'}</td>
+            <td style="font-size:12px">${E(this._tgl(r.tgl))||'<span class="text-muted-2">–</span>'}</td>
+            <td><code style="font-size:11px;word-break:break-all">${E(r.url)}</code>${r.url===s.EXEC_URL?' <span class="badge-soft st-HADIR">aktif</span>':''}</td>
+            <td style="font-size:12px">${E(this._waktu(r.waktu))}</td><td style="font-size:12px">${E(r.oleh||'')}</td>
+            ${this._canEdit()?`<td><button class="btn btn-outline-secondary btn-sm" data-pakai="${i}" title="Isi kolom alamat dengan alamat ini">Pakai</button></td>`:''}</tr>`).join('')}
+          </tbody></table></div>`
+        :'<div class="text-muted-2" style="font-size:12px">Belum ada riwayat. Setiap kali alamat disimpan, alamat + versi + tanggalnya tercatat di sini (10 terakhir).</div>';
+      riw.querySelectorAll('[data-pakai]').forEach(b=>b.onclick=()=>{const r=this._riw[+b.dataset.pakai];if(r)document.getElementById('svrUrl').value=r.url;});
+    }
+  },
+
+  /* ---------- aksi ---------- */
+  _urlVal(){return (document.getElementById('svrUrl').value||'').trim();},
+  _msg(html){const el=document.getElementById('svrTest');if(el)el.innerHTML=html;},
+  async uji(){
+    const E=SRIT.Util.esc,v=this._urlVal();
+    if(!v){this._msg('<span class="text-muted-2">Isi alamat dulu.</span>');return;}
+    if(!this.RX.test(v)){this._msg('<span style="color:#c62828">Alamat harus berbentuk https://script.google.com/macros/s/…/exec</span>');return;}
+    this._msg('<span class="text-muted-2">Menghubungi alamat…</span>');
+    try{
+      const r=await this._probe(v);
+      if(r.lama){this._msg('<span style="color:#b26a00"><i class="bi bi-exclamation-triangle-fill"></i> Alamat menjawab, tetapi kodenya belum memuat info versi (lebih lama dari V1.9.93).</span>');return;}
+      const c=this._cmp(SRIT.VERSION.v,r.versi);
+      this._msg(`<span style="color:#1b7f3b"><i class="bi bi-check-circle-fill"></i> Terhubung — ${this._verTxt(r.versi,r.tgl)}</span>`+(c===0?'':`<div class="text-muted-2" style="font-size:11px">Berbeda dengan tampilan ini (V${E(SRIT.VERSION.v)}).</div>`));
+    }catch(e){this._msg(`<span style="color:#c62828"><i class="bi bi-x-circle-fill"></i> ${E(e.message||e)}</span>`);}
+  },
+  async simpan(){
+    const v=this._urlVal(),btn=document.getElementById('svrSave');
+    if(v&&!this.RX.test(v)){SRIT.Notify('Alamat harus berbentuk https://script.google.com/macros/s/…/exec','warn');return;}
+    let info={};
+    if(v){   // uji dulu: alamat baru harus menjawab (dan idealnya sudah memuat versi terbaru)
+      this._msg('<span class="text-muted-2">Menguji alamat…</span>');
+      try{
+        info=await this._probe(v);
+        if(info.lama){info={};if(!confirm('Alamat ini menjawab, tetapi kodenya belum memuat info versi (belum Deploy > Versi baru dari paket terbaru). Tetap simpan?'))return;}
+      }catch(e){
+        info={};if(!confirm('Alamat ini belum bisa dihubungi: '+(e.message||e)+'\n\nTetap simpan?'))return;
+      }
+    }else if(!confirm('Kosongkan alamat server? Perangkat GitHub Pages tidak lagi diarahkan otomatis.'))return;
+    if(btn)btn.disabled=true;
+    try{
+      const r=await SRIT.Server.call('apiExecSave',v,{versi:info.versi||'',tgl:info.tgl||''});
+      const cur=SRIT.Store.readObj('SETTINGS')||{};   // cermin lokal saja (server sudah menulis); tanpa antrean sinkron
+      SRIT.Store._set('SETTINGS',Object.assign({},cur,{EXEC_URL:r.url,EXEC_URL_WAKTU:r.waktu,EXEC_URL_OLEH:r.oleh,EXEC_URL_VERSI:r.versi,EXEC_URL_TGL:r.tgl,EXEC_URL_RIWAYAT:r.riwayat}));
+      try{SRIT.Cache.invalidate('livetv');}catch(e){}
+      try{if(window.SRIT_SyncExec)window.SRIT_SyncExec(true);}catch(e){}
+      SRIT.Notify(v?'Alamat server tersimpan. Perangkat lain berpindah otomatis saat terhubung.':'Alamat server dikosongkan','ok');
+      if(SRIT.currentFeature!=='server')return;
+      this._msg('');this._paintInfo();
+    }catch(e){SRIT.Notify(e.message||'Gagal menyimpan alamat server','err',6000);}
+    finally{if(btn)btn.disabled=false;}
+  }
 };
 </script>
 
@@ -14216,7 +14398,7 @@ SRIT.Features.audit={
 /* =========================================================================
    ROUTER + FEATURE LOADER (lazy, with lifecycle)
    ========================================================================= */
-SRIT.LAZY={"settings":"View_Settings","kesehatan":"View_Kesehatan","jurnal-piket":"View_JurnalPiket","analytics":"View_Analytics","dokumentasi":"View_Dokumentasi","user":"View_User","keasramaan-master":"View_StrukturMaster","dokumen":"View_Dokumen","laporan":"View_Laporan","asesmen-bpss":"View_AsesmenBPSS","profiling":"View_Profiling","penilaian":["View_RaporSRMA","View_Penilaian"]};   // rute -> berkas menu yang dimuat saat dibuka (samakan dengan LAZY_VIEWS_ di Config.gs)
+SRIT.LAZY={"settings":"View_Settings","server":"View_Server","kesehatan":"View_Kesehatan","jurnal-piket":"View_JurnalPiket","analytics":"View_Analytics","dokumentasi":"View_Dokumentasi","user":"View_User","keasramaan-master":"View_StrukturMaster","dokumen":"View_Dokumen","laporan":"View_Laporan","asesmen-bpss":"View_AsesmenBPSS","profiling":"View_Profiling","penilaian":["View_RaporSRMA","View_Penilaian"]};   // rute -> berkas menu yang dimuat saat dibuka (samakan dengan LAZY_VIEWS_ di Config.gs)
 /** Pakai menu lain yang mungkin lazy: dimuat dulu bila belum ada, lalu fn(fitur). Dipakai antar-menu (mis. Insiden -> Laporan / Asesmen BPSS, Data Anak -> Profiling). */
 SRIT.useFeature=function(route,fn){
   const go=()=>{try{fn(SRIT.Features[route]);}catch(e){SRIT.Notify('Gagal membuka menu: '+((e&&e.message)||e),'err',6000);}};
@@ -14226,7 +14408,7 @@ SRIT.useFeature=function(route,fn){
   SRITLib.view(SRIT.LAZY[route]).then(go).catch(e=>SRIT.Notify('Menu gagal dimuat: '+((e&&e.message)||e),'err',6000));
 };
 SRIT.Router={
-  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','dokumentasi','dokumen','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','izin-keluar','tamu','tatatertib','pelanggaran','pembinaan','insiden','asesmen-bpss','inspeksi','sarpras','kesehatan','refleksi','penilaian','gamifikasi','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings'],
+  routes:['dashboard','anak','absensi','kegiatan','jadwal','jadwal-piket','jurnal-piket','dokumentasi','dokumen','bel','keasramaan','keasramaan-master','penghuni','peta','program','izin','izin-keluar','tamu','tatatertib','pelanggaran','pembinaan','insiden','asesmen-bpss','inspeksi','sarpras','kesehatan','refleksi','penilaian','gamifikasi','profiling','alert-center','analytics','laporan','user','jabatan','role','audit','settings','server'],
   go(){
     const _nav=(this._nav=(this._nav||0)+1);
     let hash=location.hash.replace('#/','')||'live';
@@ -14387,6 +14569,33 @@ SRIT.Router={
 .lv-t td{padding:8px 8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;white-space:nowrap}
 .lv-t th:first-child,.lv-t td:first-child{text-align:left}
 .lv-t tfoot td{font-weight:700;border-top:1px solid var(--ln);border-bottom:0}
+
+/* ---- v1.9.92: tab Kehadiran = tabel tiap kegiatan x jenjang x jenis kelamin ---- */
+.lv-t.kg thead th{text-align:center;height:30px;padding:4px 8px;line-height:1.15}
+.lv-t.kg thead tr:nth-child(2) th{top:30px}
+.lv-t.kg thead th:first-child{text-align:left}
+.lv-t.kg th.kg-jj{font-size:15px;font-weight:700;letter-spacing:.05em}
+.lv-t.kg thead th small{font-size:11px;font-weight:500;color:var(--mu2)}
+.lv-t.kg td{text-align:center;padding:7px 8px;font-size:17px}
+.lv-t.kg td:first-child{text-align:left}
+.lv-t.kg td b{font-size:19px;margin-right:7px}
+.lv-t.kg td small{font-size:14px;color:var(--mu)}
+.lv-t.kg .kna{color:var(--mu2);margin-right:7px}
+.lv-t.kg td.kg-tot{border-left:1px solid var(--ln)}
+.kg-dim{opacity:.35}
+.lv-t.kg tr.kg-now td{box-shadow:inset 0 1px 0 rgba(94,234,212,.35),inset 0 -1px 0 rgba(94,234,212,.35)}
+.lv-t.kg tr.kg-now td:first-child{box-shadow:inset 3px 0 0 var(--acc),inset 0 1px 0 rgba(94,234,212,.35),inset 0 -1px 0 rgba(94,234,212,.35)}
+.lv-t.kg tr.kg-up td{opacity:.55}
+.kn{display:flex;align-items:baseline;gap:10px;min-width:0}
+.kn .kj{flex:none;min-width:54px;color:var(--mu);font-size:15px;font-variant-numeric:tabular-nums}
+.kn .kt{min-width:0;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.kn .kt em{font-style:normal;color:var(--acc)}
+.kn small{flex:none;font-size:13px;color:var(--mu2)}
+.kg-bar{display:inline-flex;flex:none;width:72px;height:9px;margin-right:12px;border-radius:5px;overflow:hidden;background:rgba(255,255,255,.08)}
+.kg-bar i{display:block;height:100%}
+.kg-lg{display:inline-flex;align-items:center;gap:4px;margin-left:8px}
+.kg-lg i{display:inline-block;width:9px;height:9px;border-radius:2px}
+.lv-k.kg-dim{opacity:.4}
 .lv-t td.tx{max-width:260px;overflow:hidden;text-overflow:ellipsis}
 .lv-b{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;background:rgba(255,255,255,.08)}
 .b-ok{background:rgba(52,211,153,.16);color:var(--hadir)}.b-wr{background:rgba(251,191,36,.16);color:var(--sakit)}.b-bd{background:rgba(248,113,113,.16);color:var(--alpa)}.b-in{background:rgba(129,140,248,.18);color:#a5b4fc}
@@ -14425,6 +14634,19 @@ SRIT.Router={
 .lv-mob .lv-t.mjt th{position:static;background:none;font-size:10.5px;padding:3px 6px}
 .lv-mob .lv-t.mjt td{padding:4px 6px;font-size:12.5px}
 .lv-mob .lv-t.mjt tfoot td{padding-top:5px}
+.lv-mob .lv-t.kgm{font-size:10px}
+.lv-mob .lv-t.kgm th{position:static;background:none;font-size:9px;padding:2px 1px;text-align:center;line-height:1.1;border-bottom:1px solid var(--ln)}
+.lv-mob .lv-t.kgm th:first-child{text-align:left}
+.lv-mob .lv-t.kgm th.kg-jj{font-size:9.5px;border-bottom:0}
+.lv-mob .lv-t.kgm th small{font-size:7.5px;font-weight:500}
+.lv-mob .lv-t.kgm td{padding:3px 1px;font-size:10px;text-align:center;white-space:nowrap;line-height:1.12;border-top:1px solid rgba(255,255,255,.06);border-bottom:0}
+.lv-mob .lv-t.kgm td b{display:block;font-size:9.5px;margin:0;letter-spacing:-.2px}
+.lv-mob .lv-t.kgm td small{display:block;font-size:8px;color:var(--mu)}
+.lv-mob .lv-t.kgm td.kgn{text-align:left;padding-left:2px;padding-right:3px}
+.lv-mob .lv-t.kgm td.kgn .kt{display:block;overflow:hidden;text-overflow:ellipsis;font-size:9.5px;font-weight:600}
+.lv-mob .lv-t.kgm td.kgn .kt em{font-style:normal;color:var(--acc)}
+.lv-mob .lv-t.kgm td.kg-tot{border-left:1px solid var(--ln)}
+.lv-mob .lv-t.kgm tr.kg-now td:first-child{box-shadow:inset 2px 0 0 var(--acc)}
 .iz-tools{flex:none;display:flex;flex-wrap:wrap;gap:6px;margin:0 0 7px}
 .iz-tools input,.iz-tools select{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:var(--tx);border-radius:8px;padding:5px 8px;font-size:13px;min-width:0;outline:0;font-family:inherit}
 .iz-tools input:focus,.iz-tools select:focus{border-color:var(--acc)}
@@ -14672,11 +14894,11 @@ SRIT.Router={
    lalu memfilter Jenjang × Jenis Kelamin di sisi klien tanpa panggilan server.
    ========================================================================= */
 SRIT.LiveTV={
-  timer:null,clockTimer:null,rotTimer:null,mobile:false,slide:0,slideCount:9,cap:false,fOpen:false,fDate:'',fSesi:'',fJJ:'',fJK:'',autoJJ:false,data:null,_rounds:0,
+  timer:null,clockTimer:null,rotTimer:null,mobile:false,slide:0,slideCount:8,cap:false,fOpen:false,fDate:'',fSesi:'',fJJ:'',fJK:'',autoJJ:false,data:null,_rounds:0,
   JJ:['SRD','SRMP','SRMA'],
-  SLC:['#5eead4','#38bdf8','#34d399','#f472b6','#fb923c','#fbbf24','#a78bfa','#818cf8','#facc15'],   // warna aksen tiap slide (urut PAGES)
+  SLC:['#38bdf8','#34d399','#f472b6','#fb923c','#fbbf24','#a78bfa','#818cf8','#facc15'],   // warna aksen tiap slide (urut PAGES)
   COL:{hadir:'#34d399',izin:'#818cf8',sakit:'#fbbf24',alpa:'#f87171',belum:'#64748b',L:'#38bdf8',P:'#f472b6',SRD:'#fb923c',SRMP:'#c084fc',SRMA:'#2dd4bf',baik:'#34d399',perbaikan:'#fbbf24',rusak:'#f87171'},
-  PAGES:[['Ringkasan Eksekutif','Ringkasan'],['Profil Peserta Didik','Profil'],['Absensi & Kehadiran','Kehadiran'],['Kesehatan','Kesehatan'],['Kedisiplinan & Pembinaan','Disiplin'],['Aset & Sarana Prasarana','Aset'],['Operasional Hari Ini','Operasional'],['Izin & Kepulangan','Izin'],['Gamifikasi & Peringkat','Gamifikasi']],
+  PAGES:[['Profil Peserta Didik','Profil'],['Absensi & Kehadiran','Kehadiran'],['Kesehatan','Kesehatan'],['Kedisiplinan & Pembinaan','Disiplin'],['Aset & Sarana Prasarana','Aset'],['Operasional Hari Ini','Operasional'],['Izin & Kepulangan','Izin'],['Gamifikasi & Peringkat','Gamifikasi']],
   /* ---------- siklus hidup ---------- */
   show(mobile){
     this._forceMobile=!!mobile;this.mobile=this._forceMobile||this.isNarrow();this.slide=0;this.fDate='';this.fSesi='';this.fJJ='';this.fJK='';this._rounds=0;this.data=null;
@@ -15033,8 +15255,8 @@ SRIT.LiveTV={
     const ft=$('#ltvFTog');if(ft)ft.classList.toggle('has',!!(this.fJJ||this.fJK));
     const sh=i=>this.mobile?this.mSh(i):'';
     // halaman
-    const B=this.mobile?[this.mp1,this.mp2,this.mp3,this.mp4,this.mp5,this.mp6,this.mp7,this.mp9,this.mp8]:[this.pg1,this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7,this.pg9,this.pg8];
-    const rows=['auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr'];
+    const B=this.mobile?[this.mp2,this.mp3,this.mp4,this.mp5,this.mp6,this.mp7,this.mp9,this.mp8]:[this.pg2,this.pg3,this.pg4,this.pg5,this.pg6,this.pg7,this.pg9,this.pg8];
+    const rows=['auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr','auto 1fr 1fr'];
     let html;
     try{html=B.map((fn,i)=>`<div class="lv-pg ${i===this.slide?'on':''}" data-t="${this.PAGES[i][0]}" style="${this.mobile?'':'grid-template-rows:'+rows[i]+';'}--sl:${this.SLC[i]}">${sh(i)}${fn.call(this,v)}</div>`).join('');}
     catch(e){console.error('LiveTV render',e);html=`<div class="lv-pg on"><div class="lv-p c12"><div class="lv-empty">Gagal menampilkan data: ${E(e.message)}</div></div></div>`;}
@@ -15068,51 +15290,6 @@ SRIT.LiveTV={
       },50);this._scrollTimers.push(t);
     });
   },
-  /* =====================  HALAMAN 1 — RINGKASAN EKSEKUTIF  ===================== */
-  pg1(v){
-    const {d,p,all,cs,t,dates}=v,C=this.COL;
-    const pctS=this.hadirPctSeries(cs,dates),lastIdx=pctS.map((x,i)=>x!=null?i:-1).filter(i=>i>=0),
-      now=pctS[dates.length-1],prev=lastIdx.length>1?pctS[lastIdx[lastIdx.length-2]]:null;
-    const hp=this.pc(t.hadir,t.n),delta=(now!=null&&prev!=null&&lastIdx[lastIdx.length-1]===dates.length-1)?Math.round((now-prev)*10)/10:null;
-    const dl=delta==null?'':`<span class="${delta>0?'up':delta<0?'dn':'flat'}">${delta>0?'▲':delta<0?'▼':'■'} ${this.f1(Math.abs(delta))} poin</span> dari hari sebelumnya`;
-    const L=this.sum(cs,c=>c.jk==='L'?c.n:0),P=this.sum(cs,c=>c.jk==='P'?c.n:0);
-    const sakitS=this.trend(cs,dates).map(x=>x.rec?x.sakit:null),alpaS=this.trend(cs,dates).map(x=>x.rec?x.alpa:null);
-    const pel7=this.sum(cs,c=>c.pel.d7),pelS=dates.map((_,i)=>this.sum(cs,c=>c.pelTrend[i]));
-    const sp=this.spFiltered(p),bm=sp.rusak+sp.perbaikan;
-    const bed={t:this.sum(cs,c=>c.bed.total),o:this.sum(cs,c=>c.bed.terisi)};
-    const hasAtt=t.hadir+t.izin+t.sakit+t.alpa>0;
-    const kpis=this.kpi('Peserta didik aktif',this.fn(t.n),`Putra ${L} · Putri ${P}`,'#e8eefc',null,'c2')
-      +this.kpi('Kehadiran hari ini',hasAtt?this.f1(hp):'–',hasAtt?dl:'Belum ada absensi',hp>=90?C.hadir:hp>=75?C.sakit:C.alpa,pctS,'c2',hasAtt?'%':'')
-      +this.kpi('Sakit',this.fn(t.sakit),`${this.f1(this.pc(t.sakit,t.n))}% dari peserta`,C.sakit,sakitS,'c2')
-      +this.kpi('Alpa',this.fn(t.alpa),`${this.f1(this.pc(t.alpa,t.n))}% dari peserta`,C.alpa,alpaS,'c2')
-      +this.kpi('Pelanggaran 7 hari',this.fn(pel7),`${this.sum(cs,c=>c.pel.buka)} belum selesai`,'#fb923c',pelS,'c2')
-      +this.kpi('Aset bermasalah',this.fn(bm),`${sp.rusak} rusak · ${sp.perbaikan} perlu perbaikan`,bm?C.sakit:C.hadir,null,'c2');
-    // matriks segmen (semua sel; yang tak terpilih diredupkan)
-    const jjs=this.JJ.filter(j=>all.some(c=>c.jj===j&&c.n>0));
-    const cellHm=(j,k)=>{const c=(all.find(x=>x.jj===j&&x.jk===k));if(!c||!c.n)return `<div class="c dim"><b style="color:var(--mu2)">–</b><small>tidak ada</small></div>`;
-      const has=c.att.hadir+c.att.izin+c.att.sakit+c.att.alpa>0,pc=this.pc(c.att.hadir,c.n),a=has?Math.max(.08,Math.min(.6,(pc-60)/40*.55+.08)):0;
-      return `<div class="c ${this.inSel(c)?'':'dim'}" style="background:rgba(52,211,153,${a});${this.inSel(c)&&(this.fJJ||this.fJK)?'border-color:#e8eefc':''}"><b>${has?this.f1(pc)+'%':'–'}</b><small>${c.att.hadir}/${c.n} hadir</small></div>`;};
-    const hm=`<div class="hm" style="grid-template-rows:auto repeat(${jjs.length||1},1fr)"><div></div><div class="h" style="color:${C.L}">Putra</div><div class="h" style="color:${C.P}">Putri</div>${jjs.map(j=>`<div class="r">${j}</div>${cellHm(j,'L')}${cellHm(j,'P')}`).join('')}</div>`;
-    // tren hadir% per jenjang (mengikuti filter JK)
-    const lineS=this.JJ.filter(j=>all.some(c=>c.jj===j&&c.n>0)).map(j=>{const cj=all.filter(c=>c.jj===j&&(!this.fJK||c.jk===this.fJK));return {name:j,color:C[j],vals:this.hadirPctSeries(cj,dates),dim:!!this.fJJ&&this.fJJ!==j};});
-    const lab=dates.map(x=>x.slice(8)+'/'+x.slice(5,7));
-    // donut komposisi
-    const don=this.donut([{v:t.hadir,c:C.hadir,l:'Hadir'},{v:t.izin,c:C.izin,l:'Izin'},{v:t.sakit,c:C.sakit,l:'Sakit'},{v:t.alpa,c:C.alpa,l:'Alpa'},{v:t.belum,c:C.belum,l:'Belum tercatat'}],hasAtt?this.f1(hp)+'%':'–','hadir');
-    // batang per segmen
-    const stRows=all.filter(c=>c.n>0).map(c=>({label:this.segName(c),dim:!this.inSel(c),parts:[{v:c.att.hadir,c:C.hadir},{v:c.att.izin,c:C.izin},{v:c.att.sakit,c:C.sakit},{v:c.att.alpa,c:C.alpa},{v:c.att.belum,c:C.belum}],right:this.f1(this.pc(c.att.hadir,c.n))+'%',sub:c.n+' org'}));
-    const mxN=Math.max(1,...all.map(c=>c.n));
-    const ins=this.insights(v).slice(0,6);const ic={ok:'✓',warn:'!',bad:'▲'};
-    const cur=d.curInfo||{};
-    return kpis
-      +this.pnl('Kehadiran per jenjang dan jenis kelamin','Persentase hadir hari ini · kotak menyala = sesuai filter',hm,'c4')
-      +this.pnl('Tren kehadiran 7 hari','Persentase hadir per jenjang',this.line(lineS,lab,{min:undefined})+this.legend(this.JJ.map(j=>[C[j],j])),'c5')
-      +this.pnl('Komposisi status hari ini',this.filterLabel(),don,'c3')
-      +this.pnl('Status kehadiran tiap segmen','Bar sama panjang = jumlah peserta sama',this.stack(stRows,mxN)+this.legend([[C.hadir,'Hadir'],[C.izin,'Izin'],[C.sakit,'Sakit'],[C.alpa,'Alpa'],[C.belum,'Belum']]),'c5')
-      +this.pnl('Perlu perhatian','Dihitung otomatis dari data terbaru',ins.map(x=>`<div class="in ${x.l}"><i>${ic[x.l]}</i><span>${x.x}</span></div>`).join('')||this.emp('Semua normal'),'c4',true)
-      +this.pnl('Kegiatan sekarang',cur.jam||'',`<div style="font-size:26px;font-weight:700;line-height:1.2">${E(cur.nama||'Belum ada kegiatan')}</div><div style="color:var(--mu);margin-top:6px;font-size:16px">${E(cur.sasaran||'')}</div><div style="margin-top:auto;font-size:16px"><span style="color:var(--mu)">Berikutnya</span><br><b style="font-size:20px">${E(d.next||'-')}</b></div>
-        <div style="margin-top:14px;font-size:15px;color:var(--mu)">Hunian asrama <b style="color:var(--tx)">${bed.t?this.f1(this.pc(bed.o,bed.t)):'–'}%</b> (${bed.o}/${bed.t} tempat tidur)</div>`,'c3');
-    function E(s){return SRIT.Util.esc(s);}
-  },
   /* =====================  HALAMAN 2 — PROFIL PESERTA  ===================== */
   pg2(v){
     const {cs,all,t}=v,C=this.COL,E=SRIT.Util.esc;
@@ -15142,29 +15319,58 @@ SRIT.LiveTV={
       +this.pnl('Rincian segmen','Redup = di luar filter',tbl,'c4',true)
       +this.pnl('Jumlah per jenjang &amp; jenis kelamin','Redup = di luar filter',this.jjJkTbl(all,false),'c4',true);
   },
-  /* =====================  HALAMAN 3 — ABSENSI  ===================== */
+  /* =====================  HALAMAN 3 — KEHADIRAN TIAP KEGIATAN  =====================
+     v1.9.92: fokus ke tiap kegiatan ber-absensi. Baris = kegiatan, kolom = jenjang x jenis kelamin (+ total).
+     Tiap sel: persentase hadir dan jumlah anak (hadir/sasaran). Sumber: d.kegiatan (Api_LiveTV.gs liveKegiatan_). */
+  pcol(p){const C=this.COL;return p>=90?C.hadir:p>=75?C.sakit:C.alpa;},
+  ptint(p){return p>=90?'rgba(52,211,153,.13)':p>=75?'rgba(251,191,36,.13)':'rgba(248,113,113,.17)';},
+  kegSum(k,keys){const t={n:0,hadir:0,izin:0,sakit:0,alpa:0};keys.forEach(x=>{const o=k.seg&&k.seg[x];if(o)for(const f in t)t[f]+=o[f]||0;});t.rec=t.hadir+t.izin+t.sakit+t.alpa;return t;},
+  kegData(v){
+    const K=v.d.kegiatan;
+    if(K===undefined)return {err:'Data kegiatan belum diterima dari server. Pastikan Api_LiveTV.gs versi terbaru sudah di-deploy (Deploy › Kelola deployment › Edit › Versi baru).'};
+    if(K.error)return {err:'Gagal membaca data kegiatan: '+K.error};
+    const list=K.list||[],set={},segs=[];
+    list.forEach(k=>Object.keys(k.seg||{}).forEach(x=>set[x]=1));
+    this.JJ.forEach(j=>['L','P'].forEach(s=>{if(set[j+'|'+s])segs.push({key:j+'|'+s,jj:j,jk:s,on:this.inSel({jj:j,jk:s})});}));
+    const selKeys=segs.filter(s=>s.on).map(s=>s.key);
+    const all=list.map(k=>({k,tot:this.kegSum(k,selKeys),cells:segs.map(s=>this.kegSum(k,[s.key]))}));
+    const rows=all.filter(r=>r.tot.n>0);                       // filter aktif: kegiatan yang tidak menyasar segmen terpilih disembunyikan
+    const agg={};segs.forEach((s,i)=>{const a={H:0,N:0,cnt:0};all.forEach(r=>{const c=r.cells[i];if(c.rec>0){a.H+=c.hadir;a.N+=c.n;a.cnt++;}});agg[s.key]=a;});
+    const rec=rows.filter(r=>r.tot.rec>0),H=rec.reduce((a,r)=>a+r.tot.hadir,0),N=rec.reduce((a,r)=>a+r.tot.n,0);
+    const low=rec.slice().sort((a,b)=>this.pc(a.tot.hadir,a.tot.n)-this.pc(b.tot.hadir,b.tot.n))[0]||null;
+    return {list,segs,selKeys,rows,agg,all:{H,N,cnt:rec.length},low,selesai:rows.filter(r=>r.k.done||r.tot.rec>0).length};
+  },
+  /* sel angka: rec>0 -> "93,4%" + "28/30"; belum ada absensi -> "–" + jumlah sasaran */
+  kegTd(c,on,mob,extra){
+    const cl=(on?'':'kg-dim ')+(extra||'');
+    if(!c.n)return `<td class="${cl}"><span class="kna">–</span></td>`;
+    if(!c.rec)return mob?`<td class="${cl}"><b class="kna">–</b><small>${c.n}</small></td>`:`<td class="${cl}"><span class="kna">–</span><small>${c.n} anak</small></td>`;
+    const p=this.pc(c.hadir,c.n);
+    return `<td class="${cl}" style="background:${this.ptint(p)}"><b style="color:${this.pcol(p)}">${this.f1(p)}%</b><small>${c.hadir}/${c.n}</small></td>`;
+  },
+  kegBar(t){const C=this.COL;return `<span class="kg-bar">${[['hadir',C.hadir],['izin',C.izin],['sakit',C.sakit],['alpa',C.alpa]].map(x=>t[x[0]]?`<i style="width:${t[x[0]]/t.n*100}%;background:${x[1]}"></i>`:'').join('')}</span>`;},
+  kegHead(K,mob){
+    const C=this.COL,grp=[];K.segs.forEach(s=>{const g=grp[grp.length-1];if(g&&g.jj===s.jj){g.n++;g.on=g.on||s.on;}else grp.push({jj:s.jj,n:1,on:s.on});});
+    const flt=!!(this.fJJ||this.fJK);
+    return `<thead><tr><th rowspan="2">Kegiatan</th>${grp.map(g=>`<th colspan="${g.n}" class="kg-jj ${g.on?'':'kg-dim'}" style="color:${C[g.jj]}">${g.jj}</th>`).join('')}<th rowspan="2">Total${flt?'<br><small>sesuai filter</small>':''}</th></tr>`
+      +`<tr>${K.segs.map(s=>`<th class="${s.on?'':'kg-dim'}"><i class="lv-dot" style="background:${C[s.jk]}"></i>${mob?s.jk:(s.jk==='L'?'Putra':'Putri')}</th>`).join('')}</tr></thead>`;
+  },
   pg3(v){
-    const {d,p,all,cs,t,dates}=v,C=this.COL,E=SRIT.Util.esc;
-    const hasAtt=t.hadir+t.izin+t.sakit+t.alpa>0;
-    const stat=(l,k)=>this.kpi(l,this.fn(t[k]),`${this.f1(this.pc(t[k],t.n))}% dari ${this.fn(t.n)} peserta`,C[k],this.trend(cs,dates).map(x=>x.rec?x[k]:null),'c2');
-    const kp=stat('Hadir','hadir')+stat('Izin','izin')+stat('Sakit','sakit')+stat('Alpa','alpa')+stat('Belum tercatat','belum')
-      +this.kpi('Tingkat kehadiran',hasAtt?this.f1(this.pc(t.hadir,t.n)):'–','status terkini tiap peserta',C.hadir,null,'c2',hasAtt?'%':'');
-    // tren hadir% per segmen JK × jenjang → 2 garis per JK bila filter jenjang; default per jenjang
-    const lab=dates.map(x=>x.slice(8)+'/'+x.slice(5,7));
-    const sL=this.JJ.filter(j=>all.some(c=>c.jj===j&&c.n>0)).map(j=>({name:j,color:C[j],vals:this.hadirPctSeries(all.filter(c=>c.jj===j&&(!this.fJK||c.jk===this.fJK)),dates),dim:!!this.fJJ&&this.fJJ!==j}));
-    const gender=['L','P'].map(k=>({name:k==='L'?'Putra':'Putri',color:C[k],vals:this.hadirPctSeries(all.filter(c=>c.jk===k&&(!this.fJJ||c.jj===this.fJJ)),dates),dim:!!this.fJK&&this.fJK!==k}));
-    const stRows=all.filter(c=>c.n>0).map(c=>({label:this.segName(c),dim:!this.inSel(c),parts:[{v:c.att.hadir,c:C.hadir},{v:c.att.izin,c:C.izin},{v:c.att.sakit,c:C.sakit},{v:c.att.alpa,c:C.alpa},{v:c.att.belum,c:C.belum}],right:this.f1(this.pc(c.att.hadir,c.n))+'%',sub:''}));
-    const mxN=Math.max(1,...all.map(c=>c.n));
-    const ged=(d.perGedung||[]).filter(g=>(!this.fJJ||g.jenjang===this.fJJ)&&(!this.fJK||g.jk===this.fJK));
-    const gt=`<table class="lv-t"><thead><tr><th>Gedung</th><th>Jenjang</th><th>Hadir</th><th>Alpa</th><th>%</th></tr></thead><tbody>${ged.map(g=>{const col=g.pct>=90?C.hadir:g.pct>=75?C.sakit:C.alpa;return `<tr><td>${E(g.nama)}</td><td>${E(g.jenjang)} ${g.jkLabel}</td><td>${g.hadir}/${g.total}</td><td>${g.alpa}</td><td><b style="color:${col}">${this.f1(g.pct)}%</b></td></tr>`;}).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--mu2)">Belum ada data</td></tr>'}</tbody></table>`;
-    const rk=(d.rekapKegiatan||[]);
-    const rkHtml=rk.length?rk.map(k=>`<div class="sb" style="grid-template-columns:70px 1fr 90px;${k.now?'':''}"><span class="lb" style="color:${k.now?'var(--acc)':'var(--mu)'}">${E(k.jam)}</span><div style="min-width:0"><div style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${k.now?700:500}">${k.now?'● ':''}${E(k.nama)}</div><div class="tr" style="height:8px;margin-top:4px"><i style="width:${k.pct}%;background:${k.done||k.now?(k.pct>=90?C.hadir:k.pct>=75?C.sakit:C.alpa):C.belum}"></i></div></div><span class="rt">${k.hadir}/${k.total}</span></div>`).join(''):this.emp('Tidak ada kegiatan ber-absensi hari ini');
-    return kp
-      +this.pnl('Tren kehadiran 7 hari','Per jenjang (mengikuti filter jenis kelamin)',this.line(sL,lab)+this.legend(this.JJ.map(j=>[C[j],j])),'c4')
-      +this.pnl('Putra dibanding putri','Persentase hadir (mengikuti filter jenjang)',this.line(gender,lab)+this.legend([[C.L,'Putra'],[C.P,'Putri']]),'c4')
-      +this.pnl('Status tiap segmen','Hari ini',this.stack(stRows,mxN)+this.legend([[C.hadir,'Hadir'],[C.izin,'Izin'],[C.sakit,'Sakit'],[C.alpa,'Alpa'],[C.belum,'Belum']]),'c4')
-      +this.pnl('Per gedung asrama','Kegiatan aktif / terpilih',gt,'c6',true)
-      +this.pnl('Kehadiran tiap kegiatan hari ini','Persentase hadir terhadap sasaran kegiatan',rkHtml,'c6',true);
+    const C=this.COL,E=SRIT.Util.esc,K=this.kegData(v);
+    if(K.err)return this.pnl('Kehadiran tiap kegiatan','',this.emp(E(K.err)),'c12 r2');
+    if(!K.list.length)return this.pnl('Kehadiran tiap kegiatan','',this.emp('Tidak ada kegiatan ber-absensi pada tanggal ini'),'c12 r2');
+    const sp=K.segs.length?Math.floor(12/K.segs.length):12;
+    const tiles=K.segs.map(s=>{const a=K.agg[s.key],p=this.pc(a.H,a.N);
+      return this.kpi(this.segName(s),a.cnt?this.f1(p):'–',a.cnt?`rata-rata dari ${a.cnt} kegiatan`:'Belum ada absensi',a.cnt?this.pcol(p):C.belum,null,'c'+sp+(s.on?'':' kg-dim'),a.cnt?'%':'');}).join('');
+    const body=K.rows.map(r=>{
+      const k=r.k,t=r.tot,now=!!k.now,up=!k.done&&!t.rec,spec=k.sasaran&&k.sasaran!=='Semua jenjang';
+      const tot=t.rec?`<td class="kg-tot"><span style="display:inline-flex;align-items:center">${this.kegBar(t)}<b style="color:${this.pcol(this.pc(t.hadir,t.n))}">${this.f1(this.pc(t.hadir,t.n))}%</b><small>${t.hadir}/${t.n}</small></span></td>`
+        :`<td class="kg-tot"><span class="lv-b ${k.now?'b-ok':k.done?'b-wr':'b-in'}">${k.now?'Berlangsung':k.done?'Belum diabsen':'Menyusul'}</span><small>${t.n} anak</small></td>`;
+      return `<tr class="${now?'kg-now':''} ${up?'kg-up':''}"><td><div class="kn"><span class="kj">${E(k.jam)}</span><span class="kt">${k.now?'<em>●</em> ':''}${E(k.nama)}</span>${spec?`<small>${E(k.sasaran)}</small>`:''}</div></td>${r.cells.map((c,i)=>this.kegTd(c,K.segs[i].on,false)).join('')}${tot}</tr>`;}).join('');
+    const tbl=K.rows.length?`<table class="lv-t kg">${this.kegHead(K,false)}<tbody>${body}</tbody></table>`:this.emp('Tidak ada kegiatan untuk segmen terpilih');
+    const lg=`<span class="kg-lg"><i style="background:${C.hadir}"></i>hadir</span><span class="kg-lg"><i style="background:${C.izin}"></i>izin</span><span class="kg-lg"><i style="background:${C.sakit}"></i>sakit</span><span class="kg-lg"><i style="background:${C.alpa}"></i>alpa</span>`;
+    return tiles
+      +this.pnl('Kehadiran tiap kegiatan per jenjang dan jenis kelamin',`Persentase hadir · jumlah hadir/sasaran anak · ≥90% hijau, ≥75% kuning, di bawahnya merah · batang Total: ${lg}`,tbl,'c12 r2',true);
   },
   /* =====================  HALAMAN 4 — KESEHATAN  ===================== */
   pg4(v){
@@ -15427,7 +15633,6 @@ SRIT.LiveTV={
    ========================================================================= */
 Object.assign(SRIT.LiveTV,{
   ICON:[
-    '<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
     '<circle cx="9" cy="8" r="3.4"/><path d="M2.5 20c.6-3.6 3.2-5.6 6.5-5.6s5.9 2 6.5 5.6"/><circle cx="17.2" cy="9" r="2.6"/><path d="M17.5 14.2c2.4.2 4 1.8 4.4 4.6"/>',
     '<circle cx="12" cy="12" r="9"/><path d="M7.8 12.4l3 3 5.6-6.4"/>',
     '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8v8M8 12h8"/>',
@@ -15468,17 +15673,6 @@ Object.assign(SRIT.LiveTV,{
   },
   segRows(all,withSub){const C=this.COL;return all.filter(c=>c.n>0).map(c=>({label:this.segName(c),dim:!this.inSel(c),parts:[{v:c.att.hadir,c:C.hadir},{v:c.att.izin,c:C.izin},{v:c.att.sakit,c:C.sakit},{v:c.att.alpa,c:C.alpa},{v:c.att.belum,c:C.belum}],right:this.f1(this.pc(c.att.hadir,c.n))+'%',sub:withSub?c.n+' org':''}));},
   mLab(dates){return dates.map(x=>x.slice(8));},
-  /* ---------- 1 RINGKASAN ---------- */
-  mp1(v){
-    const {d,p,all,cs,t}=v,C=this.COL,E=SRIT.Util.esc,cur=d.curInfo||{};
-    const sp=this.spFiltered(p),bm=sp.rusak+sp.perbaikan,pel7=this.sum(cs,c=>c.pel.d7),bed={t:this.sum(cs,c=>c.bed.total),o:this.sum(cs,c=>c.bed.terisi)};
-    const L=this.sum(cs,c=>c.jk==='L'?c.n:0),P=this.sum(cs,c=>c.jk==='P'?c.n:0);
-    const rows=this.segRows(all);
-    return this.mC('Kehadiran hari ini',this.attDelta(v),this.attHero(v),'g0')
-      +this.mRow([this.mT('Peserta aktif',this.fn(t.n),`L ${L} · P ${P}`,'#e8eefc'),this.mT('Pelanggaran',this.fn(pel7),'7 hari terakhir','#fb923c'),this.mT('Aset masalah',this.fn(bm),`${sp.rusak} rusak`,bm?C.sakit:C.hadir)],3)
-      +this.mC('Status tiap segmen','Hadir · izin · sakit · alpa',rows.length?this.stack(rows,Math.max(1,...all.map(c=>c.n))):this.emp(),'tr')
-      +this.mC('Kegiatan sekarang',E(cur.jam||''),`<div style="font-size:clamp(15px,4.6vw,18px);font-weight:800;line-height:1.2;color:var(--acc)">${E(cur.nama||'Belum ada kegiatan')}</div><div style="font-size:11px;color:var(--mu);margin-top:3px">${E(cur.sasaran||'')}</div><div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--mu);margin-top:7px"><span>Berikutnya: <b style="color:var(--tx)">${E(d.next||'-')}</b></span><span>Hunian <b style="color:var(--tx)">${bed.t?this.f1(this.pc(bed.o,bed.t)):'–'}%</b></span></div>`,'g0');
-  },
   /* ---------- 2 PROFIL ---------- */
   mp2(v){
     const {cs,all,t}=v,C=this.COL,E=SRIT.Util.esc;
@@ -15500,16 +15694,23 @@ Object.assign(SRIT.LiveTV,{
       +this.mC('Komposisi peserta','Jenjang × jenis kelamin',this.mDon(segs,this.fn(this.sum(all,c=>c.n)),'peserta'),'g2')
       +this.mPair(this.mC('Per kelas','',kH,'tr'),this.mC('Asal wilayah','',wH,'tr'),true);
   },
-  /* ---------- 3 KEHADIRAN ---------- */
+  /* ---------- 2 KEHADIRAN (tiap kegiatan × jenjang × jenis kelamin) ---------- */
   mp3(v){
-    const {d,all,cs,dates}=v,C=this.COL,E=SRIT.Util.esc,W=this.mW();
-    const sL=this.JJ.filter(j=>all.some(c=>c.jj===j&&c.n>0)).map(j=>({name:j,color:C[j],vals:this.hadirPctSeries(all.filter(c=>c.jj===j&&(!this.fJK||c.jk===this.fJK)),dates),dim:!!this.fJJ&&this.fJJ!==j}));
-    const rk=d.rekapKegiatan||[];
-    const rkH=rk.length?rk.map(k=>`<div class="mi ${k.now?'now':''}"><span class="t">${E(k.jam)}</span><span class="x">${k.now?'● ':''}${E(k.nama)}<div class="tr" style="height:5px;border-radius:3px;margin-top:3px;display:flex;background:rgba(255,255,255,.06)"><i style="width:${k.pct}%;background:${k.done||k.now?(k.pct>=90?C.hadir:k.pct>=75?C.sakit:C.alpa):C.belum}"></i></div></span><span class="r">${k.hadir}/${k.total}</span></div>`).join(''):this.emp('Tidak ada kegiatan ber-absensi');
-    return this.mC('Kehadiran hari ini',this.attDelta(v),this.attHero(v),'g0')
-      +this.mC('Tren 7 hari','% hadir per jenjang · tanggal',this.line(sL,this.mLab(dates),{w:W,h:Math.round(W*.36),pr:90,pl:42})+this.legend(this.JJ.map(j=>[C[j],j])),'g2')
-      +this.mC('Status tiap segmen','',this.stack(this.segRows(all),Math.max(1,...all.map(c=>c.n))),'tr')
-      +this.mC('Kehadiran tiap kegiatan','',rkH,'tr');
+    const C=this.COL,E=SRIT.Util.esc,K=this.kegData(v);
+    if(K.err)return this.mC('Kehadiran tiap kegiatan','',this.emp(E(K.err)),'tr');
+    if(!K.list.length)return this.mC('Kehadiran tiap kegiatan','',this.emp('Tidak ada kegiatan ber-absensi'),'tr');
+    const hp=this.pc(K.all.H,K.all.N);
+    const tiles=this.mRow([
+      this.mT('Rata-rata hadir',K.all.cnt?this.f1(hp):'–',K.all.cnt?`${K.all.cnt} kegiatan tercatat`:'belum ada absensi',K.all.cnt?this.pcol(hp):C.belum,K.all.cnt?'%':''),
+      this.mT('Kegiatan',`${K.selesai}/${K.rows.length}`,'sudah berjalan',C.hadir),
+      this.mT('Terendah',K.low?this.f1(this.pc(K.low.tot.hadir,K.low.tot.n)):'–',K.low?E(K.low.k.nama):'-',K.low?this.pcol(this.pc(K.low.tot.hadir,K.low.tot.n)):C.belum,K.low?'%':'')],3);
+    const cg=`<colgroup><col style="width:29%">${K.segs.map(()=>`<col>`).join('')}<col style="width:14%"></colgroup>`;
+    const body=K.rows.map(r=>{
+      const k=r.k,t=r.tot,up=!k.done&&!t.rec;
+      const tot=t.rec?this.kegTd(t,true,true,'kg-tot'):`<td class="kg-tot"><small>${k.now?'berlangsung':k.done?'belum diabsen':'menyusul'}</small></td>`;
+      return `<tr class="${k.now?'kg-now':''} ${up?'kg-up':''}"><td class="kgn"><span class="kt">${k.now?'<em>●</em> ':''}${E(k.nama)}</span><small>${E(k.jam)}</small></td>${r.cells.map((c,i)=>this.kegTd(c,K.segs[i].on,true)).join('')}${tot}</tr>`;}).join('');
+    const tbl=K.rows.length?`<table class="lv-t kgm" style="table-layout:fixed">${cg}${this.kegHead(K,true)}<tbody>${body}</tbody></table>`:this.emp('Tidak ada kegiatan untuk segmen terpilih');
+    return tiles+this.mC('Tiap kegiatan','% hadir · hadir/sasaran anak',tbl,'tr');
   },
   /* ---------- 4 KESEHATAN ---------- */
   mp4(v){

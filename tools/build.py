@@ -7,6 +7,15 @@ import re, sys, pathlib, shutil
 src = pathlib.Path(sys.argv[1]); out = pathlib.Path(sys.argv[2])
 import subprocess
 subprocess.run([sys.executable, str(pathlib.Path(__file__).with_name('make_manifest.py')), str(src)], check=True)   # manifest berkas untuk selfCheck_ (Apps Script)
+# V1.9.93: versi harus SAMA di tiga tempat (Config.gs APP_INFO_, JS_Util.html SRIT.VERSION, sw.js nama cache) — menu "Server & Versi" membandingkannya.
+_cfg = (src / 'Config.gs').read_text(encoding='utf-8'); _utl = (src / 'JS_Util.html').read_text(encoding='utf-8'); _sw = (out / 'sw.js').read_text(encoding='utf-8')
+_a = re.search(r"APP_INFO_\s*=\s*\{[^}]*versi:\s*'([^']+)'[^}]*tgl:\s*'([^']+)'", _cfg)
+_b = re.search(r"SRIT\.VERSION\s*=\s*\{\s*v:\s*'([^']+)'\s*,\s*tgl:\s*'([^']+)'", _utl)
+_c = re.search(r"const V\s*=\s*'sriti-([^']+)'", _sw)
+if not (_a and _b and _c): raise SystemExit('Versi tidak terbaca: periksa APP_INFO_ (Config.gs), SRIT.VERSION (JS_Util.html), const V (sw.js)')
+if not (_a.group(1) == _b.group(1) == _c.group(1) and _a.group(2) == _b.group(2)):
+    raise SystemExit('Versi TIDAK SAMA: Config.gs=%s/%s  JS_Util.html=%s/%s  sw.js=%s' % (_a.group(1), _a.group(2), _b.group(1), _b.group(2), _c.group(1)))
+print('Versi', _a.group(1), '(' + _a.group(2) + ') konsisten di Config.gs, JS_Util.html, sw.js')
 inc = re.compile(r"<\?!=\s*include\(\s*['\"]([A-Za-z0-9_]+)['\"]\s*\)\s*;?\s*\?>")
 def expand(text, depth=0):
     if depth > 5: raise SystemExit('include terlalu dalam')
